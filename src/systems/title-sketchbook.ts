@@ -1,8 +1,6 @@
 import { type Input, KEYS_BACK, KEYS_INTERACT, KEYS_LEFT, KEYS_RIGHT } from '@systems/input';
-import type { Sketchbook, SketchbookPage } from '@systems/sketchbook';
-
-// Same bracketed grammar as `[ press E to close ]`, with the paging keys.
-const NAV_HINT = '[ ← → turn page    E close ]';
+import type { LeafEdge, Sketchbook, SketchbookPage } from '@systems/sketchbook';
+import { TURN_PAGE_HINT } from '@systems/sketchbook';
 
 export type GalleryEvent = 'turned' | 'closed' | null;
 
@@ -22,7 +20,7 @@ export class TitleSketchbook {
     this.book = book;
     this.pages = pages;
     this.blankPages = blankPages;
-    this.render();
+    this.render('first');
   }
 
   // One call per frame while open. Reports what happened so Game can play
@@ -35,22 +33,29 @@ export class TitleSketchbook {
     if (input.isAnyPressed(KEYS_RIGHT)) dir += 1;
     if (dir === 0) return null;
 
+    // A page long enough to run to a second leaf takes the arrow first: the
+    // deck only moves on once the reader is off the end of the page in hand.
+    if (this.book.turnLeaf(dir)) return 'turned';
+
     // No wrap: a book has two covers.
     const next = Math.min(this.pages.length, Math.max(0, this.index + dir));
     if (next === this.index) return null;
     this.index = next;
-    this.render();
+    // Turning back lands on the end of the page behind, so ← then → returns
+    // the reader to where they were rather than re-reading from the top.
+    this.render(dir < 0 ? 'last' : 'first');
     return 'turned';
   }
 
-  private render(): void {
+  private render(open: LeafEdge): void {
     if (this.index < this.pages.length) {
-      this.book.show(this.pages[this.index], {
-        hint: NAV_HINT,
-        corner: `${this.index + 1} / ${this.pages.length}`,
-      });
+      this.book.show(
+        this.pages[this.index],
+        { hint: TURN_PAGE_HINT, corner: `${this.index + 1} / ${this.pages.length}` },
+        open,
+      );
     } else {
-      this.book.showNote(blankPagesLine(this.blankPages), { hint: NAV_HINT });
+      this.book.showNote(blankPagesLine(this.blankPages), { hint: TURN_PAGE_HINT });
     }
   }
 }

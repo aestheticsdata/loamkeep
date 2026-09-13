@@ -183,6 +183,12 @@ src/
   marker desaturates to "logged" state. The same prompt model is reused by
   doors — once you've discovered any interactable, the tutorial bubble
   collapses to "!" everywhere.
+- **A page may run to more than one leaf**: `Sketchbook` wraps a description
+  at the column it draws it in and deals it out into leaves of as many lines
+  as fit above the hint, turned with ← →. The page in the world and the page
+  in the title gallery inherit it from the same `show()`, and the content is
+  clipped to the parchment, so a description that outgrows its frame reads as
+  a page that continues rather than as ink on the wall behind it.
 - **Implicit level walls**: out-of-bounds tiles report as solid, so every
   level gets boundary walls for free.
 - **Level data is plain ASCII**: each level is an array of strings where each
@@ -255,4 +261,5 @@ Other actions:
 - **Jump / swim up**: Space / ↑ / W / Z (AZERTY)
 - **Dive (while in water)**: ↓ / S
 - **Interact / close sketchbook**: E
+- **Turn the leaves of a long sketchbook page**: ← →
 - **Respawn at level's default spawn**: R

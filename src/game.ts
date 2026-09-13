@@ -309,10 +309,17 @@ export class Game {
         this.greeting.hide();
       }
     } else if (this.sketchbook.isVisible()) {
-      // Sketchbook open: gameplay is paused. Only the close input is handled.
+      // Sketchbook open: gameplay is paused, so the walking keys are free to
+      // turn the leaves of a description too long to fit on one. E still
+      // closes the book, and a page that fits on one leaf ignores the arrows.
       if (this.input.isAnyPressed(KEYS_INTERACT)) {
         this.audio.closeBook();
         this.sketchbook.hide();
+      } else {
+        let dir = 0;
+        if (this.input.isAnyPressed(KEYS_LEFT)) dir -= 1;
+        if (this.input.isAnyPressed(KEYS_RIGHT)) dir += 1;
+        if (dir !== 0 && this.sketchbook.turnLeaf(dir)) this.audio.pageTurn();
       }
     } else {
       // Esc: back to the title. The mode flips right away so the world
