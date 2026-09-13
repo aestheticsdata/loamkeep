@@ -5,6 +5,7 @@ import type { Entity, InteractContext } from '@entities/entity';
 import { drawFishLarge, Fish } from '@entities/fish';
 import { Landmark } from '@entities/landmark';
 import { Player } from '@entities/player';
+import { drawPumpkin, Pumpkin } from '@entities/pumpkin';
 import { drawRabbit, Rabbit } from '@entities/rabbit';
 import { Audio } from '@systems/audio';
 import { Camera } from '@systems/camera';
@@ -22,11 +23,12 @@ import {
 import { ScreenFade } from '@systems/screen-fade';
 import type { SketchbookPage } from '@systems/sketchbook';
 import { Sketchbook } from '@systems/sketchbook';
-import { LANDMARKS_BOOK_ID, landmarkPageId, SketchbookStore } from '@systems/sketchbook-store';
+import { CREATURES_BOOK_ID, LANDMARKS_BOOK_ID, landmarkPageId, SketchbookStore } from '@systems/sketchbook-store';
 import { getBook, SKETCHBOOKS, type SketchbookBook } from '@systems/sketchbooks';
 import { TitleScreen } from '@systems/title-screen';
 import { TitleSketchbook } from '@systems/title-sketchbook';
 import { WorldState } from '@systems/world-state';
+import type { CreatureId } from '@world/creatures';
 import type { Level } from '@world/level';
 import { loadLevel, STARTING_LEVEL_ID } from '@world/levels';
 import { ParallaxBackground } from '@world/parallax';
@@ -347,6 +349,7 @@ export class Game {
       this.checkRabbitEncounter();
       this.checkFishEncounter();
       this.checkBirdEncounter();
+      this.checkPumpkinEncounter();
 
       this.runInteractionLoop();
 
@@ -603,11 +606,12 @@ export class Game {
   // transitions, so meeting a rabbit in the meadow won't fire again
   // if a rabbit ever shows up in another level.
   private checkRabbitEncounter(): void {
-    if (this.worldState.get('rabbit-greeted')) return;
+    if (this.metCreature('rabbit', 'rabbit-greeted')) return;
     for (const entity of this.currentEntities) {
       if (!(entity instanceof Rabbit)) continue;
       if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
         this.worldState.set('rabbit-greeted', true);
+        this.sketchbookStore.add(CREATURES_BOOK_ID, 'rabbit');
         this.greeting.show({
           drawSubject: (g) => drawRabbit(g, 0),
           subjectScale: 4,
@@ -626,11 +630,12 @@ export class Game {
   // scale ×3 fills the popup frame at the same visual weight as the
   // rabbit at ×4.
   private checkFishEncounter(): void {
-    if (this.worldState.get('fish-greeted')) return;
+    if (this.metCreature('fish', 'fish-greeted')) return;
     for (const entity of this.currentEntities) {
       if (!(entity instanceof Fish)) continue;
       if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
         this.worldState.set('fish-greeted', true);
+        this.sketchbookStore.add(CREATURES_BOOK_ID, 'fish');
         const touchedColor = entity.color;
         this.greeting.show({
           drawSubject: (g) => drawFishLarge(g, touchedColor),
@@ -650,12 +655,13 @@ export class Game {
   // they're standing on a platform (typically the high row-3/row-4
   // grass islands where the bird flight band sits).
   private checkBirdEncounter(): void {
-    if (this.worldState.get('bird-greeted')) return;
+    if (this.metCreature('bird', 'bird-greeted')) return;
     if (!this.player.onGround) return;
     for (const entity of this.currentEntities) {
       if (!(entity instanceof Bird)) continue;
       if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
         this.worldState.set('bird-greeted', true);
+        this.sketchbookStore.add(CREATURES_BOOK_ID, 'bird');
         this.greeting.show({
           // Wings UP (frame 1) reads as "caught mid-flap" — a single
           // frozen flight pose, the right vibe for "stopped to chat."
@@ -666,6 +672,40 @@ export class Game {
         return;
       }
     }
+  }
+
+  // The pumpkin, which until now was the one creature the player could walk
+  // straight through. Same one-shot semantics as the rabbit: it lives on the
+  // keep's entry-hall floor and is the book's one reason to go indoors.
+  private checkPumpkinEncounter(): void {
+    if (this.metCreature('pumpkin', 'pumpkin-greeted')) return;
+    for (const entity of this.currentEntities) {
+      if (!(entity instanceof Pumpkin)) continue;
+      if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
+        this.worldState.set('pumpkin-greeted', true);
+        this.sketchbookStore.add(CREATURES_BOOK_ID, 'pumpkin');
+        this.greeting.show({
+          drawSubject: drawPumpkin,
+          // 7x8 native, so x4 gives it the rabbit's presence in the frame.
+          subjectScale: 4,
+          speech: 'hop hop hop ! tu veux faire la course ?',
+        });
+        return;
+      }
+    }
+  }
+
+  // Whether this creature's greeting has already happened — and so whether
+  // the encounter check can stop before walking the entity list.
+  //
+  // Two guards, because they answer different questions. The page is the
+  // permanent record: once it is written, the popup has had its moment and
+  // must not open again on a later visit. The WorldState flag is memory-only
+  // and covers the session, which is what still holds when the page could not
+  // be written at all — storage blocked, private mode — so a player there gets
+  // the popup once rather than on every touch for the rest of the afternoon.
+  private metCreature(id: CreatureId, flag: string): boolean {
+    return this.worldState.get(flag) || this.sketchbookStore.has(CREATURES_BOOK_ID, id);
   }
 
   private respawnAtDefault(): void {

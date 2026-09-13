@@ -1,5 +1,6 @@
 import type { SketchbookPage } from '@systems/sketchbook';
-import { LANDMARKS_BOOK_ID, landmarkPageId } from '@systems/sketchbook-store';
+import { CREATURES_BOOK_ID, LANDMARKS_BOOK_ID, landmarkPageId } from '@systems/sketchbook-store';
+import { CREATURE_PAGES } from '@world/creatures';
 import { listLandmarkPages } from '@world/levels';
 
 // One leaf of a book as the game tracks it: the id the store writes down, and
@@ -41,6 +42,14 @@ export const SKETCHBOOKS: readonly SketchbookBook[] = [
         id: landmarkPageId(levelId, spec.id),
         page: spec,
       })),
+  },
+  {
+    id: CREATURES_BOOK_ID,
+    label: 'CREATURES',
+    // Authored rather than derived: a species is not registered anywhere the
+    // way a landmark is registered on a level, and one page covers however
+    // many of the thing the world holds.
+    pages: () => CREATURE_PAGES.map(({ id, page }) => ({ id, page })),
   },
 ];
 

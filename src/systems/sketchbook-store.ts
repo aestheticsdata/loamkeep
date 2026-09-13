@@ -26,10 +26,12 @@ interface StoredV2 {
   books: Record<string, string[]>;
 }
 
-// The book the landmarks live in. Named here rather than in the registry
-// because it is a name written to disk: the migration below has to spell it,
-// and a v1 save's pages belong to this book and no other.
+// The books, by the names they are written to disk under. They live here
+// rather than in the registry because these strings end up inside the blob:
+// the migration below has to spell the landmarks one, and a book renamed here
+// is every one of its pages forgotten.
 export const LANDMARKS_BOOK_ID = 'landmarks';
+export const CREATURES_BOOK_ID = 'creatures';
 
 // Landmark pages are keyed '<level-id>.<landmark-id>' — the WorldState naming
 // convention — and never by display name, so renaming Old Cairn keeps the

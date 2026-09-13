@@ -1,5 +1,6 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
+import type { Vec2 } from '@types';
 import { Container, Graphics } from 'pixi.js';
 
 // Hop dynamics — tuned by feel for a small "petit saut" arc.
@@ -64,6 +65,14 @@ export class Pumpkin implements Entity {
 
   private readonly body: Graphics;
 
+  // Pumpkin extent in entity-local coordinates (around posX, posY = base).
+  // Matches drawPumpkin's widest band and its stem, so the hitbox tracks the
+  // silhouette rather than a guessed square.
+  private static readonly BODY_LEFT = -3;
+  private static readonly BODY_RIGHT = 4;
+  private static readonly BODY_TOP_FROM_BASE = -8;
+  private static readonly BODY_BOTTOM_FROM_BASE = 0;
+
   constructor(spec: PumpkinSpec) {
     this.posX = spec.x;
     this.posY = spec.y;
@@ -126,6 +135,23 @@ export class Pumpkin implements Entity {
     this.syncSprite();
   }
 
+  // AABB overlap with the player, same shape as Rabbit's. Note the pumpkin
+  // moves in its own hop arc, so this is checked against wherever it is this
+  // frame — mid-hop included.
+  isPlayerInRange(playerPos: Vec2, playerSize: Vec2): boolean {
+    const pumpkinLeft = this.posX + Pumpkin.BODY_LEFT;
+    const pumpkinRight = this.posX + Pumpkin.BODY_RIGHT;
+    const pumpkinTop = this.posY + Pumpkin.BODY_TOP_FROM_BASE;
+    const pumpkinBottom = this.posY + Pumpkin.BODY_BOTTOM_FROM_BASE;
+    const playerLeft = playerPos.x;
+    const playerRight = playerPos.x + playerSize.x;
+    const playerTop = playerPos.y;
+    const playerBottom = playerPos.y + playerSize.y;
+    return (
+      playerLeft < pumpkinRight && playerRight > pumpkinLeft && playerTop < pumpkinBottom && playerBottom > pumpkinTop
+    );
+  }
+
   private syncSprite(): void {
     this.sprite.x = this.posX;
     this.sprite.y = this.posY;
@@ -148,7 +174,10 @@ export class Pumpkin implements Entity {
 // Then a top highlight (lit from upper-left), a right-side shadow column,
 // a darker bottom row for grounding, and a single centre rib so the gourd
 // reads as having lobes without looking like a jack-o'-lantern.
-function drawPumpkin(g: Graphics): void {
+//
+// Exported so the greeting popup and the creatures sketchbook can render an
+// oversized copy, the way the rabbit, fish and bird already do.
+export function drawPumpkin(g: Graphics): void {
   const orange = DB32.tahitiGold;
   const orangeHi = DB32.twine;
   const orangeShadow = DB32.rope;

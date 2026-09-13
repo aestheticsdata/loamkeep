@@ -98,6 +98,7 @@ src/
     tilemap.ts      # Tile enum + Tilemap class + procedural per-tile renderer
     level.ts        # LevelSpec interface + materialised Level (ASCII → Tilemap)
     levels.ts       # Level registry + loadLevel() lookup
+    creatures.ts    # The creatures sketchbook's pages, one per species
     levels/
       meadow.ts          # Outdoor starting area
       old-keep.ts        # Indoor castle interior
@@ -130,12 +131,22 @@ src/
   it. `Game` has a `'title' | 'playing'` mode; Esc in the world fades back to
   the title.
 - **The sketchbooks are plural**: `sketchbooks.ts` lists the books in menu
-  order, each with a label and a `pages()` that derives its own table of
-  contents — the `landmarks` book walks the level registry, so adding a
-  landmark anywhere updates its count and gallery order for free. Registering
-  a book there is the whole of adding one; the title screen has no per-book
-  code. Four books is the comfortable ceiling before the menu plate reaches
-  the key line.
+  order, each with a label and a `pages()` that gives its own table of
+  contents. `landmarks` derives its own by walking the level registry, so
+  adding a landmark anywhere updates its count and gallery order for free;
+  `creatures` is authored in `world/creatures.ts`, one page per species —
+  rabbit, fish, bird, pumpkin — because a species is not registered on a level
+  the way a landmark is. Registering a book is the whole of adding one; the
+  title screen has no per-book code. Four books is the comfortable ceiling
+  before the menu plate reaches the key line.
+- **A creature page is earned by touching one**: the first time the player
+  walks into a rabbit, fish, bird or pumpkin, the greeting popup opens *and*
+  the page is written. The popup is the event and the page is the record — the
+  speech is the creature talking, the page is the wanderer's note about it. The
+  page suppresses the popup on every later visit; the memory-only `WorldState`
+  flag beside it covers the session when storage is blocked and the page cannot
+  be written at all. Creature sketches reuse the in-world drawings, scaled up
+  through the graphics context rather than redrawn.
 - **Discoveries persist**: written pages are the only state kept between
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
   under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old

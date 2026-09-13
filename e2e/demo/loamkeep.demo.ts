@@ -414,10 +414,11 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.press(KEY.right);
   await demo.dwell(3000);
 
-  // The take's own closing assertion: the book holds what the run put in it, and the title behind
-  // the gallery is counting the same pages.
+  // The take's own closing assertion: the books hold what the run put in them, and the title behind
+  // the gallery is counting the same pages. Three, across two books — the Sunken Stone and the
+  // Crystal Vein in the landmarks, and the rabbit whose greeting chapter two waits on.
   const end = await look(page);
-  if (end.pagesWritten < 2) {
-    throw new Error(`demo: the take wrote ${end.pagesWritten} of ${end.pagesTotal} pages — it should have written 2`);
+  if (end.pagesWritten < 3) {
+    throw new Error(`demo: the take wrote ${end.pagesWritten} of ${end.pagesTotal} pages — it should have written 3`);
   }
 });
