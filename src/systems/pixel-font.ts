@@ -6,7 +6,7 @@ import type { Graphics } from 'pixi.js';
 // hard-edged pixel art; these glyphs ARE the pixel art, so they stay crisp on
 // any screen. Uppercase, digits and the few symbols the menu labels need —
 // drawPixelText throws on anything missing, so a typo can't render blank.
-const GLYPH_H = 7;
+export const PIXEL_FONT_HEIGHT = 7;
 // 5 columns of ink plus one blank, like Silkscreen at 8 px.
 const ADVANCE = 6;
 
@@ -65,7 +65,7 @@ export function drawPixelText(g: Graphics, text: string, x: number, y: number, c
   for (const ch of text) {
     const rows = GLYPHS[ch];
     if (rows === undefined) throw new Error(`No pixel glyph for '${ch}'`);
-    for (let r = 0; r < GLYPH_H; r++) {
+    for (let r = 0; r < PIXEL_FONT_HEIGHT; r++) {
       const row = rows[r];
       let c = 0;
       while (c < row.length) {

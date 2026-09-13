@@ -1,7 +1,7 @@
 import { DB32, SCREEN_WIDTH, textResolution } from '@constants';
 import type { Audio } from '@systems/audio';
 import { type Input, KEYS_CONFIRM, KEYS_DOWN, KEYS_UP } from '@systems/input';
-import { drawPixelText, measurePixelText } from '@systems/pixel-font';
+import { drawPixelText, measurePixelText, PIXEL_FONT_HEIGHT } from '@systems/pixel-font';
 import {
   BIRD_COUNT,
   birdFrame,
@@ -45,10 +45,17 @@ const KEY_LINE = 'arrows walk    space jump    E look closer';
 const ENTER_LABEL = 'ENTER THE MEADOW';
 
 // Menu column: rows on the 16-px rhythm, cursor triangle 8 px to the left.
+// The two-row block is centred in its plate rather than placed at the
+// design's y=112, which left it hugging the plate's bottom edge.
 const MENU_X = 24;
-const MENU_FIRST_Y = 112;
+const MENU_PLATE_X = 14;
+const MENU_PLATE_Y = 106;
+const MENU_PLATE_H = 30;
 const MENU_ROW_H = 16;
+const MENU_FIRST_Y = MENU_PLATE_Y + Math.round((MENU_PLATE_H - (MENU_ROW_H + PIXEL_FONT_HEIGHT)) / 2);
 const CURSOR_X = MENU_X - 8;
+// Horizontal breathing room between a label and its plate edge, both sides.
+const MENU_PAD_X = MENU_X - MENU_PLATE_X;
 
 // Cursor blink: 1.15 s cycle, lit for the first 0.78 s of it.
 const CURSOR_PERIOD = 1.15;
@@ -290,18 +297,19 @@ export class TitleScreen {
     // pixel under a thin antialiased glyph reads as a second copy.
     const tagline = makeText(TAGLINE, { ...SMALL_TEXT, fill: U.tagline });
     const taglinePlate = new Graphics();
-    drawPlate(taglinePlate, 20, 58, Math.ceil(tagline.width) + 8, 15);
-    tagline.position.set(24, 62);
+    const taglineW = Math.ceil(tagline.width) + 8;
+    drawPlate(taglinePlate, 20, 58, taglineW, 15);
+    centerText(tagline, 20, 58, taglineW, 15);
     ui.addChild(taglinePlate, tagline);
 
     ui.addChild(this.menuLayer, this.cursor);
 
     const keyLine = makeText(KEY_LINE, { ...SMALL_TEXT, fill: U.hint });
-    const keyW = Math.ceil(keyLine.width);
-    const keyX = Math.round(SCREEN_WIDTH / 2 - keyW / 2);
+    const keyPlateW = Math.ceil(keyLine.width) + 10;
+    const keyPlateX = Math.round(SCREEN_WIDTH / 2 - keyPlateW / 2);
     const keyPlate = new Graphics();
-    drawPlate(keyPlate, keyX - 5, 203, keyW + 10, 14);
-    keyLine.position.set(keyX, 206);
+    drawPlate(keyPlate, keyPlateX, 203, keyPlateW, 14);
+    centerText(keyLine, keyPlateX, 203, keyPlateW, 14);
     ui.addChild(keyPlate, keyLine);
 
     return ui;
@@ -315,7 +323,7 @@ export class TitleScreen {
 
     const maxW = Math.max(...this.entries.map((entry) => measurePixelText(entry.label)));
     const menu = new Graphics();
-    drawPlate(menu, 14, 106, maxW + 22, 30);
+    drawPlate(menu, MENU_PLATE_X, MENU_PLATE_Y, maxW + MENU_PAD_X * 2, MENU_PLATE_H);
     for (let i = 0; i < this.entries.length; i++) {
       const { label, color } = this.entries[i];
       const y = MENU_FIRST_Y + i * MENU_ROW_H;
@@ -341,4 +349,11 @@ function makeText(text: string, style: TextStyleOptions): Text {
   // Rasterise at device resolution so the glyphs land 1:1 on screen pixels.
   t.resolution = textResolution();
   return t;
+}
+
+// Centre a text's measured box inside a plate, on whole pixels. Measured,
+// not hard-coded: the box height depends on which monospace font the
+// browser picked, and a line that is 2 px low on a 14-px plate shows.
+function centerText(text: Text, x: number, y: number, w: number, h: number): void {
+  text.position.set(x + Math.round((w - text.width) / 2), y + Math.round((h - text.height) / 2));
 }
