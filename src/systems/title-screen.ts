@@ -41,21 +41,29 @@ export type TitleAction = { go: 'meadow'; spawn: 'default' } | { open: 'sketchbo
 // All screen copy is English: lowercase mono for the small lines, matching
 // `press E to enter` in the world, and the 5×7 bitmap font for the menu.
 const TAGLINE = 'An old keep, a meadow, all day to wander.';
-const KEY_LINE = 'arrows walk    space jump    E look closer';
+const KEY_LINE = '← → walk    ↑/space jump    E look closer';
 const ENTER_LABEL = 'ENTER THE MEADOW';
 
 // Menu column: rows on the 16-px rhythm, cursor triangle 8 px to the left.
-// The two-row block is centred in its plate rather than placed at the
-// design's y=112, which left it hugging the plate's bottom edge.
+// The plate is sized from its contents — widest label plus MENU_PAD_X each
+// side, the two-row block plus MENU_PAD_Y above and below — so the gaps are
+// equal by construction. The design's fixed 30-px plate around a 23-px block
+// could not be centred on whole pixels (4 px above, 3 below).
 const MENU_X = 24;
 const MENU_PLATE_X = 14;
 const MENU_PLATE_Y = 106;
-const MENU_PLATE_H = 30;
 const MENU_ROW_H = 16;
-const MENU_FIRST_Y = MENU_PLATE_Y + Math.round((MENU_PLATE_H - (MENU_ROW_H + PIXEL_FONT_HEIGHT)) / 2);
-const CURSOR_X = MENU_X - 8;
-// Horizontal breathing room between a label and its plate edge, both sides.
 const MENU_PAD_X = MENU_X - MENU_PLATE_X;
+const MENU_PAD_Y = 4;
+const MENU_FIRST_Y = MENU_PLATE_Y + MENU_PAD_Y;
+const MENU_PLATE_H = MENU_ROW_H + PIXEL_FONT_HEIGHT + MENU_PAD_Y * 2;
+const CURSOR_X = MENU_X - 8;
+
+// Plate padding around the two mono lines: the measured text box plus this
+// much on every side, so each line sits centred whatever box height the
+// browser's monospace font produces.
+const TAGLINE_PAD = { x: 4, y: 3 } as const;
+const KEYS_PAD = { x: 5, y: 2 } as const;
 
 // Cursor blink: 1.15 s cycle, lit for the first 0.78 s of it.
 const CURSOR_PERIOD = 1.15;
@@ -296,21 +304,14 @@ export class TitleScreen {
     // plate carries the contrast, and a shadow offset by a whole logical
     // pixel under a thin antialiased glyph reads as a second copy.
     const tagline = makeText(TAGLINE, { ...SMALL_TEXT, fill: U.tagline });
-    const taglinePlate = new Graphics();
-    const taglineW = Math.ceil(tagline.width) + 8;
-    drawPlate(taglinePlate, 20, 58, taglineW, 15);
-    centerText(tagline, 20, 58, taglineW, 15);
-    ui.addChild(taglinePlate, tagline);
+    ui.addChild(plateAround(tagline, 20, 58, TAGLINE_PAD), tagline);
 
     ui.addChild(this.menuLayer, this.cursor);
 
     const keyLine = makeText(KEY_LINE, { ...SMALL_TEXT, fill: U.hint });
-    const keyPlateW = Math.ceil(keyLine.width) + 10;
+    const keyPlateW = Math.ceil(keyLine.width) + KEYS_PAD.x * 2;
     const keyPlateX = Math.round(SCREEN_WIDTH / 2 - keyPlateW / 2);
-    const keyPlate = new Graphics();
-    drawPlate(keyPlate, keyPlateX, 203, keyPlateW, 14);
-    centerText(keyLine, keyPlateX, 203, keyPlateW, 14);
-    ui.addChild(keyPlate, keyLine);
+    ui.addChild(plateAround(keyLine, keyPlateX, 203, KEYS_PAD), keyLine);
 
     return ui;
   }
@@ -351,9 +352,15 @@ function makeText(text: string, style: TextStyleOptions): Text {
   return t;
 }
 
-// Centre a text's measured box inside a plate, on whole pixels. Measured,
-// not hard-coded: the box height depends on which monospace font the
-// browser picked, and a line that is 2 px low on a 14-px plate shows.
-function centerText(text: Text, x: number, y: number, w: number, h: number): void {
-  text.position.set(x + Math.round((w - text.width) / 2), y + Math.round((h - text.height) / 2));
+// A plate fitted around a text's measured box with `pad` on every side, the
+// text placed at the padding offset. Measured, not hard-coded: the box
+// height depends on which monospace font the browser picked, and a line
+// that sits 1 px low on a 14-px plate shows.
+function plateAround(text: Text, x: number, y: number, pad: { x: number; y: number }): Graphics {
+  const w = Math.ceil(text.width) + pad.x * 2;
+  const h = Math.ceil(text.height) + pad.y * 2;
+  const plate = new Graphics();
+  drawPlate(plate, x, y, w, h);
+  text.position.set(x + pad.x, y + pad.y);
+  return plate;
 }
