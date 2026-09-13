@@ -3,17 +3,30 @@ import { Bird, drawBird } from '@entities/bird';
 import { Decoration } from '@entities/decoration';
 import type { Entity, InteractContext } from '@entities/entity';
 import { drawFishLarge, Fish } from '@entities/fish';
-import { Landmark } from '@entities/landmark';
+import { Landmark, type LandmarkSpec } from '@entities/landmark';
 import { Player } from '@entities/player';
 import { drawRabbit, Rabbit } from '@entities/rabbit';
 import { Audio } from '@systems/audio';
 import { Camera } from '@systems/camera';
 import { Greeting } from '@systems/greeting';
-import { Input, KEYS_DOWN, KEYS_INTERACT, KEYS_JUMP, KEYS_LEFT, KEYS_RESPAWN, KEYS_RIGHT } from '@systems/input';
+import {
+  Input,
+  KEYS_BACK,
+  KEYS_DOWN,
+  KEYS_INTERACT,
+  KEYS_JUMP,
+  KEYS_LEFT,
+  KEYS_RESPAWN,
+  KEYS_RIGHT,
+} from '@systems/input';
+import { ScreenFade } from '@systems/screen-fade';
 import { Sketchbook } from '@systems/sketchbook';
+import { landmarkPageId, SketchbookStore } from '@systems/sketchbook-store';
+import { TitleScreen } from '@systems/title-screen';
+import { TitleSketchbook } from '@systems/title-sketchbook';
 import { WorldState } from '@systems/world-state';
 import type { Level } from '@world/level';
-import { loadLevel, STARTING_LEVEL_ID } from '@world/levels';
+import { listLandmarkPages, loadLevel, STARTING_LEVEL_ID } from '@world/levels';
 import { ParallaxBackground } from '@world/parallax';
 import {
   renderCryptBackdrop,
@@ -31,14 +44,25 @@ import { type Application, Container, Graphics } from 'pixi.js';
 const WATER_BOB_AMPLITUDE = 1;
 const WATER_BOB_FREQ = 4;
 
+// Length of the cut between the title and the meadow, each way. Twelve
+// frames is the Amiga idiom: a fifth of a second at 60 Hz.
+const FADE_FRAMES = 12;
+
+// Which loop is running. 'title' ticks only the TitleScreen (and the
+// sketchbook gallery when it is open) — no player physics, no camera follow,
+// no entity updates. 'playing' is the world loop. The cut between them is a
+// FADE_FRAMES fade each way; the title's containers stay alive throughout so
+// returning to it is instant and allocation-free.
+type GameMode = 'title' | 'playing';
+
 // The Game owns one Player, one Camera, one Parallax — all reused across
 // level transitions — plus a `levelLayer` sub-container that's rebuilt
 // every time the active level changes.
 //
 // Container hierarchy:
 //   stage
-//   ├── parallax.container          (rebuilt per-flavor on transition)
-//   ├── world (camera-offset)
+//   ├── parallax.container          (rebuilt per-flavor on transition; hidden on the title)
+//   ├── world (camera-offset; hidden on the title)
 //   │   ├── levelLayer              (cleared + repopulated on transition)
 //   │   │   ├── rock backdrop
 //   │   │   ├── tilemap
@@ -47,7 +71,10 @@ const WATER_BOB_FREQ = 4;
 //   │   │   ├── landmarks
 //   │   │   └── entities (doors, future levers/gates)
 //   │   └── player.sprite           (persists across transitions)
-//   └── sketchbook.container        (modal overlay, pauses gameplay)
+//   ├── title.container             (the title screen; hidden while playing)
+//   ├── sketchbook.container        (modal overlay, pauses gameplay; doubles as the title's gallery)
+//   ├── greeting.container
+//   └── fade.container              (black veil for the title ⇄ meadow cut)
 export class Game {
   private readonly app: Application;
   private readonly input: Input;
@@ -58,6 +85,19 @@ export class Game {
   // popup can be visible at a time anyway since gameplay pauses.
   private readonly greeting: Greeting;
   private readonly worldState: WorldState;
+  // The only state that survives a reload: which sketchbook pages exist.
+  private readonly sketchbookStore: SketchbookStore;
+
+  private mode: GameMode = 'title';
+  private readonly title: TitleScreen;
+  // The sketchbook read from the title. Non-null only while it is open.
+  private titleGallery: TitleSketchbook | null = null;
+  private readonly fade: ScreenFade;
+  // True until the player has entered the world once. The constructor
+  // mounts the starting level at its default spawn, which is exactly what
+  // ENTER THE MEADOW asks for, so the first entry skips the rebuild; every
+  // later entry (after Esc back to the title) rebuilds it fresh.
+  private worldPristine = true;
 
   // Camera-offset world container.
   private readonly world: Container;
@@ -92,6 +132,7 @@ export class Game {
     this.sketchbook = new Sketchbook();
     this.greeting = new Greeting();
     this.worldState = new WorldState();
+    this.sketchbookStore = new SketchbookStore();
 
     // Container hierarchy. Build empty containers first; populate later.
     this.world = new Container();
@@ -119,12 +160,21 @@ export class Game {
     // these on transitions.
     this.camera = new Camera(this.currentLevel.tilemap);
 
+    // Title screen above the world (it covers the whole viewport) and below
+    // the modals, so the sketchbook gallery opens over it.
+    this.title = new TitleScreen(this.audio);
+    app.stage.addChild(this.title.container);
+
     // Sketchbook overlay on stage above the world so it stays fixed on
     // screen (not affected by the camera) and renders on top of everything.
     app.stage.addChild(this.sketchbook.container);
 
     // Greeting overlay sits on top of the sketchbook in z-order.
     app.stage.addChild(this.greeting.container);
+
+    // The fade veils everything, modals included.
+    this.fade = new ScreenFade();
+    app.stage.addChild(this.fade.container);
 
     // Placeholder; mountLevelContent() overwrites this immediately.
     this.waterSurface = new Graphics();
@@ -136,92 +186,199 @@ export class Game {
     this.aimCameraAtPlayer();
     this.camera.snap();
     this.camera.applyTo(this.world);
+
+    // Boot on the title. The world above is built and waiting behind it.
+    this.showTitle();
   }
 
   start(): void {
     this.app.ticker.add((ticker) => {
       const dt = Math.min(ticker.deltaMS / 1000, 1 / 30);
-      const tilemap = this.currentLevel.tilemap;
-
-      // Water surface bob — runs only while the player is in water; the
-      // surface snaps to rest as soon as they step out. Body never moves;
-      // only the highlight/sheen strip ripples ±1 px around its rest line.
-      // Only the pool the player is currently inside ripples; other lakes
-      // in the level stay perfectly still.
-      const playerTx = Math.floor((this.player.pos.x + this.player.size.x / 2) / TILE_SIZE);
-      const playerTy = Math.floor((this.player.pos.y + this.player.size.y / 2) / TILE_SIZE);
-      const activeBodyId = this.player.inWater ? tilemap.waterBodyAt(playerTx, playerTy) : -1;
-      if (this.player.inWater) {
-        this.waterAnimTime += dt;
+      // The fade steps first so a cut that lands on this frame hands
+      // control over before either mode reads input.
+      this.fade.step();
+      if (this.mode === 'title') {
+        this.tickTitle(dt);
       } else {
-        this.waterAnimTime = 0;
+        this.tickPlaying(dt);
       }
-      const surfaceOffset = Math.round(Math.sin(this.waterAnimTime * WATER_BOB_FREQ) * WATER_BOB_AMPLITUDE);
-      renderWaterSurfaceInto(this.waterSurface, tilemap, surfaceOffset, activeBodyId);
-
-      if (this.greeting.isVisible()) {
-        // Greeting popup open: gameplay is paused (rabbits, fish,
-        // birds, pumpkin, player — nothing updates). Closes on a fresh
-        // movement-key press. We use isAnyPressed (not isAnyDown) so the
-        // popup doesn't close on the same frame it opens just because
-        // the player was already holding a direction key.
-        if (
-          this.input.isAnyPressed(KEYS_LEFT) ||
-          this.input.isAnyPressed(KEYS_RIGHT) ||
-          this.input.isAnyPressed(KEYS_JUMP) ||
-          this.input.isAnyPressed(KEYS_DOWN)
-        ) {
-          this.greeting.hide();
-        }
-      } else if (this.sketchbook.isVisible()) {
-        // Sketchbook open: gameplay is paused. Only the close input is handled.
-        if (this.input.isAnyPressed(KEYS_INTERACT)) {
-          this.audio.closeBook();
-          this.sketchbook.hide();
-        }
-      } else {
-        // Respawn (R) — now goes to the CURRENT level's default spawn, not
-        // the meadow's. Still the temporary escape hatch from underground
-        // until ascent mechanics land.
-        if (this.input.isAnyPressed(KEYS_RESPAWN)) {
-          this.respawnAtDefault();
-        }
-
-        this.player.update(this.input, dt, tilemap);
-
-        // SFX driven by player one-shot event flags (set during update()).
-        if (this.player.didJumpThisFrame) this.audio.jump();
-        if (this.player.didLandThisFrame) this.audio.land();
-        if (this.player.didFootstepThisFrame) {
-          if (this.player.inWater) this.audio.wadeStep();
-          else this.audio.footstep();
-        }
-        if (this.player.didEnterWaterThisFrame) this.audio.splash();
-        if (this.player.didSwimStrokeThisFrame) this.audio.swimStroke();
-
-        // Per-frame entity update (e.g. animated decorations once we add
-        // them, lever cooldowns, push-block physics). Doors have no update.
-        for (const entity of this.currentEntities) {
-          entity.update?.(dt);
-        }
-
-        // First-encounter checks. Each fires exactly ONCE per Game
-        // instance — the corresponding WorldState flag short-circuits
-        // the rest of every future call.
-        this.checkRabbitEncounter();
-        this.checkFishEncounter();
-        this.checkBirdEncounter();
-
-        this.runInteractionLoop();
-
-        this.aimCameraAtPlayer();
-        this.camera.update(dt);
-        this.camera.applyTo(this.world);
-        this.parallax.update(this.camera);
-      }
-
       this.input.endFrame();
     });
+  }
+
+  // Title mode: animate the scene, then — unless a fade is in flight — feed
+  // input to the gallery if it is open, otherwise to the menu.
+  private tickTitle(dt: number): void {
+    this.title.tick(dt);
+    // Mid-fade the menu is dead: the choice has been made, or the meadow is
+    // still dissolving behind the veil.
+    if (this.fade.running) return;
+
+    if (this.titleGallery !== null) {
+      const event = this.titleGallery.update(this.input);
+      if (event === 'turned') {
+        this.audio.pageTurn();
+      } else if (event === 'closed') {
+        this.audio.closeBook();
+        this.titleGallery = null;
+        this.sketchbook.hide();
+      }
+      return;
+    }
+
+    const action = this.title.handleInput(this.input);
+    if (action === null) return;
+    if ('open' in action) {
+      this.openGallery();
+      return;
+    }
+    // Fade to black over the still-animating title, swap on the black
+    // frame, then fade in on the meadow.
+    this.fade.out(FADE_FRAMES, () => {
+      this.enterWorld(action.go, action.spawn);
+      this.fade.in(FADE_FRAMES);
+    });
+  }
+
+  // Playing mode: the world loop.
+  private tickPlaying(dt: number): void {
+    const tilemap = this.currentLevel.tilemap;
+
+    // Water surface bob — runs only while the player is in water; the
+    // surface snaps to rest as soon as they step out. Body never moves;
+    // only the highlight/sheen strip ripples ±1 px around its rest line.
+    // Only the pool the player is currently inside ripples; other lakes
+    // in the level stay perfectly still.
+    const playerTx = Math.floor((this.player.pos.x + this.player.size.x / 2) / TILE_SIZE);
+    const playerTy = Math.floor((this.player.pos.y + this.player.size.y / 2) / TILE_SIZE);
+    const activeBodyId = this.player.inWater ? tilemap.waterBodyAt(playerTx, playerTy) : -1;
+    if (this.player.inWater) {
+      this.waterAnimTime += dt;
+    } else {
+      this.waterAnimTime = 0;
+    }
+    const surfaceOffset = Math.round(Math.sin(this.waterAnimTime * WATER_BOB_FREQ) * WATER_BOB_AMPLITUDE);
+    renderWaterSurfaceInto(this.waterSurface, tilemap, surfaceOffset, activeBodyId);
+
+    if (this.greeting.isVisible()) {
+      // Greeting popup open: gameplay is paused (rabbits, fish,
+      // birds, pumpkin, player — nothing updates). Closes on a fresh
+      // movement-key press. We use isAnyPressed (not isAnyDown) so the
+      // popup doesn't close on the same frame it opens just because
+      // the player was already holding a direction key.
+      if (
+        this.input.isAnyPressed(KEYS_LEFT) ||
+        this.input.isAnyPressed(KEYS_RIGHT) ||
+        this.input.isAnyPressed(KEYS_JUMP) ||
+        this.input.isAnyPressed(KEYS_DOWN)
+      ) {
+        this.greeting.hide();
+      }
+    } else if (this.sketchbook.isVisible()) {
+      // Sketchbook open: gameplay is paused. Only the close input is handled.
+      if (this.input.isAnyPressed(KEYS_INTERACT)) {
+        this.audio.closeBook();
+        this.sketchbook.hide();
+      }
+    } else {
+      // Esc: back to the title. The mode flips right away so the world
+      // freezes on this frame while it fades; showTitle() runs on the
+      // black frame, and the title fades in from there.
+      if (this.input.isAnyPressed(KEYS_BACK)) {
+        this.mode = 'title';
+        this.fade.out(FADE_FRAMES, () => {
+          this.showTitle();
+          this.fade.in(FADE_FRAMES);
+        });
+        return;
+      }
+
+      // Respawn (R) — now goes to the CURRENT level's default spawn, not
+      // the meadow's. Still the temporary escape hatch from underground
+      // until ascent mechanics land.
+      if (this.input.isAnyPressed(KEYS_RESPAWN)) {
+        this.respawnAtDefault();
+      }
+
+      this.player.update(this.input, dt, tilemap);
+
+      // SFX driven by player one-shot event flags (set during update()).
+      if (this.player.didJumpThisFrame) this.audio.jump();
+      if (this.player.didLandThisFrame) this.audio.land();
+      if (this.player.didFootstepThisFrame) {
+        if (this.player.inWater) this.audio.wadeStep();
+        else this.audio.footstep();
+      }
+      if (this.player.didEnterWaterThisFrame) this.audio.splash();
+      if (this.player.didSwimStrokeThisFrame) this.audio.swimStroke();
+
+      // Per-frame entity update (e.g. animated decorations once we add
+      // them, lever cooldowns, push-block physics). Doors have no update.
+      for (const entity of this.currentEntities) {
+        entity.update?.(dt);
+      }
+
+      // First-encounter checks. Each fires exactly ONCE per Game
+      // instance — the corresponding WorldState flag short-circuits
+      // the rest of every future call.
+      this.checkRabbitEncounter();
+      this.checkFishEncounter();
+      this.checkBirdEncounter();
+
+      this.runInteractionLoop();
+
+      this.aimCameraAtPlayer();
+      this.camera.update(dt);
+      this.camera.applyTo(this.world);
+      this.parallax.update(this.camera);
+    }
+  }
+
+  // Put the title in front of whatever was playing. Called at boot and from
+  // Esc, always on a frame nobody can see (black, or the very first).
+  private showTitle(): void {
+    this.mode = 'title';
+    this.sketchbook.hide();
+    this.greeting.hide();
+    this.titleGallery = null;
+    this.parallax.container.visible = false;
+    this.world.visible = false;
+    const { written, total } = this.writtenPages();
+    this.title.setSketchbookPages(written.length, total);
+    this.title.container.visible = true;
+  }
+
+  // Swap the title for the world at the named spawn. The first entry after
+  // boot reuses the level the constructor mounted (same level, same spawn);
+  // anything else rebuilds it so a return trip starts clean.
+  private enterWorld(levelId: string, spawnId: string): void {
+    const pristineMatches =
+      this.worldPristine && levelId === STARTING_LEVEL_ID && spawnId === this.currentLevel.spec.defaultSpawnId;
+    if (!pristineMatches) {
+      this.transitionTo(levelId, spawnId);
+    }
+    this.worldPristine = false;
+    this.mode = 'playing';
+    this.title.container.visible = false;
+    this.parallax.container.visible = true;
+    this.world.visible = true;
+  }
+
+  // Open the gallery over the title. Only reachable when at least one page
+  // is written — the menu skips the entry otherwise.
+  private openGallery(): void {
+    const { written, total } = this.writtenPages();
+    this.titleGallery = new TitleSketchbook(this.sketchbook, written, total - written.length);
+  }
+
+  // The pages the player has written, in world order, plus the size of the
+  // whole book. Both are computed from the level registry, never hardcoded.
+  private writtenPages(): { written: LandmarkSpec[]; total: number } {
+    const pages = listLandmarkPages();
+    const written = pages
+      .filter((page) => this.sketchbookStore.has(landmarkPageId(page.levelId, page.spec.id)))
+      .map((page) => page.spec);
+    return { written, total: pages.length };
   }
 
   // Switch to a different level, placing the player at the named spawn.
@@ -306,8 +463,15 @@ export class Game {
     }
 
     // Landmarks (materialised — instance carries the discovered flag, prompt
-    // state, etc.).
-    this.currentLandmarks = level.spec.landmarks.map((spec) => new Landmark(spec));
+    // state, etc.). A page that survived a reload is discovered from the
+    // moment its landmark is built, so it never prompts again.
+    this.currentLandmarks = level.spec.landmarks.map((spec) => {
+      const landmark = new Landmark(spec);
+      if (this.sketchbookStore.has(landmarkPageId(level.spec.id, spec.id))) {
+        landmark.markDiscovered();
+      }
+      return landmark;
+    });
     for (const landmark of this.currentLandmarks) {
       this.levelLayer.addChild(landmark.sprite);
     }
@@ -365,6 +529,8 @@ export class Game {
       if (!handled && inRange && pressedE) {
         if (!landmark.discovered) {
           landmark.markDiscovered();
+          // Write through: the page exists from this frame on, reload or not.
+          this.sketchbookStore.add(landmarkPageId(this.currentLevel.spec.id, landmark.spec.id));
           this.interactionTutorialDone = true;
           this.audio.discover();
         }

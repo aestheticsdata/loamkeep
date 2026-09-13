@@ -267,102 +267,20 @@ export class Player implements Body {
 
   // Rebuild the figure each frame so feet, arm, and body-bob can swing as
   // 1-pixel integer offsets. Stays pixel-perfect — no scale-based animation.
-  // Cost is ~20 rect() calls/frame.
-  //
-  // Visual brief: a small hooded wanderer in a pale near-white cloak,
-  // with two gray-white boots and a darker satchel strap doubling as the
-  // visible arm. The 1-pixel hard outline along the cloak and hood sides
-  // is what reads as "Amiga sprite" rather than "Minecraft block" — the
-  // colors themselves stay pale-gray. Three poses: idle, walk (foot/arm
-  // swing + body-bob), jump (feet together, diagonal arm). Water cast is
-  // applied uniformly via sprite.tint in syncSprite — drawFigure draws
-  // with original colors.
-  private drawFigure(): void {
-    const g = this.sprite;
-    g.clear();
-
-    const cloak = DB32.lightSteel;
-    const cloakHi = DB32.white;
-    const cloakLo = DB32.heather;
-    const outline = DB32.valhalla; // 1-px hard silhouette outline
-    const inside = DB32.valhalla;
-    const eye = DB32.twine;
-    const boots = DB32.heather;
-    const strap = DB32.dimGray;
-
-    const airborne = !this.onGround;
+  // Cost is ~20 rect() calls/frame. The drawing itself is the module-level
+  // drawFigure(), shared with the title screen; this just derives the pose
+  // from physics state. Water cast is applied uniformly via sprite.tint in
+  // syncSprite — drawFigure draws with original colors.
+  private paintFigure(): void {
     const walking = this.onGround && this.vel.x !== 0;
-    const stepOffset = this.stepOffset;
-    const bodyBob = walking ? -Math.abs(stepOffset) : 0;
-
-    // Feet — two 2×2 boots with a 2-pixel gap between them at rest.
-    //   walking : left foot swings +stepOffset, right foot swings -stepOffset
-    //             (always moving opposite — looks like alternating strides)
-    //   jumping/swimming : both feet pulled together at center
-    if (airborne || this.swimming) {
-      g.rect(-2, -2, 2, 2).fill(boots);
-      g.rect(0, -2, 2, 2).fill(boots);
-    } else {
-      g.rect(-3 + stepOffset, -2, 2, 2).fill(boots);
-      g.rect(1 - stepOffset, -2, 2, 2).fill(boots);
-    }
-
-    // Cloak — main body. 10 wide × 8 tall. Layering:
-    //   1. Fill base color.
-    //   2. Top highlight (between the outline columns).
-    //   3. Bottom shadow row.
-    //   4. Side outlines — drawn LAST so they win at every corner.
-    //      THIS is what carries the Amiga look: a crisp 1-px dark edge
-    //      against any background. Without it the pale cloak read as a
-    //      modern flat block.
-    g.rect(-5, -10 + bodyBob, 10, 8).fill(cloak);
-    g.rect(-4, -10 + bodyBob, 8, 1).fill(cloakHi);
-    g.rect(-4, -3 + bodyBob, 8, 1).fill(cloakLo);
-    g.rect(-5, -10 + bodyBob, 1, 8).fill(outline);
-    g.rect(4, -10 + bodyBob, 1, 8).fill(outline);
-
-    // Hood — 8 wide × 6 tall, sits flush on top of the cloak. Same
-    // outline-last layering as the cloak so the silhouette stays crisp.
-    g.rect(-4, -16 + bodyBob, 8, 6).fill(cloak);
-    g.rect(-3, -16 + bodyBob, 6, 1).fill(cloakHi);
-    g.rect(-4, -16 + bodyBob, 1, 6).fill(outline);
-    g.rect(3, -16 + bodyBob, 1, 6).fill(outline);
-
-    // Inside the hood: deep shadow + a single warm pixel for the eye.
-    g.rect(-3, -15 + bodyBob, 6, 4).fill(inside);
-    const eyeY = -13 + bodyBob + (airborne ? -2 : 0);
-    g.rect(1, eyeY, 1, 1).fill(eye);
-
-    // Arm — drawn as a 4-pixel diagonal "strap" across the cloak.
-    //   walking  : shifts horizontally opposite to the step (arm/leg in
-    //              counter-phase reads as natural gait)
-    //   jumping  : raised diagonally up-and-forward — the "leap" pose
-    //   swimming : front-crawl. Two arms at chest height, lengths
-    //              alternating front/back so the figure reads as paddling
-    //              even though it isn't rotated.
-    //   idle     : at base position
-    if (this.swimming) {
-      const phase = Math.sin(this.elapsedTime * 5);
-      const frontLen = 3 + Math.round(phase * 2); // 1..5
-      const backLen = 3 - Math.round(phase * 2); // 5..1
-      for (let i = 0; i < frontLen; i++) {
-        g.rect(2 + i, -7, 1, 1).fill(strap);
-      }
-      for (let i = 0; i < backLen; i++) {
-        g.rect(-3 - i, -7, 1, 1).fill(strap);
-      }
-    } else if (airborne) {
-      g.rect(0, -10, 1, 1).fill(strap);
-      g.rect(1, -11, 1, 1).fill(strap);
-      g.rect(2, -12, 1, 1).fill(strap);
-      g.rect(3, -13, 1, 1).fill(strap);
-    } else {
-      const armDx = -stepOffset;
-      g.rect(-4 + armDx, -7 + bodyBob, 1, 1).fill(strap);
-      g.rect(-3 + armDx, -6 + bodyBob, 1, 1).fill(strap);
-      g.rect(-2 + armDx, -5 + bodyBob, 1, 1).fill(strap);
-      g.rect(-1 + armDx, -4 + bodyBob, 1, 1).fill(strap);
-    }
+    this.sprite.clear();
+    drawFigure(this.sprite, {
+      airborne: !this.onGround,
+      swimming: this.swimming,
+      stepOffset: this.stepOffset,
+      bodyBob: walking ? -Math.abs(this.stepOffset) : 0,
+      swimPhase: Math.sin(this.elapsedTime * 5),
+    });
   }
 
   // Position is kept as floats here — the PixiJS Application has roundPixels
@@ -375,7 +293,7 @@ export class Player implements Body {
   // "facing left"). scale.y stays at 1: any non-integer scale would break
   // pixel-art rendering.
   private syncSprite(): void {
-    this.drawFigure();
+    this.paintFigure();
     this.sprite.x = this.pos.x + this.size.x / 2;
     this.sprite.y = this.pos.y + this.size.y;
     this.sprite.scale.set(this.facing, 1);
@@ -383,6 +301,112 @@ export class Player implements Body {
     // tinted blue; otherwise normal colors. PixiJS multiplies the tint
     // into every pixel of the Graphics in one shot.
     this.sprite.tint = this.bodyTouchesWater ? SUBMERGED_TINT : 0xffffff;
+  }
+}
+
+// Everything drawFigure needs to know about the current pose. Plain data,
+// not a Player, so the title screen can draw the wanderer standing on a
+// painted meadow with no tilemap or physics behind it.
+export interface FigurePose {
+  airborne: boolean;
+  swimming: boolean;
+  // Quantised stride (-1 / 0 / +1). Feet swing by this; the arm swings the
+  // opposite way.
+  stepOffset: number;
+  // Vertical offset (0 or -1) of everything above the feet: the walk bob in
+  // the game, the breathing on the title screen.
+  bodyBob: number;
+  // -1..1 driver for the front-crawl arms while swimming.
+  swimPhase: number;
+}
+
+// The hooded wanderer, drawn around (0, 0) with the feet at the origin and
+// the head at negative y — the same anchor convention as every other sprite.
+//
+// Visual brief: a small hooded wanderer in a pale near-white cloak, with two
+// gray-white boots and a darker satchel strap doubling as the visible arm.
+// The 1-pixel hard outline along the cloak and hood sides is what reads as
+// "Amiga sprite" rather than "Minecraft block" — the colors themselves stay
+// pale-gray. Three poses: idle, walk (foot/arm swing + body-bob), jump (feet
+// together, diagonal arm), plus the swim stroke.
+export function drawFigure(g: Graphics, pose: FigurePose): void {
+  const cloak = DB32.lightSteel;
+  const cloakHi = DB32.white;
+  const cloakLo = DB32.heather;
+  const outline = DB32.valhalla; // 1-px hard silhouette outline
+  const inside = DB32.valhalla;
+  const eye = DB32.twine;
+  const boots = DB32.heather;
+  const strap = DB32.dimGray;
+
+  const { airborne, swimming, stepOffset, bodyBob } = pose;
+
+  // Feet — two 2×2 boots with a 2-pixel gap between them at rest.
+  //   walking : left foot swings +stepOffset, right foot swings -stepOffset
+  //             (always moving opposite — looks like alternating strides)
+  //   jumping/swimming : both feet pulled together at center
+  if (airborne || swimming) {
+    g.rect(-2, -2, 2, 2).fill(boots);
+    g.rect(0, -2, 2, 2).fill(boots);
+  } else {
+    g.rect(-3 + stepOffset, -2, 2, 2).fill(boots);
+    g.rect(1 - stepOffset, -2, 2, 2).fill(boots);
+  }
+
+  // Cloak — main body. 10 wide × 8 tall. Layering:
+  //   1. Fill base color.
+  //   2. Top highlight (between the outline columns).
+  //   3. Bottom shadow row.
+  //   4. Side outlines — drawn LAST so they win at every corner.
+  //      THIS is what carries the Amiga look: a crisp 1-px dark edge
+  //      against any background. Without it the pale cloak read as a
+  //      modern flat block.
+  g.rect(-5, -10 + bodyBob, 10, 8).fill(cloak);
+  g.rect(-4, -10 + bodyBob, 8, 1).fill(cloakHi);
+  g.rect(-4, -3 + bodyBob, 8, 1).fill(cloakLo);
+  g.rect(-5, -10 + bodyBob, 1, 8).fill(outline);
+  g.rect(4, -10 + bodyBob, 1, 8).fill(outline);
+
+  // Hood — 8 wide × 6 tall, sits flush on top of the cloak. Same
+  // outline-last layering as the cloak so the silhouette stays crisp.
+  g.rect(-4, -16 + bodyBob, 8, 6).fill(cloak);
+  g.rect(-3, -16 + bodyBob, 6, 1).fill(cloakHi);
+  g.rect(-4, -16 + bodyBob, 1, 6).fill(outline);
+  g.rect(3, -16 + bodyBob, 1, 6).fill(outline);
+
+  // Inside the hood: deep shadow + a single warm pixel for the eye.
+  g.rect(-3, -15 + bodyBob, 6, 4).fill(inside);
+  const eyeY = -13 + bodyBob + (airborne ? -2 : 0);
+  g.rect(1, eyeY, 1, 1).fill(eye);
+
+  // Arm — drawn as a 4-pixel diagonal "strap" across the cloak.
+  //   walking  : shifts horizontally opposite to the step (arm/leg in
+  //              counter-phase reads as natural gait)
+  //   jumping  : raised diagonally up-and-forward — the "leap" pose
+  //   swimming : front-crawl. Two arms at chest height, lengths
+  //              alternating front/back so the figure reads as paddling
+  //              even though it isn't rotated.
+  //   idle     : at base position
+  if (swimming) {
+    const frontLen = 3 + Math.round(pose.swimPhase * 2); // 1..5
+    const backLen = 3 - Math.round(pose.swimPhase * 2); // 5..1
+    for (let i = 0; i < frontLen; i++) {
+      g.rect(2 + i, -7, 1, 1).fill(strap);
+    }
+    for (let i = 0; i < backLen; i++) {
+      g.rect(-3 - i, -7, 1, 1).fill(strap);
+    }
+  } else if (airborne) {
+    g.rect(0, -10, 1, 1).fill(strap);
+    g.rect(1, -11, 1, 1).fill(strap);
+    g.rect(2, -12, 1, 1).fill(strap);
+    g.rect(3, -13, 1, 1).fill(strap);
+  } else {
+    const armDx = -stepOffset;
+    g.rect(-4 + armDx, -7 + bodyBob, 1, 1).fill(strap);
+    g.rect(-3 + armDx, -6 + bodyBob, 1, 1).fill(strap);
+    g.rect(-2 + armDx, -5 + bodyBob, 1, 1).fill(strap);
+    g.rect(-1 + armDx, -4 + bodyBob, 1, 1).fill(strap);
   }
 }
 

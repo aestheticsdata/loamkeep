@@ -1,3 +1,4 @@
+import type { LandmarkSpec } from '@entities/landmark';
 import { Level, type LevelSpec } from '@world/level';
 import { meadowLevel } from '@world/levels/meadow';
 import { oldKeepLevel } from '@world/levels/old-keep';
@@ -28,4 +29,23 @@ export function loadLevel(id: string): Level {
     throw new Error(`Unknown level id '${id}'. Known: ${Object.keys(LEVEL_SPECS).join(', ')}`);
   }
   return new Level(LEVEL_SPECS[id as LevelId]);
+}
+
+// Every landmark in the game, in registry order (meadow → keep → crypt, then
+// authoring order inside each level). This is the sketchbook's table of
+// contents: the title screen's page count and the gallery's page order both
+// come from here, so adding a landmark to any level updates both for free.
+export interface LandmarkPage {
+  levelId: LevelId;
+  spec: LandmarkSpec;
+}
+
+export function listLandmarkPages(): LandmarkPage[] {
+  const pages: LandmarkPage[] = [];
+  for (const levelId of Object.keys(LEVEL_SPECS) as LevelId[]) {
+    for (const spec of LEVEL_SPECS[levelId].landmarks) {
+      pages.push({ levelId, spec });
+    }
+  }
+  return pages;
 }

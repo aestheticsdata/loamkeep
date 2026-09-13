@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Loamkeep</title>
     <style>
+      /* No elastic overscroll bounce on any scroller, ever. The horizontal
+         axis is left alone: that one is the browser's back gesture. */
+      * {
+        overscroll-behavior-y: none;
+      }
       html, body {
         margin: 0;
         padding: 0;

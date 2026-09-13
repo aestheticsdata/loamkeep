@@ -80,3 +80,12 @@ export const KEYS_INTERACT = ['KeyE'] as const;
 // Respawn-at-surface key. Temporary escape hatch for getting out of the
 // underground until proper ascent mechanics (ladders / double-jump) land.
 export const KEYS_RESPAWN = ['KeyR'] as const;
+
+// Title-screen bindings. Up is KEYS_JUMP minus Space: on the menu, Space
+// confirms instead of moving the cursor, so the two sets have to differ.
+export const KEYS_UP = ['ArrowUp', 'KeyW', 'KeyZ'] as const;
+// Confirm the highlighted menu entry. E and Space per the design; Enter
+// because every title screen accepts it and nothing else claims the key.
+export const KEYS_CONFIRM = ['KeyE', 'Space', 'Enter', 'NumpadEnter'] as const;
+// Step back: gallery → title, meadow → title.
+export const KEYS_BACK = ['Escape'] as const;

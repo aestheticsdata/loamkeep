@@ -1,12 +1,23 @@
 import { DB32, DEFAULT_SCALE, SCREEN_HEIGHT, SCREEN_WIDTH } from '@constants';
 import type { LandmarkSpec } from '@entities/landmark';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, type TextStyleOptions } from 'pixi.js';
 
 // Frame geometry inside the 320×224 logical viewport.
 const FRAME_X = 40;
 const FRAME_Y = 32;
 const FRAME_W = 240;
 const FRAME_H = 160;
+
+// What sits at the bottom of a page, plus an optional page number in the
+// top-right corner. The in-game page carries a single close hint; the
+// title-screen gallery swaps in the page-turning keys and numbers its
+// leaves. Same parchment either way — the layout is never forked.
+export interface PageFooter {
+  hint: string;
+  corner?: string;
+}
+
+const DEFAULT_FOOTER: PageFooter = { hint: '[ press E to close ]' };
 
 // Modal overlay shown when the player discovers a landmark. Pauses gameplay
 // while visible. Content is rebuilt every show() so each landmark gets its
@@ -35,7 +46,7 @@ export class Sketchbook {
     this.container.addChild(this.content);
   }
 
-  show(spec: LandmarkSpec): void {
+  show(spec: LandmarkSpec, footer: PageFooter = DEFAULT_FOOTER): void {
     this.clearContent();
 
     // Title
@@ -70,17 +81,25 @@ export class Sketchbook {
     description.position.set(FRAME_X + 110, FRAME_Y + 46);
     this.content.addChild(description);
 
-    // Close hint at the bottom.
-    const hint = makeText('[ press E to close ]', {
-      fontFamily: 'monospace',
-      fontSize: 8,
-      fill: DB32.dimGray,
-    });
-    hint.position.set(FRAME_X + (FRAME_W - hint.width) / 2, FRAME_Y + FRAME_H - 16);
-    this.content.addChild(hint);
+    this.addFooter(footer);
+    this.reveal();
+  }
 
-    this._visible = true;
-    this.container.visible = true;
+  // A leaf with nothing on it but one centred line — the gallery's last
+  // page, where the count of pages still blank lives. Same parchment, so it
+  // reads as part of the same book rather than a separate notice.
+  showNote(line: string, footer: PageFooter): void {
+    this.clearContent();
+
+    const note = makeText(line, { fontFamily: 'monospace', fontSize: 8, fill: DB32.valhalla });
+    note.position.set(
+      FRAME_X + Math.round((FRAME_W - note.width) / 2),
+      FRAME_Y + Math.round((FRAME_H - note.height) / 2),
+    );
+    this.content.addChild(note);
+
+    this.addFooter(footer);
+    this.reveal();
   }
 
   hide(): void {
@@ -93,6 +112,33 @@ export class Sketchbook {
     return this._visible;
   }
 
+  // Hint centred along the bottom edge; page number (when given) tucked into
+  // the top-right corner on the title's line, right-aligned to the margin.
+  private addFooter(footer: PageFooter): void {
+    const hint = makeText(footer.hint, {
+      fontFamily: 'monospace',
+      fontSize: 8,
+      fill: DB32.dimGray,
+    });
+    hint.position.set(FRAME_X + Math.round((FRAME_W - hint.width) / 2), FRAME_Y + FRAME_H - 16);
+    this.content.addChild(hint);
+
+    if (footer.corner !== undefined) {
+      const corner = makeText(footer.corner, {
+        fontFamily: 'monospace',
+        fontSize: 8,
+        fill: DB32.dimGray,
+      });
+      corner.position.set(FRAME_X + FRAME_W - 12 - Math.ceil(corner.width), FRAME_Y + 13);
+      this.content.addChild(corner);
+    }
+  }
+
+  private reveal(): void {
+    this._visible = true;
+    this.container.visible = true;
+  }
+
   private clearContent(): void {
     // Remove and destroy children so text textures don't pile up.
     for (const child of this.content.removeChildren()) {
@@ -101,8 +147,7 @@ export class Sketchbook {
   }
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: Pixi's TextStyle type is awkward to use here.
-function makeText(text: string, style: any): Text {
+function makeText(text: string, style: TextStyleOptions): Text {
   const t = new Text({ text, style });
   // Render text at the upscale resolution so it stays crisp on screen.
   t.resolution = DEFAULT_SCALE;

@@ -150,6 +150,13 @@ export class Audio {
     this.blip({ freq: 330, freqEnd: 220, duration: 0.1, volume: 0.15, type: 'triangle' });
   }
 
+  // Turning a leaf inside a book that is already open: only the papery
+  // dust of openBook, no tone. Quiet on purpose — it fires on every arrow
+  // press in the title-screen gallery.
+  pageTurn(): void {
+    this.noise({ duration: 0.06, volume: 0.05 });
+  }
+
   // "Floc" — short low blip with a noise tail. Played when the player wades
   // into a water tile. Two layers: a low triangle thump for the splash body,
   // a brief noise burst for the spray.

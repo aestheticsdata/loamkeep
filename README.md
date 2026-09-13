@@ -88,6 +88,11 @@ src/
     sketchbook.ts   # Discovery modal (landmark page)
     greeting.ts     # First-encounter "you met X" popup (rabbit/fish/bird)
     world-state.ts  # Cross-level boolean-flag store
+    sketchbook-store.ts  # localStorage persistence for discovered landmark pages
+    screen-fade.ts  # 12-frame black veil for the title ⇄ meadow cut
+    title-screen.ts # Title screen: scene, wordmark, menu, cursor
+    title-art.ts    # The painted dawn meadow + keep behind the title (mood table)
+    title-sketchbook.ts  # Sketchbook gallery read from the title
   world/
     tilemap.ts      # Tile enum + Tilemap class + procedural per-tile renderer
     level.ts        # LevelSpec interface + materialised Level (ASCII → Tilemap)
@@ -118,6 +123,15 @@ src/
   tears down the current level layer, rebuilds the new one, and repositions
   the persistent player at the named spawn. The same Player, Camera, and
   parallax container are reused across transitions.
+- **Title screen**: the game boots on a painted dawn scene of the meadow and
+  the keep (`title-art.ts` — all `rect()` art, a bitmap wordmark, no assets or
+  fonts), with two entries: `ENTER THE MEADOW` and the sketchbook. `Game` has a
+  `'title' | 'playing'` mode; Esc in the world fades back to the title.
+- **Discoveries persist**: landmark pages are the only state kept between
+  sessions, as `{ version, discovered: ['meadow.old-cairn', …] }` under the
+  `loamkeep.sketchbook.v1` localStorage key. The title's entry reads
+  `SKETCHBOOK 3/8` once pages exist and opens a gallery of them, ending on a
+  count of the pages still blank — never their names.
 - **Per-level visual flavor**: each level picks its own parallax flavor
   (`meadow` rolling hills, `keep` indoor backdrop) and backdrop kind (`cave`
   rock texture, `indoor-dark` flat near-black, `crypt-black` pure black for
