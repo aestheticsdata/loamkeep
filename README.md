@@ -194,6 +194,7 @@ Then open http://127.0.0.1:5173.
 | `pnpm check:fix` | Biome: apply all fixes |
 | `pnpm format` | Biome: format only |
 | `pnpm lint` | Biome: lint only |
+| `pnpm video:generate` | Film the demo and shoot the stills — see [e2e/demo/README.md](e2e/demo/README.md) |
 
 ## Deployment
 

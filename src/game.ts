@@ -55,6 +55,26 @@ const FADE_FRAMES = 12;
 // returning to it is instant and allocation-free.
 type GameMode = 'title' | 'playing';
 
+// What `Game.snapshot()` hands out: enough of the game's state for the demo
+// harness to know when a beat has actually happened. Nothing in the game reads
+// it, and no field here is writable — it is a photograph, not a handle.
+export interface GameSnapshot {
+  mode: GameMode;
+  /** Id of the level on screen, as `levels.ts` registers it. */
+  level: string;
+  /** Player AABB top-left, in logical pixels — the same coordinates a LevelSpec uses. */
+  x: number;
+  y: number;
+  onGround: boolean;
+  inWater: boolean;
+  /** True for the whole title ⇄ world trip, while the veil is up. */
+  fading: boolean;
+  sketchbookOpen: boolean;
+  greetingOpen: boolean;
+  pagesWritten: number;
+  pagesTotal: number;
+}
+
 // The Game owns one Player, one Camera, one Parallax — all reused across
 // level transitions — plus a `levelLayer` sub-container that's rebuilt
 // every time the active level changes.
@@ -641,5 +661,29 @@ export class Game {
 
   private aimCameraAtPlayer(): void {
     this.camera.follow(this.player.pos.x + this.player.size.x / 2, this.player.pos.y + this.player.size.y / 2);
+  }
+
+  /**
+   * A read-only look at the game, for the demo harness in e2e/demo — the only
+   * caller there has ever been, and `main.ts` only hangs it on `window` in a
+   * dev build. Everything here is already private state read from one place,
+   * so a storyboard can wait on a beat having happened rather than on a
+   * guessed number of milliseconds having passed.
+   */
+  snapshot(): GameSnapshot {
+    const { written, total } = this.writtenPages();
+    return {
+      mode: this.mode,
+      level: this.currentLevel.spec.id,
+      x: this.player.pos.x,
+      y: this.player.pos.y,
+      onGround: this.player.onGround,
+      inWater: this.player.inWater,
+      fading: this.fade.running,
+      sketchbookOpen: this.sketchbook.isVisible(),
+      greetingOpen: this.greeting.isVisible(),
+      pagesWritten: written.length,
+      pagesTotal: total,
+    };
   }
 }

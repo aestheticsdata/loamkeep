@@ -6,7 +6,8 @@
     "useIgnoreFile": false
   },
   "files": {
-    "ignoreUnknown": false
+    "ignoreUnknown": false,
+    "includes": ["**", "!dist", "!test-results", "!e2e", "!playwright.demo.config.ts"]
   },
   "formatter": {
     "enabled": true,

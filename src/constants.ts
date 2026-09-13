@@ -1,13 +1,22 @@
 // Logical (internal) resolution. The whole game is authored in this coordinate space;
-// the canvas itself is rendered at SCREEN_* x DEFAULT_SCALE for pixel-perfect upscale.
+// the canvas itself is rendered at SCREEN_* x stageScale() for pixel-perfect upscale.
 export const SCREEN_WIDTH = 320;
 export const SCREEN_HEIGHT = 224;
 
 // Classic Amiga tile size. All level geometry is on this grid.
 export const TILE_SIZE = 16;
 
-// Integer upscale factor applied to the Pixi stage.
-export const DEFAULT_SCALE = 3;
+// The integer upscale the stage is drawn at, for the window it is in now: the
+// largest whole number of CSS pixels per logical pixel that fits, never under
+// 1. Whole numbers only — at 2.5× a logical pixel lands on two and a half
+// screen pixels and the art is soft everywhere, which is the one thing this
+// game cannot afford. The leftover is letterbox: 320×224 is 10:7 and no
+// window is, so index.html's near-black ground frames the picture. 960×672,
+// the size the game shipped at first, is simply what ×3 gives.
+export function stageScale(): number {
+  const fit = Math.min(window.innerWidth / SCREEN_WIDTH, window.innerHeight / SCREEN_HEIGHT);
+  return Math.max(1, Math.floor(fit));
+}
 
 // The device pixel ratio the renderer draws at. Never below 1, and re-read on
 // every resize because browser zoom changes it (90 % on a 2× display is 1.8).
@@ -15,13 +24,14 @@ export function renderResolution(): number {
   return Math.max(1, window.devicePixelRatio || 1);
 }
 
-// Resolution for every Text: the stage's 3× times the device ratio, so each
-// texel of a rasterised glyph lands on exactly one device pixel. At 3× alone
-// an 8-px line is a 24-px raster that a 2× screen has to scale up — and
-// antialiased glyph edges scaled like a sprite read as blur. Read when the
-// Text is created; text is cheap to rebuild and zoom changes are rare.
+// Resolution for every Text: the stage's current scale times the device ratio,
+// so each texel of a rasterised glyph lands on exactly one device pixel. At the
+// stage scale alone an 8-px line is a 24-px raster that a 2× screen has to
+// scale up — and antialiased glyph edges scaled like a sprite read as blur.
+// Read when the Text is created; main.ts re-reads it on every Text on the stage
+// when a resize changes the scale under them.
 export function textResolution(): number {
-  return DEFAULT_SCALE * renderResolution();
+  return stageScale() * renderResolution();
 }
 
 // DawnBringer 32 palette (DB32) — well-known pixel-art palette that fits the late-80s look.

@@ -28,8 +28,12 @@
       "@game": ["./src/game"],
       "@entities/*": ["./src/entities/*"],
       "@systems/*": ["./src/systems/*"],
-      "@world/*": ["./src/world/*"]
+      "@world/*": ["./src/world/*"],
+      // The demo harness under e2e/ — its own alias rather than a reach up
+      // through @/, because nothing under e2e is bundled and nothing in src
+      // may import it. Playwright resolves it from this file.
+      "@e2e/*": ["./e2e/*"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "e2e", "vite.config.ts"]
 }
