@@ -1,6 +1,7 @@
-import { DB32, DEFAULT_SCALE, SCREEN_WIDTH } from '@constants';
+import { DB32, SCREEN_WIDTH, textResolution } from '@constants';
 import type { Audio } from '@systems/audio';
 import { type Input, KEYS_CONFIRM, KEYS_DOWN, KEYS_UP } from '@systems/input';
+import { drawPixelText, measurePixelText } from '@systems/pixel-font';
 import {
   BIRD_COUNT,
   birdFrame,
@@ -37,8 +38,8 @@ import { Container, Graphics, Text, type TextStyleOptions } from 'pixi.js';
 // `open` into the sketchbook gallery; the title itself never touches either.
 export type TitleAction = { go: 'meadow'; spawn: 'default' } | { open: 'sketchbook' };
 
-// All screen copy is English, lowercase mono for the small lines, matching
-// `press E to enter` in the world.
+// All screen copy is English: lowercase mono for the small lines, matching
+// `press E to enter` in the world, and the 5×7 bitmap font for the menu.
 const TAGLINE = 'An old keep, a meadow, all day to wander.';
 const KEY_LINE = 'arrows walk    space jump    E look closer';
 const ENTER_LABEL = 'ENTER THE MEADOW';
@@ -61,7 +62,6 @@ const SWEEP_WIDTH = 22;
 const SWEEP_LEAD = 80;
 
 const SMALL_TEXT: TextStyleOptions = { fontFamily: 'monospace', fontSize: 8 };
-const MENU_TEXT: TextStyleOptions = { fontFamily: 'monospace', fontSize: 8, fontWeight: 'bold' };
 
 interface MenuEntry {
   label: string;
@@ -107,8 +107,8 @@ export class TitleScreen {
   private readonly foreground = new Graphics();
   private readonly sweep = new Graphics();
 
-  // Menu. The layer is rebuilt whenever the sketchbook count changes; the
-  // cursor is its own Graphics so blinking never touches the text.
+  // Menu, drawn in the bitmap font. Rebuilt whenever the sketchbook count
+  // changes; the cursor is its own Graphics so blinking never touches it.
   private readonly menuLayer = new Container();
   private readonly cursor = new Graphics();
   private entries: MenuEntry[] = [];
@@ -285,12 +285,14 @@ export class TitleScreen {
     ui.addChild(wordmark, this.sweep);
 
     // Tagline, left-aligned on the menu column on purpose: centred, it
-    // collides with the flagpole.
+    // collides with the flagpole. No drop shadow on the mono lines: the
+    // plate carries the contrast, and a shadow offset by a whole logical
+    // pixel under a thin antialiased glyph reads as a second copy.
     const tagline = makeText(TAGLINE, { ...SMALL_TEXT, fill: U.tagline });
     const taglinePlate = new Graphics();
     drawPlate(taglinePlate, 20, 58, Math.ceil(tagline.width) + 8, 15);
-    ui.addChild(taglinePlate);
-    addShadowed(ui, tagline, 24, 62);
+    tagline.position.set(24, 62);
+    ui.addChild(taglinePlate, tagline);
 
     ui.addChild(this.menuLayer, this.cursor);
 
@@ -299,24 +301,28 @@ export class TitleScreen {
     const keyX = Math.round(SCREEN_WIDTH / 2 - keyW / 2);
     const keyPlate = new Graphics();
     drawPlate(keyPlate, keyX - 5, 203, keyW + 10, 14);
-    ui.addChild(keyPlate);
-    addShadowed(ui, keyLine, keyX, 206);
+    keyLine.position.set(keyX, 206);
+    ui.addChild(keyPlate, keyLine);
 
     return ui;
   }
 
+  // Plate sized from the widest label, then each row in the bitmap font over
+  // a 1-px black copy — under 1-px strokes that offset reads as depth, the
+  // way a bitmap font's shadow does, not as doubling.
   private rebuildMenu(): void {
     for (const child of this.menuLayer.removeChildren()) child.destroy();
 
-    const texts = this.entries.map((entry) => makeText(entry.label, { ...MENU_TEXT, fill: entry.color }));
-    const maxW = Math.max(...texts.map((text) => Math.ceil(text.width)));
-    const plate = new Graphics();
-    drawPlate(plate, 14, 106, maxW + 22, 30);
-    this.menuLayer.addChild(plate);
-
-    for (let i = 0; i < texts.length; i++) {
-      addShadowed(this.menuLayer, texts[i], MENU_X, MENU_FIRST_Y + i * MENU_ROW_H);
+    const maxW = Math.max(...this.entries.map((entry) => measurePixelText(entry.label)));
+    const menu = new Graphics();
+    drawPlate(menu, 14, 106, maxW + 22, 30);
+    for (let i = 0; i < this.entries.length; i++) {
+      const { label, color } = this.entries[i];
+      const y = MENU_FIRST_Y + i * MENU_ROW_H;
+      drawPixelText(menu, label, MENU_X + 1, y + 1, DB32.black);
+      drawPixelText(menu, label, MENU_X, y, color);
     }
+    this.menuLayer.addChild(menu);
   }
 
   // Three-step triangle beside the highlighted row.
@@ -332,16 +338,7 @@ export class TitleScreen {
 
 function makeText(text: string, style: TextStyleOptions): Text {
   const t = new Text({ text, style });
-  // Render at the upscale resolution so 8-px mono stays crisp on screen.
-  t.resolution = DEFAULT_SCALE;
+  // Rasterise at device resolution so the glyphs land 1:1 on screen pixels.
+  t.resolution = textResolution();
   return t;
-}
-
-// Place `text` at (x, y) over a black copy offset (+1, +1) — the 1-px drop
-// shadow every small line on the title wears.
-function addShadowed(parent: Container, text: Text, x: number, y: number): void {
-  const shadow = makeText(text.text, { ...text.style, fill: DB32.black });
-  shadow.position.set(x + 1, y + 1);
-  text.position.set(x, y);
-  parent.addChild(shadow, text);
 }

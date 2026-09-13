@@ -1,4 +1,4 @@
-import { DB32, DEFAULT_SCALE, SCREEN_HEIGHT, SCREEN_WIDTH } from '@constants';
+import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH, textResolution } from '@constants';
 import { Container, Graphics, Text } from 'pixi.js';
 
 // Frame geometry inside the 320×224 logical viewport. Same proportions
@@ -70,7 +70,7 @@ export class Greeting {
       text: '[ move to continue ]',
       style: { fontFamily: 'monospace', fontSize: 8, fill: DB32.dimGray },
     });
-    hint.resolution = DEFAULT_SCALE;
+    hint.resolution = textResolution();
     hint.position.set(FRAME_X + (FRAME_W - Math.ceil(hint.width)) / 2, FRAME_Y + FRAME_H - 16);
     this.container.addChild(hint);
 
@@ -123,7 +123,7 @@ export class Greeting {
         wordWrapWidth: BUBBLE_W - 16,
       },
     });
-    speech.resolution = DEFAULT_SCALE;
+    speech.resolution = textResolution();
     speech.position.set(BUBBLE_X + 8, BUBBLE_Y + 8);
     this.content.addChild(speech);
 

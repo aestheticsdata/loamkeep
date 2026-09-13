@@ -1,4 +1,4 @@
-import { DB32, DEFAULT_SCALE, SCREEN_HEIGHT, SCREEN_WIDTH } from '@constants';
+import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH, textResolution } from '@constants';
 import type { LandmarkSpec } from '@entities/landmark';
 import { Container, Graphics, Text, type TextStyleOptions } from 'pixi.js';
 
@@ -149,7 +149,7 @@ export class Sketchbook {
 
 function makeText(text: string, style: TextStyleOptions): Text {
   const t = new Text({ text, style });
-  // Render text at the upscale resolution so it stays crisp on screen.
-  t.resolution = DEFAULT_SCALE;
+  // Rasterise at device resolution so the glyphs land 1:1 on screen pixels.
+  t.resolution = textResolution();
   return t;
 }

@@ -1,4 +1,4 @@
-import { DB32, DEFAULT_SCALE, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y } from '@constants';
+import { DB32, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y, textResolution } from '@constants';
 import type { Entity, InteractContext, PromptMode } from '@entities/entity';
 import type { Vec2 } from '@types';
 import { Container, Graphics, Text } from 'pixi.js';
@@ -153,7 +153,7 @@ export class Door implements Entity {
       text: label,
       style: { fontFamily: 'monospace', fontSize: 7, fill: DB32.valhalla },
     });
-    text.resolution = DEFAULT_SCALE;
+    text.resolution = textResolution();
     const pad = 3;
     const w = Math.ceil(text.width);
     const h = Math.ceil(text.height);

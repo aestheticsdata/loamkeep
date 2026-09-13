@@ -9,6 +9,21 @@ export const TILE_SIZE = 16;
 // Integer upscale factor applied to the Pixi stage.
 export const DEFAULT_SCALE = 3;
 
+// The device pixel ratio the renderer draws at. Never below 1, and re-read on
+// every resize because browser zoom changes it (90 % on a 2× display is 1.8).
+export function renderResolution(): number {
+  return Math.max(1, window.devicePixelRatio || 1);
+}
+
+// Resolution for every Text: the stage's 3× times the device ratio, so each
+// texel of a rasterised glyph lands on exactly one device pixel. At 3× alone
+// an 8-px line is a 24-px raster that a 2× screen has to scale up — and
+// antialiased glyph edges scaled like a sprite read as blur. Read when the
+// Text is created; text is cheap to rebuild and zoom changes are rare.
+export function textResolution(): number {
+  return DEFAULT_SCALE * renderResolution();
+}
+
 // DawnBringer 32 palette (DB32) — well-known pixel-art palette that fits the late-80s look.
 // Stored as hex numbers so they plug straight into Pixi tints / fills.
 export const DB32 = {
