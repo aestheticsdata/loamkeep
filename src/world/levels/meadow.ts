@@ -5,8 +5,10 @@ import { Door } from '@entities/door';
 import type { Entity } from '@entities/entity';
 import { Fish } from '@entities/fish';
 import type { LandmarkSpec } from '@entities/landmark';
+import { type FloraId, PLANTS } from '@entities/plants';
 import { Rabbit } from '@entities/rabbit';
 import type { LevelSpec, SpawnPoint } from '@world/level';
+import type { Graphics } from 'pixi.js';
 
 // Meadow level — the outdoor starting biome.
 //
@@ -345,134 +347,12 @@ const MEADOW_LANDMARKS: LandmarkSpec[] = [
 // ---------------------------------------------------------------------------
 // Decoration drawing functions. All draw at origin (0, 0) with the visible
 // base on the y=0 line, extending upward into negative y.
+//
+// Only the stones are still drawn here. Everything that grows moved to
+// @entities/plants once the flora sketchbook needed to draw it too — these
+// two have no page, and a book called FLORA holding gravel would be worse
+// than a shorter book.
 // ---------------------------------------------------------------------------
-
-function drawSmallTree(g: import('pixi.js').Graphics): void {
-  const trunk = DB32.oiledCedar;
-  const leafMid = DB32.eltGreen;
-  const leafLight = DB32.atlantis;
-  const leafDark = DB32.dell;
-  // Trunk.
-  g.rect(-1, -6, 2, 6).fill(trunk);
-  // Canopy (round-ish, three stacked rectangles narrowing toward the top).
-  g.rect(-4, -10, 8, 4).fill(leafMid);
-  g.rect(-3, -13, 6, 3).fill(leafMid);
-  g.rect(-2, -15, 4, 2).fill(leafMid);
-  // Highlights and shadows.
-  g.rect(-2, -15, 4, 1).fill(leafLight);
-  g.rect(-3, -13, 1, 1).fill(leafLight);
-  g.rect(2, -13, 1, 1).fill(leafLight);
-  g.rect(-4, -7, 8, 1).fill(leafDark);
-}
-
-function drawPineTree(g: import('pixi.js').Graphics): void {
-  const trunk = DB32.oiledCedar;
-  const leafMid = DB32.dell;
-  const leafLight = DB32.eltGreen;
-  // Trunk.
-  g.rect(-1, -6, 2, 6).fill(trunk);
-  // Three tiers of triangular canopy, narrowing toward the top.
-  g.rect(-5, -10, 10, 4).fill(leafMid);
-  g.rect(-5, -10, 10, 1).fill(leafLight);
-  g.rect(-4, -14, 8, 4).fill(leafMid);
-  g.rect(-4, -14, 8, 1).fill(leafLight);
-  g.rect(-3, -18, 6, 4).fill(leafMid);
-  g.rect(-3, -18, 6, 1).fill(leafLight);
-  g.rect(-1, -19, 2, 1).fill(leafLight);
-}
-
-// Big oak — 14 wide × 22 tall, the most imposing of the three. Thick trunk
-// with a root flare, plus a four-tier rounded canopy.
-function drawTallOak(g: import('pixi.js').Graphics): void {
-  const trunk = DB32.oiledCedar;
-  const trunkHi = DB32.rope;
-  const leafMid = DB32.eltGreen;
-  const leafLight = DB32.atlantis;
-  const leafDark = DB32.dell;
-
-  // Trunk — 4 px wide, 8 px tall.
-  g.rect(-2, -8, 4, 8).fill(trunk);
-  // Highlight along the left edge for a sense of light direction.
-  g.rect(-2, -8, 1, 8).fill(trunkHi);
-  // Root flare — 1 row wider than the trunk at ground level.
-  g.rect(-3, -1, 6, 1).fill(trunk);
-
-  // Canopy in four tiers: widest at the bottom, narrowing toward the crown.
-  // Bottom tier — 14 wide.
-  g.rect(-7, -12, 14, 4).fill(leafMid);
-  g.rect(-7, -12, 14, 1).fill(leafLight);
-  // Bottom-of-canopy shadow band.
-  g.rect(-7, -9, 14, 1).fill(leafDark);
-
-  // Middle tier — 12 wide.
-  g.rect(-6, -16, 12, 4).fill(leafMid);
-  g.rect(-6, -16, 12, 1).fill(leafLight);
-
-  // Upper tier — 8 wide.
-  g.rect(-4, -20, 8, 4).fill(leafMid);
-  g.rect(-4, -20, 8, 1).fill(leafLight);
-
-  // Crown — 4 wide.
-  g.rect(-2, -22, 4, 2).fill(leafMid);
-  g.rect(-2, -22, 4, 1).fill(leafLight);
-}
-
-// Giant tree — 18 wide × 30 tall, an ancient landmark-sized oak. Tapered
-// trunk (wider at the base), root flare, knot detail, and a five-tier
-// rounded canopy that reaches above row-6 platforms.
-function drawGiantTree(g: import('pixi.js').Graphics): void {
-  const trunk = DB32.oiledCedar;
-  const trunkHi = DB32.rope;
-  const trunkShadow = DB32.loulou;
-  const leafMid = DB32.eltGreen;
-  const leafLight = DB32.atlantis;
-  const leafDark = DB32.dell;
-
-  // Trunk in two segments: 6-wide base + 4-wide upper, giving a slight
-  // taper that reads as "this thing has been here a long time."
-  g.rect(-3, -6, 6, 6).fill(trunk);
-  g.rect(-3, -6, 1, 6).fill(trunkHi);
-  g.rect(-2, -12, 4, 6).fill(trunk);
-  g.rect(-2, -12, 1, 6).fill(trunkHi);
-  // Single dark knot near the middle of the upper trunk.
-  g.rect(0, -8, 2, 1).fill(trunkShadow);
-  // Root flare — 8 wide, 1 tall at ground level.
-  g.rect(-4, -1, 8, 1).fill(trunk);
-
-  // Canopy in five tiers. Bottom row carries a shadow band so the bottom
-  // edge doesn't blend into the row directly under it.
-  // Bottom tier — 18 wide (the widest of any tree in this level).
-  g.rect(-9, -16, 18, 4).fill(leafMid);
-  g.rect(-9, -16, 18, 1).fill(leafLight);
-  g.rect(-9, -13, 18, 1).fill(leafDark);
-
-  // Second tier — 16 wide.
-  g.rect(-8, -20, 16, 4).fill(leafMid);
-  g.rect(-8, -20, 16, 1).fill(leafLight);
-
-  // Third tier — 14 wide.
-  g.rect(-7, -24, 14, 4).fill(leafMid);
-  g.rect(-7, -24, 14, 1).fill(leafLight);
-
-  // Fourth tier — 10 wide.
-  g.rect(-5, -28, 10, 4).fill(leafMid);
-  g.rect(-5, -28, 10, 1).fill(leafLight);
-
-  // Crown — 6 wide.
-  g.rect(-3, -30, 6, 2).fill(leafMid);
-  g.rect(-3, -30, 6, 1).fill(leafLight);
-}
-
-function drawBush(g: import('pixi.js').Graphics): void {
-  const leafMid = DB32.eltGreen;
-  const leafLight = DB32.atlantis;
-  const leafDark = DB32.dell;
-  g.rect(-3, -4, 6, 4).fill(leafMid);
-  g.rect(-3, -4, 6, 1).fill(leafLight);
-  g.rect(-4, -2, 1, 2).fill(leafMid);
-  g.rect(3, -2, 1, 2).fill(leafMid);
-  g.rect(-3, -1, 6, 1).fill(leafDark);
-}
 
 function drawBoulder(g: import('pixi.js').Graphics): void {
   const stone = DB32.heather;
@@ -494,57 +374,57 @@ function drawPebbles(g: import('pixi.js').Graphics): void {
   g.rect(0, -1, 2, 1).fill(stone);
 }
 
-function drawMushroom(g: import('pixi.js').Graphics): void {
-  const cap = DB32.clairvoyant;
-  const stem = DB32.pancho;
-  // Stem.
-  g.rect(-1, -2, 2, 2).fill(stem);
-  // Cap (slightly wider than the stem, with a tiny dome on top).
-  g.rect(-3, -4, 6, 2).fill(cap);
-  g.rect(-2, -5, 4, 1).fill(cap);
-  // White spots on the cap — classic mushroom motif.
-  g.rect(-2, -4, 1, 1).fill(DB32.lightSteel);
-  g.rect(1, -3, 1, 1).fill(DB32.lightSteel);
-}
-
-// Convenience constructors for placing decorations on a tile row.
-const onGrass = (col: number, draw: (g: import('pixi.js').Graphics) => void): DecorationSpec => ({
+// Convenience constructors for placing decorations on a tile row. The plant
+// pair take a species rather than a drawing: that is what earns the thing a
+// page in the flora book, and looking the drawing up by the same name is what
+// keeps a bush from ever being planted under the oak's id.
+const onGrass = (col: number, draw: (g: Graphics) => void): DecorationSpec => ({
   x: col * TILE_SIZE + 8,
   y: MEADOW_GRASS_ROW * TILE_SIZE,
   draw,
 });
 
-const inCavern = (col: number, row: number, draw: (g: import('pixi.js').Graphics) => void): DecorationSpec => ({
+const inCavern = (col: number, row: number, draw: (g: Graphics) => void): DecorationSpec => ({
   x: col * TILE_SIZE + 8,
   y: row * TILE_SIZE,
   draw,
 });
 
+const plantOnGrass = (col: number, species: FloraId): DecorationSpec => ({
+  ...onGrass(col, PLANTS[species].draw),
+  species,
+});
+
+const plantInCavern = (col: number, row: number, species: FloraId): DecorationSpec => ({
+  ...inCavern(col, row, PLANTS[species].draw),
+  species,
+});
+
 const MEADOW_DECORATIONS: DecorationSpec[] = [
   // Surface — left half
-  onGrass(14, drawSmallTree),
-  onGrass(16, drawBush),
-  onGrass(18, drawGiantTree),
+  plantOnGrass(14, 'small-tree'),
+  plantOnGrass(16, 'bush'),
+  plantOnGrass(18, 'giant-tree'),
 
   // Surface — middle
-  onGrass(28, drawTallOak),
-  onGrass(33, drawBush),
+  plantOnGrass(28, 'tall-oak'),
+  plantOnGrass(33, 'bush'),
   onGrass(36, drawBoulder),
 
   // Surface — right half
-  onGrass(39, drawGiantTree),
-  onGrass(45, drawPineTree),
-  onGrass(48, drawSmallTree),
-  onGrass(53, drawTallOak),
+  plantOnGrass(39, 'giant-tree'),
+  plantOnGrass(45, 'pine-tree'),
+  plantOnGrass(48, 'small-tree'),
+  plantOnGrass(53, 'tall-oak'),
   onGrass(57, drawPebbles),
 
   // Underground — mushrooms on the stone parts of the cavern floor
-  inCavern(3, 17, drawMushroom),
-  inCavern(8, 17, drawMushroom),
+  plantInCavern(3, 17, 'mushroom'),
+  plantInCavern(8, 17, 'mushroom'),
   inCavern(11, 17, drawPebbles),
-  inCavern(35, 17, drawMushroom),
+  plantInCavern(35, 17, 'mushroom'),
   inCavern(40, 17, drawPebbles),
-  inCavern(45, 17, drawMushroom),
+  plantInCavern(45, 17, 'mushroom'),
 ];
 
 // ---------------------------------------------------------------------------

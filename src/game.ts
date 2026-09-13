@@ -23,7 +23,13 @@ import {
 import { ScreenFade } from '@systems/screen-fade';
 import type { SketchbookPage } from '@systems/sketchbook';
 import { Sketchbook } from '@systems/sketchbook';
-import { CREATURES_BOOK_ID, LANDMARKS_BOOK_ID, landmarkPageId, SketchbookStore } from '@systems/sketchbook-store';
+import {
+  CREATURES_BOOK_ID,
+  FLORA_BOOK_ID,
+  LANDMARKS_BOOK_ID,
+  landmarkPageId,
+  SketchbookStore,
+} from '@systems/sketchbook-store';
 import { getBook, SKETCHBOOKS, type SketchbookBook } from '@systems/sketchbooks';
 import { TitleScreen } from '@systems/title-screen';
 import { TitleSketchbook } from '@systems/title-sketchbook';
@@ -140,6 +146,9 @@ export class Game {
   private currentLevel: Level;
   private currentLandmarks: Landmark[] = [];
   private currentEntities: Entity[] = [];
+  // Only the ones with a species — the rest are sprites this loop would walk
+  // past every frame for nothing.
+  private currentPlants: Decoration[] = [];
 
   // True once the player has discovered any landmark this session.
   // Subsequent prompts (on landmarks AND doors) collapse to the small "!"
@@ -350,6 +359,7 @@ export class Game {
       this.checkFishEncounter();
       this.checkBirdEncounter();
       this.checkPumpkinEncounter();
+      this.noticeNearbyPlants();
 
       this.runInteractionLoop();
 
@@ -499,9 +509,14 @@ export class Game {
     renderWaterSurfaceInto(this.waterSurface, tilemap, 0, -1);
     this.levelLayer.addChild(this.waterSurface);
 
-    // Decorations.
+    // Decorations. Held onto only when they are a plant: those are the ones
+    // the flora book asks about the player's distance from, every frame.
     for (const spec of level.spec.decorations) {
-      this.levelLayer.addChild(new Decoration(spec).sprite);
+      const decoration = new Decoration(spec);
+      this.levelLayer.addChild(decoration.sprite);
+      if (decoration.species !== undefined) {
+        this.currentPlants.push(decoration);
+      }
     }
 
     // Landmarks (materialised — instance carries the discovered flag, prompt
@@ -538,6 +553,7 @@ export class Game {
     this.levelLayer.removeChildren();
     this.currentLandmarks = [];
     this.currentEntities = [];
+    this.currentPlants = [];
   }
 
   // Allocate a fresh interaction context. Cheap (one closure capture per
@@ -692,6 +708,28 @@ export class Game {
         });
         return;
       }
+    }
+  }
+
+  // The flora book's trigger, and the only one in the game that costs the
+  // player nothing: walk near a plant and its page is written. No prompt, no
+  // key, no popup — a modal for brushing past a bush would fire a dozen times
+  // on the way across the meadow and be intolerable by the third. The only
+  // feedback is a quiet note and the count on the title screen going up.
+  //
+  // Unlike the creature checks there is no guard to fall through early and no
+  // WorldState flag beside the page. Nothing is interrupted, so writing a page
+  // that is already written costs a Set lookup and changes nothing — and the
+  // store keeps its pages in memory even when storage is blocked, so the one
+  // thing a flag would buy (not re-firing the sound all afternoon) is already
+  // bought.
+  private noticeNearbyPlants(): void {
+    for (const plant of this.currentPlants) {
+      if (plant.species === undefined) continue;
+      if (this.sketchbookStore.has(FLORA_BOOK_ID, plant.species)) continue;
+      if (!plant.isPlayerInRange(this.player.pos, this.player.size)) continue;
+      this.sketchbookStore.add(FLORA_BOOK_ID, plant.species);
+      this.audio.noteWritten();
     }
   }
 

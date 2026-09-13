@@ -131,3 +131,12 @@ export const CAMERA_SMOOTHING_RATE = 10;
 // landmark's visual center. Player center inside this rectangle = can interact.
 export const LANDMARK_INTERACT_RANGE_X = 16;
 export const LANDMARK_INTERACT_RANGE_Y = 20;
+
+// How close the player has to walk for a plant to write itself into the flora
+// book: half-extents around the plant's base, player centre inside the
+// rectangle. Wider than a landmark's zone on purpose — this trigger costs no
+// key press, so it can afford to be generous, and it should be: the reward
+// for crossing the meadow is coming out the other side with the book nearly
+// full.
+export const FLORA_NOTICE_RANGE_X = 24;
+export const FLORA_NOTICE_RANGE_Y = 24;

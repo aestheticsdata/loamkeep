@@ -32,6 +32,7 @@ interface StoredV2 {
 // is every one of its pages forgotten.
 export const LANDMARKS_BOOK_ID = 'landmarks';
 export const CREATURES_BOOK_ID = 'creatures';
+export const FLORA_BOOK_ID = 'flora';
 
 // Landmark pages are keyed '<level-id>.<landmark-id>' — the WorldState naming
 // convention — and never by display name, so renaming Old Cairn keeps the

@@ -13,6 +13,32 @@ export interface SketchbookPage {
   drawSketch(g: Graphics): void;
 }
 
+// Fit a world drawing onto a leaf. The in-world drawings are sized for a
+// 320-px screen and anchored with their base on the y = 0 line; a page wants
+// them several times larger and centred on the anchor it positions. Landmarks
+// draw themselves at page size, so this is for everything that does not:
+// a creature, a plant, anything already standing in the world.
+//
+// `top` and `bottom` are the drawing's own ink extents, read off its draw
+// function; the midpoint of those is what lands on the anchor. Scales are
+// whole numbers so a scaled pixel stays square.
+//
+// Ink taller than about 60 px runs into the footer, which is the real ceiling
+// on how large a page may draw something.
+export function scaledSketch(
+  draw: (g: Graphics) => void,
+  scale: number,
+  top: number,
+  bottom: number,
+): (g: Graphics) => void {
+  const lift = Math.round(((top + bottom) / 2) * scale);
+  return (g) => {
+    g.setTransform(scale, 0, 0, scale, 0, -lift);
+    draw(g);
+    g.resetTransform();
+  };
+}
+
 // Frame geometry inside the 320×224 logical viewport.
 const FRAME_X = 40;
 const FRAME_Y = 32;

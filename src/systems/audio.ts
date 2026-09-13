@@ -157,6 +157,16 @@ export class Audio {
     this.noise({ duration: 0.06, volume: 0.05 });
   }
 
+  // A page writing itself because the player walked past a plant. The
+  // quietest thing in here by a good margin, and deliberately: it fires
+  // unprompted, several times over a walk across the meadow, and it must
+  // never read as "stop, something has happened." Pencil on paper — a dry
+  // noise tick with one soft note under it.
+  noteWritten(): void {
+    this.noise({ duration: 0.05, volume: 0.035 });
+    this.blip({ freq: 880, freqEnd: 1174.66, duration: 0.07, volume: 0.05, type: 'triangle', delay: 0.02 });
+  }
+
   // "Floc" — short low blip with a noise tail. Played when the player wades
   // into a water tile. Two layers: a low triangle thump for the splash body,
   // a brief noise burst for the spray.

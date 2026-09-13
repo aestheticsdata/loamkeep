@@ -3,8 +3,7 @@ import { drawBird } from '@entities/bird';
 import { drawFishLarge } from '@entities/fish';
 import { drawPumpkin } from '@entities/pumpkin';
 import { drawRabbit } from '@entities/rabbit';
-import type { SketchbookPage } from '@systems/sketchbook';
-import type { Graphics } from 'pixi.js';
+import { type SketchbookPage, scaledSketch } from '@systems/sketchbook';
 
 // The creatures sketchbook's table of contents: one page per species, in the
 // order the wanderer is likely to meet them — the meadow's three, then the
@@ -29,23 +28,6 @@ export interface CreaturePage {
 // meadow puts in the water.
 const PAGE_FISH_COLOR = DB32.tahitiGold;
 
-// The in-world drawings are anchored with the body's bottom at y = 0 and sized
-// for a 320-px screen. A page wants them several times larger and centred on
-// the anchor the sketchbook positions — landmarks draw themselves that way, a
-// creature is scaled into it instead, so nothing here redraws a creature that
-// already exists.
-//
-// `top` and `bottom` are the drawing's own ink extents, read off the draw
-// function; the midpoint of those is what lands on the anchor.
-function scaled(draw: (g: Graphics) => void, scale: number, top: number, bottom: number): (g: Graphics) => void {
-  const lift = Math.round(((top + bottom) / 2) * scale);
-  return (g) => {
-    g.setTransform(scale, 0, 0, scale, 0, -lift);
-    draw(g);
-    g.resetTransform();
-  };
-}
-
 // Descriptions are the wanderer's note about the creature, never the
 // creature's own voice — that is the greeting's line, and the two must not
 // read as the same thing. Observed, unexplained, no numbers.
@@ -57,7 +39,7 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
       description:
         'Small, tan, and unbothered. It paces the same stretch of grass all day, ' +
         'and lets you walk right into it — which no wild thing should do.',
-      drawSketch: scaled((g) => drawRabbit(g, 0), 4, -10, 0),
+      drawSketch: scaledSketch((g) => drawRabbit(g, 0), 4, -10, 0),
     },
   },
   {
@@ -67,7 +49,7 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
       description:
         'It hangs in the still water without seeming to swim, and then it is ' +
         'somewhere else. No two of them down there are the same colour.',
-      drawSketch: scaled((g) => drawFishLarge(g, PAGE_FISH_COLOR), 3, -10, 1),
+      drawSketch: scaledSketch((g) => drawFishLarge(g, PAGE_FISH_COLOR), 3, -10, 1),
     },
   },
   {
@@ -77,7 +59,7 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
       description:
         'It crosses high up and never lands while anyone is watching. Caught ' +
         'mid-flap it is mostly wing, and the shape is wrong for this far inland.',
-      drawSketch: scaled((g) => drawBird(g, 1, DB32.valhalla), 8, -3, 0),
+      drawSketch: scaledSketch((g) => drawBird(g, 1, DB32.valhalla), 8, -3, 0),
     },
   },
   {
@@ -87,7 +69,7 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
       description:
         'A gourd the size of a fist, hopping. It keeps to one hall of the keep ' +
         'and turns back at the same two places, as though the floor ended there.',
-      drawSketch: scaled(drawPumpkin, 4, -8, 0),
+      drawSketch: scaledSketch(drawPumpkin, 4, -8, 0),
     },
   },
 ];
