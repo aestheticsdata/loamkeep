@@ -3,7 +3,7 @@ import { Bird, drawBird } from '@entities/bird';
 import { Decoration } from '@entities/decoration';
 import type { Entity, InteractContext } from '@entities/entity';
 import { drawFishLarge, Fish } from '@entities/fish';
-import { Landmark, type LandmarkSpec } from '@entities/landmark';
+import { Landmark } from '@entities/landmark';
 import { Player } from '@entities/player';
 import { drawRabbit, Rabbit } from '@entities/rabbit';
 import { Audio } from '@systems/audio';
@@ -20,13 +20,15 @@ import {
   KEYS_RIGHT,
 } from '@systems/input';
 import { ScreenFade } from '@systems/screen-fade';
+import type { SketchbookPage } from '@systems/sketchbook';
 import { Sketchbook } from '@systems/sketchbook';
-import { landmarkPageId, SketchbookStore } from '@systems/sketchbook-store';
+import { LANDMARKS_BOOK_ID, landmarkPageId, SketchbookStore } from '@systems/sketchbook-store';
+import { getBook, SKETCHBOOKS, type SketchbookBook } from '@systems/sketchbooks';
 import { TitleScreen } from '@systems/title-screen';
 import { TitleSketchbook } from '@systems/title-sketchbook';
 import { WorldState } from '@systems/world-state';
 import type { Level } from '@world/level';
-import { listLandmarkPages, loadLevel, STARTING_LEVEL_ID } from '@world/levels';
+import { loadLevel, STARTING_LEVEL_ID } from '@world/levels';
 import { ParallaxBackground } from '@world/parallax';
 import {
   renderCryptBackdrop,
@@ -71,6 +73,7 @@ export interface GameSnapshot {
   fading: boolean;
   sketchbookOpen: boolean;
   greetingOpen: boolean;
+  /** Pages written across every book, and how many there are in total. */
   pagesWritten: number;
   pagesTotal: number;
 }
@@ -249,7 +252,7 @@ export class Game {
     const action = this.title.handleInput(this.input);
     if (action === null) return;
     if ('open' in action) {
-      this.openGallery();
+      this.openGallery(action.open);
       return;
     }
     // Fade to black over the still-animating title, swap on the black
@@ -363,8 +366,12 @@ export class Game {
     this.titleGallery = null;
     this.parallax.container.visible = false;
     this.world.visible = false;
-    const { written, total } = this.writtenPages();
-    this.title.setSketchbookPages(written.length, total);
+    this.title.setSketchbooks(
+      SKETCHBOOKS.map((book) => {
+        const { written, total } = this.writtenPages(book);
+        return { id: book.id, label: book.label, discovered: written.length, total };
+      }),
+    );
     this.title.container.visible = true;
   }
 
@@ -384,21 +391,33 @@ export class Game {
     this.world.visible = true;
   }
 
-  // Open the gallery over the title. Only reachable when at least one page
-  // is written — the menu skips the entry otherwise.
-  private openGallery(): void {
-    const { written, total } = this.writtenPages();
+  // Open one book's gallery over the title. Only reachable when at least one
+  // of its pages is written — the menu skips an empty book's row.
+  private openGallery(bookId: string): void {
+    const book = getBook(bookId);
+    const { written, total } = this.writtenPages(book);
     this.titleGallery = new TitleSketchbook(this.sketchbook, written, total - written.length);
   }
 
-  // The pages the player has written, in world order, plus the size of the
-  // whole book. Both are computed from the level registry, never hardcoded.
-  private writtenPages(): { written: LandmarkSpec[]; total: number } {
-    const pages = listLandmarkPages();
-    const written = pages
-      .filter((page) => this.sketchbookStore.has(landmarkPageId(page.levelId, page.spec.id)))
-      .map((page) => page.spec);
+  // The pages of one book the player has written, in the book's own order,
+  // plus the size of the whole book. Both come from the book's own table of
+  // contents, never hardcoded.
+  private writtenPages(book: SketchbookBook): { written: SketchbookPage[]; total: number } {
+    const pages = book.pages();
+    const written = pages.filter((leaf) => this.sketchbookStore.has(book.id, leaf.id)).map((leaf) => leaf.page);
     return { written, total: pages.length };
+  }
+
+  // Every book's pages added together, for the demo harness's snapshot.
+  private allPages(): { written: number; total: number } {
+    let written = 0;
+    let total = 0;
+    for (const book of SKETCHBOOKS) {
+      const counts = this.writtenPages(book);
+      written += counts.written.length;
+      total += counts.total;
+    }
+    return { written, total };
   }
 
   // Switch to a different level, placing the player at the named spawn.
@@ -487,7 +506,7 @@ export class Game {
     // moment its landmark is built, so it never prompts again.
     this.currentLandmarks = level.spec.landmarks.map((spec) => {
       const landmark = new Landmark(spec);
-      if (this.sketchbookStore.has(landmarkPageId(level.spec.id, spec.id))) {
+      if (this.sketchbookStore.has(LANDMARKS_BOOK_ID, landmarkPageId(level.spec.id, spec.id))) {
         landmark.markDiscovered();
       }
       return landmark;
@@ -550,7 +569,7 @@ export class Game {
         if (!landmark.discovered) {
           landmark.markDiscovered();
           // Write through: the page exists from this frame on, reload or not.
-          this.sketchbookStore.add(landmarkPageId(this.currentLevel.spec.id, landmark.spec.id));
+          this.sketchbookStore.add(LANDMARKS_BOOK_ID, landmarkPageId(this.currentLevel.spec.id, landmark.spec.id));
           this.interactionTutorialDone = true;
           this.audio.discover();
         }
@@ -671,7 +690,7 @@ export class Game {
    * guessed number of milliseconds having passed.
    */
   snapshot(): GameSnapshot {
-    const { written, total } = this.writtenPages();
+    const { written, total } = this.allPages();
     return {
       mode: this.mode,
       level: this.currentLevel.spec.id,
@@ -682,7 +701,7 @@ export class Game {
       fading: this.fade.running,
       sketchbookOpen: this.sketchbook.isVisible(),
       greetingOpen: this.greeting.isVisible(),
-      pagesWritten: written.length,
+      pagesWritten: written,
       pagesTotal: total,
     };
   }

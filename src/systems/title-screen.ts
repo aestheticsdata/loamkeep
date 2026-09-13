@@ -35,8 +35,20 @@ import {
 import { Container, Graphics, Text, type TextStyleOptions } from 'pixi.js';
 
 // What the menu asked for. Game turns `go` into a fade + level load and
-// `open` into the sketchbook gallery; the title itself never touches either.
-export type TitleAction = { go: 'meadow'; spawn: 'default' } | { open: 'sketchbook' };
+// `open` into that book's gallery; the title itself never touches either, and
+// never learns what a book id means.
+export type TitleAction = { go: 'meadow'; spawn: 'default' } | { open: string };
+
+// One book as the menu shows it: the id to hand back when it is chosen, the
+// label to draw, and how much of it is written. Game builds these from the
+// book registry and the store — the title screen knows about neither, which
+// is why a new book costs this screen no code at all.
+export interface SketchbookRow {
+  id: string;
+  label: string;
+  discovered: number;
+  total: number;
+}
 
 // All screen copy is English: lowercase mono for the small lines, matching
 // `press E to enter` in the world, and the 5×7 bitmap font for the menu.
@@ -46,7 +58,7 @@ const ENTER_LABEL = 'ENTER THE MEADOW';
 
 // Menu column: rows on the 16-px rhythm, cursor triangle 8 px to the left.
 // The plate is sized from its contents — widest label plus MENU_PAD_X each
-// side, the two-row block plus MENU_PAD_Y above and below — so the gaps are
+// side, the whole row block plus MENU_PAD_Y above and below — so the gaps are
 // equal by construction. The design's fixed 30-px plate around a 23-px block
 // could not be centred on whole pixels (4 px above, 3 below).
 const MENU_X = 24;
@@ -56,8 +68,17 @@ const MENU_ROW_H = 16;
 const MENU_PAD_X = MENU_X - MENU_PLATE_X;
 const MENU_PAD_Y = 4;
 const MENU_FIRST_Y = MENU_PLATE_Y + MENU_PAD_Y;
-const MENU_PLATE_H = MENU_ROW_H + PIXEL_FONT_HEIGHT + MENU_PAD_Y * 2;
 const CURSOR_X = MENU_X - 8;
+
+// The plate around n rows: (n - 1) steps of the rhythm, plus the last row's
+// glyphs, plus the padding. The menu grows downward from MENU_PLATE_Y at 106
+// and the key line's plate starts at 203, so the bottom edge lands at 137 for
+// one book, 169 for three, 185 for four — 18 px of air. A fifth book leaves
+// 2 px and a sixth runs into the key line; at that point MENU_PLATE_Y moves
+// up rather than the rows getting tighter.
+function menuPlateHeight(rows: number): number {
+  return (rows - 1) * MENU_ROW_H + PIXEL_FONT_HEIGHT + MENU_PAD_Y * 2;
+}
 
 // Plate padding around the two mono lines: the measured text box plus this
 // much on every side, so each line sits centred whatever box height the
@@ -81,14 +102,18 @@ const SMALL_TEXT: TextStyleOptions = { fontFamily: 'monospace', fontSize: 8 };
 interface MenuEntry {
   label: string;
   color: number;
-  // The sketchbook is skipped by the cursor while it is empty — a thing to
-  // fill, never a locked door, so there is no error beep either.
+  // A book with nothing in it is skipped by the cursor — a thing to fill,
+  // never a locked door, so there is no error beep either.
   selectable: boolean;
+  // What choosing this row means. Held per row so confirming is a lookup
+  // rather than a switch on which row the cursor happens to be sitting on.
+  action: TitleAction;
 }
 
 // The first thing the player sees: one quiet scene of the world (see
-// title-art.ts), the wordmark, two menu entries and the keys. Owns the
-// scene clock and the menu cursor; knows nothing about levels or storage.
+// title-art.ts), the wordmark, the menu — the meadow and a row per book —
+// and the keys. Owns the scene clock and the menu cursor; knows nothing about
+// levels, books or storage.
 //
 // Layer order, bottom → top, mirroring Game's stage comment:
 //   backdrop                 sky bands, stars, sun          (static)
@@ -122,8 +147,8 @@ export class TitleScreen {
   private readonly foreground = new Graphics();
   private readonly sweep = new Graphics();
 
-  // Menu, drawn in the bitmap font. Rebuilt whenever the sketchbook count
-  // changes; the cursor is its own Graphics so blinking never touches it.
+  // Menu, drawn in the bitmap font. Rebuilt whenever the book counts change;
+  // the cursor is its own Graphics so blinking never touches it.
   private readonly menuLayer = new Container();
   private readonly cursor = new Graphics();
   private entries: MenuEntry[] = [];
@@ -167,25 +192,41 @@ export class TitleScreen {
     this.container.addChild(this.wanderer, this.foreground);
 
     this.container.addChild(this.buildUi());
-    this.setSketchbookPages(0, 0);
+    // One row until Game reports the books — showTitle() does that before the
+    // title is ever visible, so this arrangement is never seen.
+    this.setSketchbooks([]);
     this.tick(0);
   }
 
-  // Relabel the second entry from the store: `(EMPTY)` and dimmed while
-  // nothing has been found, `3/8` and fully lit once pages exist. Game
-  // calls this every time the title is shown.
-  setSketchbookPages(discovered: number, total: number): void {
+  // Rebuild the menu from the store: the meadow on top, then one row per
+  // book, each reading `(EMPTY)` and dimmed while nothing has been found and
+  // `3/8` fully lit once pages exist. Game calls this every time the title is
+  // shown.
+  setSketchbooks(books: readonly SketchbookRow[]): void {
     const U = this.mood.ui;
-    const empty = discovered === 0;
+    const meadow: MenuEntry = {
+      label: ENTER_LABEL,
+      color: U.active,
+      selectable: true,
+      action: { go: 'meadow', spawn: 'default' },
+    };
     this.entries = [
-      { label: ENTER_LABEL, color: U.active, selectable: true },
-      {
-        label: empty ? 'SKETCHBOOK (EMPTY)' : `SKETCHBOOK ${discovered}/${total}`,
-        color: empty ? U.idle : U.active,
-        selectable: !empty,
-      },
+      meadow,
+      ...books.map((book): MenuEntry => {
+        const empty = book.discovered === 0;
+        return {
+          label: empty ? `${book.label} (EMPTY)` : `${book.label} ${book.discovered}/${book.total}`,
+          color: empty ? U.idle : U.active,
+          selectable: !empty,
+          action: { open: book.id },
+        };
+      }),
     ];
-    if (!this.entries[this.cursorRow].selectable) this.cursorRow = 0;
+    // Fall back to the top row if the cursor's book just emptied, or if there
+    // are fewer rows than there were — the meadow is always selectable.
+    if (this.cursorRow >= this.entries.length || !this.entries[this.cursorRow].selectable) {
+      this.cursorRow = 0;
+    }
     this.rebuildMenu();
     this.paintCursor();
   }
@@ -264,12 +305,13 @@ export class TitleScreen {
     }
 
     if (input.isAnyPressed(KEYS_CONFIRM)) {
-      if (this.cursorRow === 0) {
+      const { action } = this.entries[this.cursorRow];
+      if ('open' in action) {
+        this.audio.openBook();
+      } else {
         this.audio.discover();
-        return { go: 'meadow', spawn: 'default' };
       }
-      this.audio.openBook();
-      return { open: 'sketchbook' };
+      return action;
     }
     return null;
   }
@@ -324,7 +366,8 @@ export class TitleScreen {
 
     const maxW = Math.max(...this.entries.map((entry) => measurePixelText(entry.label)));
     const menu = new Graphics();
-    drawPlate(menu, MENU_PLATE_X, MENU_PLATE_Y, maxW + MENU_PAD_X * 2, MENU_PLATE_H);
+    const plateH = menuPlateHeight(this.entries.length);
+    drawPlate(menu, MENU_PLATE_X, MENU_PLATE_Y, maxW + MENU_PAD_X * 2, plateH);
     for (let i = 0; i < this.entries.length; i++) {
       const { label, color } = this.entries[i];
       const y = MENU_FIRST_Y + i * MENU_ROW_H;

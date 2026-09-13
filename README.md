@@ -85,14 +85,15 @@ src/
     camera.ts       # Smooth follow camera with bounds clamping
     input.ts        # Keyboard state (down / pressed / released)
     audio.ts        # Web Audio synth + 8-bit SFX
-    sketchbook.ts   # Discovery modal (landmark page)
+    sketchbook.ts   # Discovery modal (one sketchbook page)
     greeting.ts     # First-encounter "you met X" popup (rabbit/fish/bird)
     world-state.ts  # Cross-level boolean-flag store
-    sketchbook-store.ts  # localStorage persistence for discovered landmark pages
+    sketchbook-store.ts  # localStorage persistence for the pages found, per book
+    sketchbooks.ts  # Registry of the books the title menu lists, in menu order
     screen-fade.ts  # 12-frame black veil for the title ⇄ meadow cut
     title-screen.ts # Title screen: scene, wordmark, menu, cursor
     title-art.ts    # The painted dawn meadow + keep behind the title (mood table)
-    title-sketchbook.ts  # Sketchbook gallery read from the title
+    title-sketchbook.ts  # One book's gallery, read from the title
   world/
     tilemap.ts      # Tile enum + Tilemap class + procedural per-tile renderer
     level.ts        # LevelSpec interface + materialised Level (ASCII → Tilemap)
@@ -125,13 +126,23 @@ src/
   parallax container are reused across transitions.
 - **Title screen**: the game boots on a painted dawn scene of the meadow and
   the keep (`title-art.ts` — all `rect()` art, a bitmap wordmark, no assets or
-  fonts), with two entries: `ENTER THE MEADOW` and the sketchbook. `Game` has a
-  `'title' | 'playing'` mode; Esc in the world fades back to the title.
-- **Discoveries persist**: landmark pages are the only state kept between
-  sessions, as `{ version, discovered: ['meadow.old-cairn', …] }` under the
-  `loamkeep.sketchbook.v1` localStorage key. The title's entry reads
-  `SKETCHBOOK 3/8` once pages exist and opens a gallery of them, ending on a
-  count of the pages still blank — never their names.
+  fonts), with `ENTER THE MEADOW` on top and one entry per sketchbook under
+  it. `Game` has a `'title' | 'playing'` mode; Esc in the world fades back to
+  the title.
+- **The sketchbooks are plural**: `sketchbooks.ts` lists the books in menu
+  order, each with a label and a `pages()` that derives its own table of
+  contents — the `landmarks` book walks the level registry, so adding a
+  landmark anywhere updates its count and gallery order for free. Registering
+  a book there is the whole of adding one; the title screen has no per-book
+  code. Four books is the comfortable ceiling before the menu plate reaches
+  the key line.
+- **Discoveries persist**: written pages are the only state kept between
+  sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
+  under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old
+  name so no save is orphaned; a v1 blob migrates into the `landmarks` book on
+  read). A book's entry reads `LANDMARKS 3/8` once pages exist and opens a
+  gallery of them, ending on a count of the pages still blank — never their
+  names. An empty book reads `(EMPTY)`, is dimmed, and the cursor skips it.
 - **Per-level visual flavor**: each level picks its own parallax flavor
   (`meadow` rolling hills, `keep` indoor backdrop) and backdrop kind (`cave`
   rock texture, `indoor-dark` flat near-black, `crypt-black` pure black for

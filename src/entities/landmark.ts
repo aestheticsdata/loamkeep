@@ -1,4 +1,5 @@
 import { DB32, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y, textResolution } from '@constants';
+import type { SketchbookPage } from '@systems/sketchbook';
 import type { Vec2 } from '@types';
 import { Container, Graphics, Text } from 'pixi.js';
 
@@ -7,23 +8,18 @@ import { Container, Graphics, Text } from 'pixi.js';
 // its base).
 const LANDMARK_HALF_HEIGHT = 8;
 
-// Static description of a landmark: where it sits in the world, plus the
-// content of its sketchbook page when discovered.
-export interface LandmarkSpec {
+// Static description of a landmark: where it sits in the world, plus — via
+// SketchbookPage — the content of its page once discovered. A landmark is a
+// page that also stands somewhere; nothing else in a book has to.
+export interface LandmarkSpec extends SketchbookPage {
   id: string;
   // World position of the landmark's base (the point where it touches a tile).
   x: number;
   y: number;
-  name: string;
-  description: string;
   // Populate the given Graphics with the in-world body. Drawn around the
   // origin (0, 0): feet at the origin, body extending into negative y.
   // `discovered` flips the palette to the muted "logged" state.
   drawBody(g: Graphics, discovered: boolean): void;
-  // Populate the given Graphics with the sketchbook illustration. Drawn
-  // around the origin (0, 0); the sketchbook positions the result inside
-  // the frame.
-  drawSketch(g: Graphics): void;
 }
 
 // Which prompt is currently displayed above the landmark:

@@ -1,25 +1,24 @@
-import type { LandmarkSpec } from '@entities/landmark';
 import { type Input, KEYS_BACK, KEYS_INTERACT, KEYS_LEFT, KEYS_RIGHT } from '@systems/input';
-import type { Sketchbook } from '@systems/sketchbook';
+import type { Sketchbook, SketchbookPage } from '@systems/sketchbook';
 
 // Same bracketed grammar as `[ press E to close ]`, with the paging keys.
 const NAV_HINT = '[ ← → turn page    E close ]';
 
 export type GalleryEvent = 'turned' | 'closed' | null;
 
-// The sketchbook as read from the title: a deck of the pages already
-// written, in world order, ending on one leaf that says how many are still
+// One book as read from the title: a deck of the pages already written, in
+// the book's own order, ending on one leaf that says how many are still
 // blank — a count, never the names, because the names are the only
 // discovery the game has. Rendering is delegated to Sketchbook so this and
 // the in-game page can never drift apart.
 export class TitleSketchbook {
   private readonly book: Sketchbook;
-  private readonly pages: readonly LandmarkSpec[];
+  private readonly pages: readonly SketchbookPage[];
   private readonly blankPages: number;
   // 0..pages.length; the last index is the blank-count leaf.
   private index = 0;
 
-  constructor(book: Sketchbook, pages: readonly LandmarkSpec[], blankPages: number) {
+  constructor(book: Sketchbook, pages: readonly SketchbookPage[], blankPages: number) {
     this.book = book;
     this.pages = pages;
     this.blankPages = blankPages;

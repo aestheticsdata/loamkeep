@@ -55,7 +55,7 @@ death to end a wrong turn, so the storyboard walks off a ledge where a player wo
 
 | | | |
 |---|---|---|
-| 0:00 | The title | the painted dawn — seven sky bands, the sun coming up behind the keep, the rabbit that also lives in the meadow — and the second entry reading SKETCHBOOK (EMPTY), because the browser is cold; then ENTER THE MEADOW and the twelve-frame fade |
+| 0:00 | The title | the painted dawn — seven sky bands, the sun coming up behind the keep, the rabbit that also lives in the meadow — and the second entry reading LANDMARKS (EMPTY), because the browser is cold; then ENTER THE MEADOW and the twelve-frame fade |
 | 0:05 | The meadow | a few steps left to the ledge over the first shaft, the stone marker on its platform across it, and a jump on the spot: the whole platforming vocabulary, since holding the key goes higher than tapping it |
 | 0:09 | A first meeting | the rabbit paces this platform at 32 px/s and the player walks at 72, so walking right is enough; the parchment popup, its line of speech, and any movement key closing it |
 | 0:15 | Under the meadow | off the end of the grass, down the one-tile shaft onto the shelf at row 13, off that and into the cavern pool |
@@ -105,7 +105,7 @@ the film saved losslessly at twice its resolution.
 
 The take writes nothing outside `out/`. The game has no account and no server, and its one piece of
 persistence — `loamkeep.sketchbook.v1` in localStorage — belongs to Playwright's browser, which is
-cold on every run: that is what makes chapter one's SKETCHBOOK (EMPTY) and the last chapter's two
+cold on every run: that is what makes chapter one's LANDMARKS (EMPTY) and the last chapter's two
 pages both reliable. Your own tab on `localhost:5173` is not touched, and its sketchbook is yours.
 
 ## Loamkeep-specific traps

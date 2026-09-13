@@ -1,6 +1,17 @@
 import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH, textResolution } from '@constants';
-import type { LandmarkSpec } from '@entities/landmark';
 import { Container, Graphics, Text, type TextStyleOptions } from 'pixi.js';
+
+// One leaf of a book: the only three fields a page actually renders. A
+// landmark spec is one of these plus where it stands in the world; a creature
+// page is one of these and nothing else, so it never has to pretend it sits
+// on a tile.
+export interface SketchbookPage {
+  name: string;
+  description: string;
+  // Populate the given Graphics with the illustration. Drawn around the
+  // origin (0, 0); the sketchbook positions the result inside the frame.
+  drawSketch(g: Graphics): void;
+}
 
 // Frame geometry inside the 320×224 logical viewport.
 const FRAME_X = 40;
@@ -20,8 +31,8 @@ export interface PageFooter {
 const DEFAULT_FOOTER: PageFooter = { hint: '[ press E to close ]' };
 
 // Modal overlay shown when the player discovers a landmark. Pauses gameplay
-// while visible. Content is rebuilt every show() so each landmark gets its
-// own page.
+// while visible. Content is rebuilt every show() so each page gets its own
+// leaf.
 export class Sketchbook {
   readonly container: Container;
   private readonly content: Container;
@@ -46,11 +57,11 @@ export class Sketchbook {
     this.container.addChild(this.content);
   }
 
-  show(spec: LandmarkSpec, footer: PageFooter = DEFAULT_FOOTER): void {
+  show(page: SketchbookPage, footer: PageFooter = DEFAULT_FOOTER): void {
     this.clearContent();
 
     // Title
-    const title = makeText(spec.name, {
+    const title = makeText(page.name, {
       fontFamily: 'monospace',
       fontSize: 14,
       fontWeight: 'bold',
@@ -63,14 +74,14 @@ export class Sketchbook {
     const sep = new Graphics().rect(FRAME_X + 12, FRAME_Y + 32, FRAME_W - 24, 1).fill(DB32.oiledCedar);
     this.content.addChild(sep);
 
-    // Sketch — provided by the landmark spec. Centered in the left column.
+    // Sketch — provided by the page. Centered in the left column.
     const sketch = new Graphics();
-    spec.drawSketch(sketch);
+    page.drawSketch(sketch);
     sketch.position.set(FRAME_X + 50, FRAME_Y + 110);
     this.content.addChild(sketch);
 
     // Description on the right column, word-wrapped.
-    const description = makeText(spec.description, {
+    const description = makeText(page.description, {
       fontFamily: 'monospace',
       fontSize: 9,
       fill: DB32.valhalla,
