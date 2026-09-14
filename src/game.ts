@@ -54,14 +54,16 @@ import { type Application, Container, Graphics } from 'pixi.js';
 const WATER_BOB_AMPLITUDE = 1;
 const WATER_BOB_FREQ = 4;
 
-// Length of the cut between the title and the meadow, each way. Twelve
-// frames is the Amiga idiom: a fifth of a second at 60 Hz.
-const FADE_FRAMES = 12;
+// Length of the cut between the title and the meadow, each way. A wave wants
+// a little more room than the crossfade it replaced: twenty frames is a third
+// of a second at 60 Hz, long enough to watch the band cross the screen and
+// short enough to still be a cut rather than a transition.
+const WIPE_FRAMES = 20;
 
 // Which loop is running. 'title' ticks only the TitleScreen (and the
 // sketchbook gallery when it is open) — no player physics, no camera follow,
 // no entity updates. 'playing' is the world loop. The cut between them is a
-// FADE_FRAMES fade each way; the title's containers stay alive throughout so
+// WIPE_FRAMES wave wipe each way; the title's containers stay alive so
 // returning to it is instant and allocation-free.
 type GameMode = 'title' | 'playing';
 
@@ -105,7 +107,7 @@ export interface GameSnapshot {
 //   ├── title.container             (the title screen; hidden while playing)
 //   ├── sketchbook.container        (modal overlay, pauses gameplay; doubles as the title's gallery)
 //   ├── greeting.container
-//   └── fade.container              (black veil for the title ⇄ meadow cut)
+//   └── fade.container              (the wiping veil for the title ⇄ meadow cut)
 export class Game {
   private readonly app: Application;
   private readonly input: Input;
@@ -244,8 +246,8 @@ export class Game {
   // input to the gallery if it is open, otherwise to the menu.
   private tickTitle(dt: number): void {
     this.title.tick(dt);
-    // Mid-fade the menu is dead: the choice has been made, or the meadow is
-    // still dissolving behind the veil.
+    // Mid-cut the menu is dead: the choice has been made, or the meadow is
+    // still coming out from under the veil.
     if (this.fade.running) return;
 
     if (this.titleGallery !== null) {
@@ -266,11 +268,11 @@ export class Game {
       this.openGallery(action.open);
       return;
     }
-    // Fade to black over the still-animating title, swap on the black
-    // frame, then fade in on the meadow.
-    this.fade.out(FADE_FRAMES, () => {
+    // Wipe the still-animating title under, swap on the fully covered frame,
+    // then let the same wave carry on and uncover the meadow.
+    this.fade.out(WIPE_FRAMES, () => {
       this.enterWorld(action.go, action.spawn);
-      this.fade.in(FADE_FRAMES);
+      this.fade.in(WIPE_FRAMES);
     });
   }
 
@@ -323,13 +325,13 @@ export class Game {
       }
     } else {
       // Esc: back to the title. The mode flips right away so the world
-      // freezes on this frame while it fades; showTitle() runs on the
-      // black frame, and the title fades in from there.
+      // freezes on this frame while the wave crosses it; showTitle() runs on
+      // the fully covered frame, and the title comes out from under it.
       if (this.input.isAnyPressed(KEYS_BACK)) {
         this.mode = 'title';
-        this.fade.out(FADE_FRAMES, () => {
+        this.fade.out(WIPE_FRAMES, () => {
           this.showTitle();
-          this.fade.in(FADE_FRAMES);
+          this.fade.in(WIPE_FRAMES);
         });
         return;
       }
