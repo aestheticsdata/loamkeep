@@ -67,17 +67,20 @@ death to end a wrong turn, so the storyboard walks off a ledge where a player wo
 
 ## What this run actually measured
 
-The take shipped to the landing page, filmed on 2026-09-13 at `DEMO_SPEED=1`, 1920×1080 at a device
-scale factor of 2:
+The take shipped to the landing page, filmed on 2026-09-14 at `DEMO_SPEED=1`, 1280×720 at a device
+scale factor of 3:
 
-- 1:24 of film — 83.7s, nine chapters at the marks in the table above. The screencast delivered
-  4915 frames at 58.7 fps; the mp4 is 4.6 MB at CRF 26, 0.44 Mbit/s — under the band the consoles'
-  takes sit in, because a 320×224 picture upscaled fourfold is mostly flat colour.
-- 1.9 minutes end to end: the take, then the encode and the stills in the fixture's teardown, well
+- 1:27 of film — 87.3s, nine chapters at the marks in the table above. The screencast delivered
+  5169 frames at 59.2 fps; the mp4 is 2.8 MB at CRF 26, 0.25 Mbit/s — far under the band the
+  consoles' takes sit in, because a 320×224 picture upscaled threefold is mostly flat colour, and
+  the black the frame puts around it is flatter still.
+- 1.7 minutes end to end: the take, then the encode and the stills in the fixture's teardown, well
   inside the config's fifteen-minute timeout.
-- Nine stills at 3840×2160, 34 KB–178 KB each as lossless PNG.
-- Three rehearsals at `DEMO_SPEED=4` and two takes at 1 went before it, and every one of them found
-  something. All four are in the traps below. Rehearse first.
+- Nine stills at 3840×2160, 33 KB–192 KB each as lossless PNG. The viewport shrank and the scale
+  factor grew to hold that number: a still is one times the other.
+- One take went before it, and it died in the keep — the pumpkin that commit `125e042` put in the
+  entry hall stops the game to introduce itself, and the beat was holding Right against a player
+  who could not move. `walkRightMeeting` is what came of it. Rehearse first.
 
 ## The stills
 
@@ -112,8 +115,11 @@ pages both reliable. Your own tab on `localhost:5173` is not touched, and its sk
 
 **The GPU flags are the difference between a film and a slideshow.** Headless Chromium falls back
 to SwiftShader, which rasterises on the CPU. This game repaints every pixel of the screen every
-frame — parallax, water, a player figure rebuilt from `rect()` calls — so at 1920×1080 and a device
-scale of 2 the screencast delivered **8.6 fps**. The same take with `--enable-gpu --use-angle=metal
+frame — parallax, water, a player figure rebuilt from `rect()` calls — so against a 3840×2160
+compositor surface the screencast delivered **8.6 fps**. That surface is what the cost is measured
+in, not the frame: it was 1920×1080 at a device scale of 2 when this was first measured and it is
+1280×720 at 3 now, which is the same number of pixels and the same slideshow without the flags
+below. The same take with `--enable-gpu --use-angle=metal
 --ignore-gpu-blocklist` delivers **58**. The five consoles this harness filmed never noticed: a
 mostly-still UI costs SwiftShader almost nothing.
 
