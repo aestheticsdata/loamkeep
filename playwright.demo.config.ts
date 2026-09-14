@@ -30,11 +30,11 @@ process.env.DEMO_CURSOR ??= "off";
 /**
  * 1080p by default: native, 16:9, and nothing upscales on the way to a landing page.
  *
- * The game fills it as far as a 320×224 picture can — `stageScale()` takes the largest whole
- * upscale that fits, which at 1080 tall is ×4, a 1280×896 canvas centred on `index.html`'s
- * near-black ground. The bands left and right are not a fault to fix: 10:7 does not become 16:9
- * without either cropping the world or putting half a pixel of art on a screen pixel. A frame
- * around an arcade screen is the honest way to show one.
+ * The game is a fixed 960×672 canvas — the stage is ×3 in every window, never the window's
+ * own size — centred on `index.html`'s near-black ground, so a take is that picture with the
+ * ground around it. The bands are not a fault to fix: 10:7 does not become 16:9 without either
+ * cropping the world or putting half a pixel of art on a screen pixel. A frame around an arcade
+ * screen is the honest way to show one, and `DEMO_WIDTH`/`DEMO_HEIGHT` tightens that frame.
  */
 const viewport = {
   width: Number(process.env.DEMO_WIDTH ?? 1920),

@@ -195,8 +195,9 @@ src/
   character is a tile type (`.` sky, `G` grass, `D` dirt, `S` stone,
   `K` dark stone, `W` water, `B`/`F`/`P` castle bricks/floor/pillar,
   `c`/`v` crypt bricks/floor). Easy to hand-edit and read.
-- **Logical resolution is 320×224.** The PixiJS stage is integer-upscaled
-  for pixel-perfect rendering at any window size.
+- **Logical resolution is 320×224.** The PixiJS stage upscales it ×3 to a
+  fixed 960×672 canvas — the same size in every window, centred on the page's
+  near-black ground, so a logical pixel is always exactly three of them.
 - **Scene graph**: a parallax container behind, a world container (level layer
   + persistent player) in front, modal overlays (sketchbook, greeting) on top
   of the stage. The camera offsets only the world container; parallax layers
