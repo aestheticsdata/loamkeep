@@ -355,11 +355,12 @@ export class Demo {
 /**
  * The stills pass — same page, same session, after the video is closed.
  *
- * A screenshot comes out at the viewport times `deviceScaleFactor`, so the 2x
- * that supersamples the video gives 3840x2160 here: twice the resolution of the
- * mp4, lossless, and with the harness's own overlays painted out. Pulling the
- * same frames back out of the finished video with ffmpeg cannot do any of
- * that — it is capped at 1080p, it is h264, and the pointer is baked in.
+ * A screenshot comes out at the viewport times `deviceScaleFactor`, so the 3x
+ * that supersamples the video gives 3840x2160 here: three times the resolution
+ * of the mp4, lossless, and with the harness's own overlays painted out. Pulling
+ * the same frames back out of the finished video with ffmpeg cannot do any of
+ * that — it is capped at the mp4's own 720p, it is h264, and the pointer is
+ * baked in.
  */
 async function captureStills(page: Page, stills: Still[], dir: string): Promise<string[]> {
   if (stills.length === 0) return [];

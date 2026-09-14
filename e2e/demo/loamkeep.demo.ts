@@ -163,6 +163,22 @@ const whenRightOf = (page: Page, x: number) =>
 const whenLeftOf = (page: Page, x: number) =>
   page.waitForFunction((limit) => (window.__loamkeep?.().x ?? Infinity) <= limit, x, { timeout: ARRIVE });
 
+/**
+ * Arrived at a column, or stopped short of it by something with a greeting to make.
+ *
+ * One wait rather than a race between two, because a race leaves the loser running and its timeout
+ * surfaces later as an unhandled rejection, in a worker that by then is filming something else.
+ */
+const whenRightOfOrGreeted = (page: Page, x: number) =>
+  page.waitForFunction(
+    (limit) => {
+      const s = window.__loamkeep?.();
+      return !!s && (s.x >= limit || s.greetingOpen);
+    },
+    x,
+    { timeout: ARRIVE },
+  );
+
 /** Arrived at a column AND settled on the floor of the level the beat expects. */
 const whenLanded = (page: Page, x: number, y: number) =>
   page.waitForFunction(
@@ -234,6 +250,34 @@ test("loamkeep, end to end", async ({ demo }) => {
   /** Walk until the player is at or past a column, then stop dead — vel.x is input, so it is instant. */
   const walkRightTo = (x: number) => demo.holdWhile(KEY.right, () => whenRightOf(page, x));
   const walkLeftTo = (x: number) => demo.holdWhile(KEY.left, () => whenLeftOf(page, x));
+
+  /**
+   * Walk right to a column, stopping to be spoken to on the way.
+   *
+   * The first time the player touches a creature the game freezes and a parchment says something.
+   * A walk that only waited for the far column would wait for ever when that happens: the key is
+   * already down when the parchment opens, and closing it reads a fresh press. So the wait ends on
+   * the column *or* on the parchment, and a parchment is held long enough to be read, tapped away
+   * with the same key that carries the walk on, and the walk goes again.
+   *
+   * Whether the meeting happens at all is deliberately not decided here. The keep's pumpkin hops
+   * cols 8-28 and this walk crosses all of it, but the pumpkin spends half its time in the air and
+   * the player can pass under a hop — so waiting for the greeting outright would fail every take
+   * where it never fired, which is the mirror of the bug this replaced.
+   */
+  const walkRightMeeting = async (x: number): Promise<void> => {
+    // A creature greets once and the flag that says so outlives the level, so two parchments on one
+    // walk is already surprising. Bounded rather than trusted: the fall-through is the plain walk,
+    // which fails with the timeout that names the column instead of looping here for ever.
+    for (let met = 0; met < 2; met++) {
+      await demo.holdWhile(KEY.right, () => whenRightOfOrGreeted(page, x));
+      if (!(await look(page)).greetingOpen) return;
+      await demo.dwell(2600);
+      await demo.hold(KEY.right, 120);
+      await whenGreeting(page, false);
+    }
+    await walkRightTo(x);
+  };
 
   /**
    * A jump to the right, held through the landing.
@@ -365,8 +409,9 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.dwell(1600);
   await demo.still("the-old-keep");
   // Cool grey brick, a polished floor, gold pillars and candles the length of the hall — walked
-  // end to end, because the only way down is the hole at the far end of it.
-  await demo.holdWhile(KEY.right, () => whenRightOf(page, KEEP.floorHole));
+  // end to end, because the only way down is the hole at the far end of it. The hall is also where
+  // the pumpkin hops, so this walk is the one that may be interrupted to be introduced.
+  await walkRightMeeting(KEEP.floorHole);
   await whenLanded(page, 0, KEEP.basementY);
   await demo.dwell(1200);
   // Back along the basement to the door under the hall, which stops the walk itself: the pillar

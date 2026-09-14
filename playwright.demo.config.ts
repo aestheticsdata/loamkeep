@@ -28,26 +28,32 @@ process.env.DEMO_CURSOR ??= "off";
  */
 
 /**
- * 1080p by default: native, 16:9, and nothing upscales on the way to a landing page.
+ * 720p by default: 16:9 for the landing page's player, and cut to the game rather than to a
+ * standard.
  *
- * The game is a fixed 960×672 canvas — the stage is ×3 in every window, never the window's
- * own size — centred on `index.html`'s near-black ground, so a take is that picture with the
- * ground around it. The bands are not a fault to fix: 10:7 does not become 16:9 without either
- * cropping the world or putting half a pixel of art on a screen pixel. A frame around an arcade
- * screen is the honest way to show one, and `DEMO_WIDTH`/`DEMO_HEIGHT` tightens that frame.
+ * The game is a fixed 960×672 canvas — the stage is ×3 in every window, never the window's own
+ * size — centred on `index.html`'s near-black ground. So the frame is chosen to sit close around
+ * that picture: at 1280×720 it fills three quarters of the width and nearly all of the height,
+ * where 1080p would have left it at half the width inside a wide black border. The bands that
+ * remain are not a fault to fix: 10:7 does not become 16:9 without either cropping the world or
+ * putting half a pixel of art on a screen pixel. A frame around an arcade screen is the honest way
+ * to show one — `DEMO_WIDTH`/`DEMO_HEIGHT` is there for a take that wants a different one.
  */
 const viewport = {
-  width: Number(process.env.DEMO_WIDTH ?? 1920),
-  height: Number(process.env.DEMO_HEIGHT ?? 1080),
+  width: Number(process.env.DEMO_WIDTH ?? 1280),
+  height: Number(process.env.DEMO_HEIGHT ?? 720),
 };
 
 /**
- * Renders at twice the resolution and lets the encoder downsample into the same
- * frame. Supersampling: visibly crisper text, for CPU. It is the default
- * because `pnpm video:generate` should produce the best picture it can without
- * being asked — `DEMO_SCALE=1` is the way out if a slow machine drops frames.
+ * Renders at three times the resolution and lets the encoder downsample into the same frame.
+ * Supersampling: visibly crisper text, for CPU. ×3 rather than ×2 because a still is the viewport
+ * times this factor, and 1280×720 needs ×3 to keep the shots at the 3840×2160 the portfolio takes
+ * — text is also rasterised at `DEFAULT_SCALE` × the device ratio, so the factor is real detail in
+ * the glyphs and not just a bigger file. It is the default because `pnpm video:generate` should
+ * produce the best picture it can without being asked — `DEMO_SCALE=2` or `1` is the way out if a
+ * slow machine drops frames.
  */
-const deviceScaleFactor = Number(process.env.DEMO_SCALE ?? 2);
+const deviceScaleFactor = Number(process.env.DEMO_SCALE ?? 3);
 
 const chrome = {
   ...devices["Desktop Chrome"],

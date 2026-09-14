@@ -92,9 +92,10 @@ export class CdpRecorder {
     await cdp.send("Page.startScreencast", {
       format: "jpeg",
       quality: FRAME_QUALITY,
-      // In CSS pixels. The compositor surface is twice this at the default 2x,
-      // so Chromium downsamples into the frame and the result is supersampled —
-      // the same trick that made the old path look better, for free.
+      // In CSS pixels. The compositor surface is three times this at the
+      // default 3x, so Chromium downsamples into the frame and the result is
+      // supersampled — the same trick that made the old path look better, for
+      // free.
       //
       // Rounded down to even, as Playwright's own screencast does: yuv420p
       // cannot represent an odd dimension, so an odd viewport would fail the
