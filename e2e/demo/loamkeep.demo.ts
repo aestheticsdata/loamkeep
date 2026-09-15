@@ -33,7 +33,7 @@ import type { Page } from "@playwright/test";
  *
  * IT WRITES TWO SKETCHBOOK PAGES, AND NOTHING ELSE LEAVES THE BROWSER. `loamkeep.sketchbook.v1`
  * in localStorage is the game's only persistence; Playwright's context is cold on every run, so
- * chapter one always opens on LANDMARKS (EMPTY) and the last chapter always finds exactly the
+ * chapter one always opens on LANDMARKS 0/8 and the last chapter always finds exactly the
  * pages this take wrote.
  */
 
@@ -308,8 +308,9 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.chapter("The title");
   // The game boots on a painted dawn: seven sky bands, the sun coming up behind the keep, a rabbit
   // on the ground that is the same rabbit the meadow has. Nothing is pressed for a few seconds —
-  // the cursor blinks, the sun climbs, and the second entry reads LANDMARKS (EMPTY) because
-  // Playwright's browser is cold and the book is the one thing this game keeps.
+  // the cursor blinks, the sun climbs, and the second entry reads LANDMARKS 0/8 because
+  // Playwright's browser is cold and the book is the one thing this game keeps. The zero is the
+  // take's, not the game's: your own tab has whatever you have found.
   await demo.dwell(4200);
   await demo.press(KEY.confirm);
   await whenMode(page, "playing");
