@@ -640,7 +640,7 @@ export class Game {
         this.greeting.show({
           drawSubject: (g) => drawRabbit(g, 0),
           subjectScale: 4,
-          speech: 'Est-ce que tu as une carotte buddy ?',
+          speech: 'Got a carrot for me, buddy?',
         });
         return;
       }
@@ -665,7 +665,7 @@ export class Game {
         this.greeting.show({
           drawSubject: (g) => drawFishLarge(g, touchedColor),
           subjectScale: 3,
-          speech: 'oh tiens ?! Un gros poisson bizarre !',
+          speech: 'Oh?! A big weird fish!',
         });
         return;
       }
@@ -692,7 +692,7 @@ export class Game {
           // frozen flight pose, the right vibe for "stopped to chat."
           drawSubject: (g) => drawBird(g, 1, DB32.valhalla),
           subjectScale: 8,
-          speech: 'un oiseau mutant !',
+          speech: 'A mutant bird!',
         });
         return;
       }
@@ -713,7 +713,7 @@ export class Game {
           drawSubject: drawPumpkin,
           // 7x8 native, so x4 gives it the rabbit's presence in the frame.
           subjectScale: 4,
-          speech: 'hop hop hop ! tu veux faire la course ?',
+          speech: 'Hop hop hop! Fancy a race?',
         });
         return;
       }

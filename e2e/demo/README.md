@@ -16,6 +16,7 @@ Output lands in `e2e/demo/out/` (gitignored):
 - `chapters.vtt` — WebVTT, for `<track kind="chapters">` on the portfolio's own `<video>`
 - `chapters.ffmeta` — ffmpeg metadata; already applied to the mp4, kept so a re-encode can reapply it
 - `chapters.json` — the same marks with millisecond precision
+- `events.json` — every key and pause, on the film's clock: see **For the landing page's films**
 - `shots/01-the-meadow.png` and eight more — stills at 3840×2160, for a page that wants pictures too
 
 This is a port of Halcyon's harness, which is a port of PFA's, which is a port of Trekker's, which
@@ -67,11 +68,11 @@ death to end a wrong turn, so the storyboard walks off a ledge where a player wo
 
 ## What this run actually measured
 
-The take shipped to the landing page, filmed on 2026-09-14 at `DEMO_SPEED=1`, 1280×720 at a device
+The take shipped to the landing page, filmed on 2026-09-15 at `DEMO_SPEED=1`, 1280×720 at a device
 scale factor of 3:
 
-- 1:27 of film — 87.3s, nine chapters at the marks in the table above. The screencast delivered
-  5169 frames at 59.2 fps; the mp4 is 2.8 MB at CRF 26, 0.25 Mbit/s — far under the band the
+- 1:27 of film — 87.6s, nine chapters at the marks in the table above. The screencast delivered
+  5151 frames at 58.8 fps; the mp4 is 2.7 MB at CRF 26, 0.25 Mbit/s — far under the band the
   consoles' takes sit in, because a 320×224 picture upscaled threefold is mostly flat colour, and
   the black the frame puts around it is flatter still.
 - 1.7 minutes end to end: the take, then the encode and the stills in the fixture's teardown, well
@@ -103,6 +104,21 @@ the film saved losslessly at twice its resolution.
 | `07-the-crypt.png` | the crypt by candlelight |
 | `08-the-title.png` | the title again, its entry now counting the pages the take wrote |
 | `09-the-gallery.png` | the gallery, page one of two |
+
+## For the landing page's films: `events.json`
+
+The landing page cuts a film of about fifty seconds from this take with Remotion
+(`landing-page/films/`): the whole window throughout, faster where the hero only walks, a line of
+text over a held frame between places. Every take also writes `events.json` (`events.ts`, ported
+from bkmk's harness with the log in `cursor.ts`, `fixture.ts` and `recorder.ts`): the chapters,
+every press, every key and every pause, with its start and end on the film's clock. The walking is
+held keys and is not logged as presses, so the edit binds its beats to the chapters, the `E`,
+`Enter` and arrow presses and the pauses between them — never to a second — and a re-take keeps
+it. A take for a film is filmed without the drawn arrow:
+
+```bash
+DEMO_CURSOR=off DEMO_FPS=30 pnpm video:generate
+```
 
 ## Running it again
 

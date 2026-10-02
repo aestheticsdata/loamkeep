@@ -174,7 +174,7 @@ src/
   collide with the player; they just inhabit the world.
 - **First-encounter greetings**: the first time you bump into a rabbit, fish,
   or bird, a parchment popup pauses gameplay with a small line of speech
-  ("Est-ce que tu as une carotte buddy ?"). One-shot per session, tracked in
+  ("Got a carrot for me, buddy?"). One-shot per session, tracked in
   `WorldState`. Closes on any movement-key press.
 - **Per-tile procedural detail**: a stable hash per `(tx, ty)` seeds grass
   tufts and sparse red wildflowers, dirt speckles, dark-stone speckles, brick
