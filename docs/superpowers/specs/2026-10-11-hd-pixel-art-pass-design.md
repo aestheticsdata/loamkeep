@@ -122,7 +122,8 @@ With `fineMotion` off, every HD frame is a classic frame redrawn.
   - The menu font keeps classic's black shadow, a logical pixel down and right. The cursor is the classic triangle smoothed to 45°.
   - The tagline and the key line are set at 3 fine a dot. At the book's 2 they read thin and dirty on the title. In HD the tagline is wrapped onto two lines, so it clears the keep.
   - The plates behind text are a 50 % checkerboard of black fine pixels, with no alpha. Each art's plate is fitted to its own text.
-  - The grass tufts, the keep's lights and the crypt candle stay classic. They are 1-px marks.
+  - The grass tufts are three 1-fine blades, bending more toward the tip, with lit tips; flowers have a stem and a plus-shaped head. Each sway step is baked once and swapped (`title-tufts-hd.ts`).
+  - The keep's lights and the crypt candle stay classic. They are 1-px marks.
 - **Behind a book or a greeting** there is no veil in HD. `rampDownFilter` (`src/hd/ramp-filter.ts`) snaps every pixel of the world and its sky to its nearest DB32 tone and paints the tone two steps down its ramp; tones without a ramp borrow the nearest ramped tone's. WebGL 1 can index a uniform array only by the loop counter, so the shader carries the answer out of its search loop.
 - **Parchment** (`src/systems/parchment-hd.ts`): the prototype's page 5, ported — vignette, 6-fine border with its bevel, dog-ear, faded rule.
 - **Large drawings** (a greeting's subject at ×3–×8, a page's sketch) are never a small sprite enlarged. `smoothScale` (`src/hd/smooth-scale.ts`) is EPX generalised to any whole factor: each source pixel becomes an f×f block, and each corner where the two neighbours agree with each other and not with the pixel is cut along the diagonal to their colour. Outer corners round off, inner ones fill, staircases become 45° edges, and no tone is added. Selout follows: the shadow side is as thick as half the scale, and the lit side is 1 fine. A lit rim as thick as the shadow read as a pale line drawn round the subject. Chamfering the enlarged blocks, the first version, left the subjects blocky.
@@ -146,3 +147,15 @@ Frame time was measured before the switch. The figure is the JS time inside each
 | cairn-observatory | 0.91 / 3.4 / 10.6 | 0.18 / 0.5 / 3.3 |
 
 On average HD is cheaper than classic: a baked chunk or sprite is one textured quad, where classic re-tessellates its Graphics. Its peaks are the 128-px chunks baked as the camera reaches them, and the worst of them stays under a 60 Hz frame. The first visit to the first level after load can take one long frame (about 200 ms once, in a cold run) while the shared caches fill.
+
+## Glows, stars and eyes, after a look at the live game (LOA-50, 2026-10-11)
+
+- **A glow keeps classic's rings, alpha and all.** This is the one thing HD draws with alpha. Every `drawGlow` light was dithered into opaque pixels at the ring's density: a candle, a firefly, a glowcap, the fallen star. Over a night sky that read as a cloud of moving yellow specks, and it was rejected on sight beside classic's soft light. `ArtBody`, `ArtSwarm` and `shownLarge` now lay classic's own rings (`paintGlow`) under the HD sprite. `haloFromClassic` only dithers a drawing's translucent rects, not its lights. The glowfish (`softLight`) and every large drawing keep their translucent rects as classic draws them too: the bundle's dithered ellipse round the glowfish was rejected along with the rest.
+- **The spiral's corner stars** are an opaque disc one step down lightSteel's ramp, under long pointed heather arms and the soft bright star. Their dithered haze read as speckle.
+- **Water depth under a pillar** is taken from the nearest column at that row whose water runs up to open air. Counted from the stone, the darkening started over and left a pale column under every pillar.
+- **Stars at classic's size.**
+  - A bright star is classic's plus, softened: a round white core, lightSteel arms near it, heather further out, drawn to a point.
+  - A dim star is classic's whole pixel with its corners a shade down.
+  - The observatory's dust specks are the same.
+  - The bundle's 1-fine crosses and 2×2 dim stars read as scratches and specks beside classic's sky, and the dust band nearly vanished.
+- **Eyes in large drawings.** `smoothScale` takes a set of eye tones. A lone pixel of one, with none of its own tone beside it, is not cut along a diagonal: it becomes a round pupil sitting in the colour around it, with a white catch-light once it is 9 fine or more. The frog's eyes, on the corners of their bumps, had been cut into triangles.

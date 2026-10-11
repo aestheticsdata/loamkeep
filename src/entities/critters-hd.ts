@@ -4,7 +4,7 @@ import { drawGlowfish, drawGlowfishLarge } from '@entities/glowfish';
 import { drawHare, type HarePose } from '@entities/hare';
 import { drawMoth, drawMothLarge } from '@entities/moth';
 import { record, up } from '@hd/classic-recorder';
-import { type CritterLayers, ellipseHalo } from '@hd/critter-hd';
+import type { CritterLayers } from '@hd/critter-hd';
 import { type FineBox, FineCanvas } from '@hd/fine-canvas';
 
 // The creatures Claude Design drew by hand — design_handoff_hd_pass/
@@ -105,7 +105,8 @@ export function glowfishHd(frame: GlowfishFrame): CritterLayers {
     [9, -12],
     [11, -10],
   ]);
-  return { body: s, halo: ellipseHalo({ cx: -1.5, cy: -4.5, rx: 22.5, ry: 16.5, peak: 0.22 + frame.glow * 0.3 }) };
+  // Its halo is classic's translucent rects, laid under it (softLight).
+  return { body: s, halo: null };
 }
 
 export function glowfishLargeHd(): CritterLayers {
@@ -118,7 +119,7 @@ export function glowfishLargeHd(): CritterLayers {
   s.rect({ x: 16, y: -24, w: 2, h: 2 }, DB32.white);
   clearBox(s, { x: 24, y: -42, w: 6, h: 6 });
   s.disc({ cx: 27, cy: -39, r: 3 }, DB32.white).set(28, -37, DB32.viking).set(29, -38, DB32.viking);
-  return { body: s, halo: ellipseHalo({ cx: 0, cy: -18, rx: 42, ry: 21, peak: 0.42 }) };
+  return { body: s, halo: null };
 }
 
 // The moth: spread wings dithered toward their trailing edge, folded wings
@@ -176,9 +177,8 @@ export function mothLargeHd(): CritterLayers {
   return { body: s, halo: null };
 }
 
-// A lit firefly: a gold point, rounded to a plus, in a radial falloff of
-// gold the radius of the classic glow. The classic glow's three faint discs
-// dithered as they are read as a disc of dots, not as light.
+// A lit firefly: a gold point, rounded to a plus. Its glow is classic's own
+// soft rings, laid under it by the swarm (art-body.ts).
 export function litFireflyHd(): CritterLayers {
   const body = new FineCanvas({ x: 0, y: 0, w: 3, h: 3 });
   body.rect({ x: 0, y: 0, w: 3, h: 3 }, DB32.goldenFizz).clear([
@@ -188,5 +188,5 @@ export function litFireflyHd(): CritterLayers {
     [2, 2],
   ]);
   body.set(1, 1, DB32.white);
-  return { body, halo: ellipseHalo({ cx: 1.5, cy: 1.5, rx: 12, ry: 12, peak: 0.45, color: DB32.goldenFizz }) };
+  return { body, halo: null };
 }

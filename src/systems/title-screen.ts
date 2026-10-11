@@ -49,6 +49,7 @@ import {
   wordmarkRuleHd,
 } from '@systems/title-hd';
 import { TitleSkyHd } from '@systems/title-sky-hd';
+import { TitleTuftsHd } from '@systems/title-tufts-hd';
 import { Container, Graphics, type TextStyleOptions } from 'pixi.js';
 
 // What the menu asked for. Game turns `go` into a fade + level load, `open`
@@ -159,6 +160,7 @@ export class TitleScreen {
   private readonly keepLights = new Graphics();
   private readonly mist = new Graphics();
   private readonly tufts = new Graphics();
+  private readonly tuftsHd: TitleTuftsHd;
   private readonly cryptCandle = new Graphics();
   private readonly rabbit = new ArtBody('rabbit');
   private rabbitTwitching = false;
@@ -211,7 +213,17 @@ export class TitleScreen {
 
     const scenery = new ArtBody('title-scenery');
     scenery.draw((g) => drawScenery(g, mood), sceneryHd);
-    this.container.addChild(scenery, this.keepLights, this.mist, this.skyHd.mist, this.tufts, this.cryptCandle);
+    this.tuftsHd = new TitleTuftsHd(mood);
+    registerArt({ classic: this.tufts, hd: this.tuftsHd.container });
+    this.container.addChild(
+      scenery,
+      this.keepLights,
+      this.mist,
+      this.skyHd.mist,
+      this.tufts,
+      this.tuftsHd.container,
+      this.cryptCandle,
+    );
 
     this.rabbit.position.set(RABBIT_X, groundTop(RABBIT_X));
     this.rabbit.draw((g) => drawTitleRabbit(g, false));
@@ -299,7 +311,8 @@ export class TitleScreen {
     }
 
     paintKeepLights(this.keepLights, mood, t);
-    paintTufts(this.tufts, mood, t);
+    if (draws(ART_KIND.classic)) paintTufts(this.tufts, mood, t);
+    if (draws(ART_KIND.hd)) this.tuftsHd.tick(t);
     paintCryptCandle(this.cryptCandle, t);
 
     const twitch = rabbitTwitch(t);

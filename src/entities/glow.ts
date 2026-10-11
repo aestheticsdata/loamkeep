@@ -21,12 +21,19 @@ const RINGS: readonly (readonly [number, number])[] = [
 
 export function drawGlow(g: Graphics, glow: GlowSpec): void {
   // A recorder (the HD pass's, see @hd/classic-recorder) takes the glow as a
-  // light, and draws it as an opaque radial falloff instead of these rows.
+  // light: HD lays these same rings under its sprite (@hd/art-body).
   const recorder = g as unknown as { recordGlow?: (glow: GlowSpec) => void };
   if (recorder.recordGlow) {
     recorder.recordGlow(glow);
     return;
   }
+  paintGlow(g, glow);
+}
+
+// The rings themselves. In HD too: a light dithered into opaque dots read as
+// a cloud of moving specks, not as light, and was rejected on sight — a glow
+// is the one thing HD draws with alpha.
+export function paintGlow(g: Graphics, glow: GlowSpec): void {
   for (const [scale, alpha] of RINGS) {
     const r = Math.max(1, Math.round(glow.radius * scale));
     for (let dy = -r; dy <= r; dy++) {

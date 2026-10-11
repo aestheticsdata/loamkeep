@@ -1,7 +1,7 @@
 import { DB32 } from '@constants';
 import { type ClassicRecorder, up } from '@hd/classic-recorder';
 import { FINE, FineCanvas } from '@hd/fine-canvas';
-import { bayer, loOf, RAMP } from '@hd/palette';
+import { bayer, RAMP } from '@hd/palette';
 import { smoothScale, toLogical } from '@hd/smooth-scale';
 import type { Vec2 } from '@types';
 
@@ -19,6 +19,9 @@ export interface CritterHdOptions {
   // selout leaves lit (L4).
   emissive?: readonly number[];
   ramp?: ReadonlyMap<number, readonly [number, number]>;
+  // Its translucent rects are light (the glowfish's halo): HD keeps them as
+  // classic draws them, under the sprite, instead of dithering them.
+  softLight?: boolean;
 }
 
 // Eyes: a classic single pixel of these tones becomes 2×2 fine, the rest of
@@ -95,28 +98,13 @@ export function ellipseHalo(e: HaloEllipse): FineCanvas {
   return s;
 }
 
-// The classic glow, translucent rects stacked on each other, as opaque
-// pixels: each rect dithers its colour in at its alpha as a density, and
-// where rects overlap the denser wins, since Bayer thresholds nest.
+// The classic drawing's translucent rects as opaque pixels: each dithers its
+// colour in at its alpha as a density, and where rects overlap the denser
+// wins, since Bayer thresholds nest. Lights (drawGlow) are not among them:
+// HD lays classic's own rings under the sprite (art-body.ts, showGlows).
 export function haloFromClassic(classic: ClassicRecorder): FineCanvas | null {
   const glows = classic.rects.filter((r) => r.alpha < 1 && r.alpha > 0);
-  const lights = classic.glows.map((g) =>
-    // A drawGlow's three faint discs, dithered as drawn, read as a disc of
-    // dots; as a radial falloff over the same radius they read as light.
-    ellipseHalo({
-      cx: (g.x + 0.5) * FINE,
-      cy: (g.y + 0.5) * FINE,
-      rx: (g.radius + 0.5) * FINE,
-      ry: (g.radius + 0.5) * FINE,
-      // Classic's three rings add up to about 18 % at the centre; a little
-      // more than that, since a dithered pixel is all or nothing.
-      peak: 0.28,
-      color: g.color,
-      outer: loOf(g.color),
-      rim: 0.35,
-    }),
-  );
-  if (glows.length === 0 && lights.length === 0) return null;
+  if (glows.length === 0) return null;
   let halo: FineCanvas | null = null;
   if (glows.length > 0) {
     const x0 = Math.min(...glows.map((r) => r.x));
@@ -134,7 +122,7 @@ export function haloFromClassic(classic: ClassicRecorder): FineCanvas | null {
       );
     }
   }
-  return [halo, ...lights].reduce<FineCanvas | null>((a, b) => (a && b ? merge(a, b) : (a ?? b)), null);
+  return halo;
 }
 
 export function critterHd(classic: ClassicRecorder, options: CritterHdOptions = {}): CritterLayers {
@@ -211,9 +199,11 @@ interface LargeRecording {
 }
 
 export function portraitHd(large: LargeRecording, options: CritterHdOptions = {}): CritterLayers {
-  const body = smoothScale(toLogical(up(large.native), FINE), FINE * large.scale);
+  const body = smoothScale(toLogical(up(large.native), FINE), FINE * large.scale, EYE_TONES);
   thickEdges(body, { thickness: Math.max(1, Math.round(large.scale / 2)), ...options });
-  return { body, halo: haloFromClassic(large.scaled) };
+  // Its glows and translucent rects are laid under it as classic draws them
+  // (shownLarge, showGlows): dithered at this size they read as dots.
+  return { body, halo: null };
 }
 
 interface ThickEdges extends CritterHdOptions {

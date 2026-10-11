@@ -1,8 +1,8 @@
 import { DB32, SCREEN_WIDTH } from '@constants';
 import type { ChunkSource } from '@hd/chunk-layer';
-import { ellipseHalo } from '@hd/critter-hd';
 import { FINE, type FineCanvas } from '@hd/fine-canvas';
-import { bayer } from '@hd/palette';
+import { bayer, loOf } from '@hd/palette';
+import type { Vec2 } from '@types';
 import {
   AUTUMN_BANDS,
   AUTUMN_HORIZON_Y,
@@ -83,8 +83,8 @@ export function hillsHd(opts: HillSilhouetteOptions): ChunkSource {
   };
 }
 
-// A dim star is a 2×2; a bright one a white plus in a lightSteel cross in a
-// heather one, inside the classic star's 3×3 footprint (RECIPES §6).
+// A star at classic's size, softened: thin 1-fine crosses and 2×2 dim stars
+// read as a sky of scratches and specks, and were rejected beside classic's.
 interface Star {
   // Logical px.
   x: number;
@@ -97,12 +97,45 @@ function star(s: FineCanvas, at: Star): void {
   const x = at.x * FINE;
   const y = at.y * FINE;
   if (!at.bright) {
-    s.rect(box(x + 1, y + 1, 2, 2), at.color);
+    // Classic's whole pixel, its corners a shade down so it reads round.
+    s.rect(box(x, y, 3, 3), loOf(at.color))
+      .rect(box(x + 1, y, 1, 3), at.color)
+      .rect(box(x, y + 1, 3, 1), at.color);
     return;
   }
-  s.rect(box(x - 3, y + 1, 9, 1), DB32.heather).rect(box(x + 1, y - 3, 1, 9), DB32.heather);
-  s.rect(box(x - 1, y + 1, 5, 1), DB32.lightSteel).rect(box(x + 1, y - 1, 1, 5), DB32.lightSteel);
-  s.rect(box(x, y + 1, 3, 1), DB32.white).rect(box(x + 1, y, 1, 3), DB32.white);
+  // Classic's plus — a white pixel with heather on its four sides — as a
+  // soft light: a round white core, its arms lightSteel near it and heather
+  // further out, drawn to a point, all inside the plus.
+  const cx = x + 1.5;
+  const cy = y + 1.5;
+  for (let py = y - 3; py < y + 6; py++) {
+    for (let px = x - 3; px < x + 6; px++) {
+      const dx = Math.abs(px + 0.5 - cx);
+      const dy = Math.abs(py + 0.5 - cy);
+      const d = Math.hypot(dx, dy);
+      const along = Math.max(dx, dy);
+      const across = Math.min(dx, dy);
+      if (d < 1.6) s.set(px, py, DB32.white);
+      else if (across < 1.5 && along < 3) s.set(px, py, DB32.lightSteel);
+      else if (across < (along > 3.5 ? 0.6 : 1.5)) s.set(px, py, DB32.heather);
+    }
+  }
+}
+
+// A corner of the spiral: classic's faint lightSteel square and its long
+// heather cross, as an opaque disc a step down lightSteel's ramp with arms
+// drawn to a point, and the bright star over it. A dithered haze here read
+// as a speckle round the star.
+function cornerStar(s: FineCanvas, at: Vec2): void {
+  const cx = at.x * FINE + 1.5;
+  const cy = at.y * FINE + 1.5;
+  s.disc({ cx, cy, r: 4.2 }, loOf(DB32.lightSteel));
+  for (let k = -7; k <= 7; k++) {
+    if (Math.abs(k) > 4) {
+      s.set(at.x * FINE + 1 + k, at.y * FINE + 1, DB32.heather).set(at.x * FINE + 1, at.y * FINE + 1 + k, DB32.heather);
+    }
+  }
+  star(s, { x: at.x, y: at.y, bright: true, color: DB32.white });
 }
 
 // The star field, from the same generator as classic's makeStarField, call
@@ -256,7 +289,13 @@ export function dustBandHd(width: number): ChunkSource {
         const x = next() * width;
         const across = (next() + next() + next() - 1.5) * 22;
         const y = 170 - (x / width) * 140 + across;
-        s.rect(box(Math.floor(x * FINE), Math.floor(y) * FINE + 1, 2, 1), DB32.deepKoamaru);
+        // Classic's whole pixel, corners a shade down: smaller specks thinned
+        // the band to nothing beside classic's.
+        const fx = Math.floor(x * FINE);
+        const fy = Math.floor(y) * FINE;
+        s.rect(box(fx, fy, 3, 3), loOf(DB32.deepKoamaru))
+          .rect(box(fx + 1, fy, 1, 3), DB32.deepKoamaru)
+          .rect(box(fx, fy + 1, 3, 1), DB32.deepKoamaru);
       }
     },
   };
@@ -285,10 +324,7 @@ export function spiralHd(): ChunkSource {
       }
       for (const corner of SPIRAL_CORNERS) {
         const [x, y] = at(corner);
-        s.blit(
-          ellipseHalo({ cx: x * FINE + 1.5, cy: y * FINE + 1.5, rx: 7.5, ry: 7.5, peak: 0.5, color: DB32.lightSteel }),
-        );
-        star(s, { x, y, bright: true, color: DB32.white });
+        cornerStar(s, { x, y });
       }
     },
   };

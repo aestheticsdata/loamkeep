@@ -554,6 +554,34 @@ export function paintMist(g: Graphics, mood: TitleMood, t: number): void {
   }
 }
 
+// What grows at a tuft site: a short tuft, a tall one, or a flower.
+export const TUFT = { short: 'short', tall: 'tall', flower: 'flower' } as const;
+export type Tuft = (typeof TUFT)[keyof typeof TUFT];
+
+export interface TuftSite {
+  x: number;
+  // The ground's top under it.
+  top: number;
+  kind: Tuft;
+}
+
+// Every 6 px along the ground, where the hash puts something.
+export function tuftSites(): TuftSite[] {
+  const sites: TuftSite[] = [];
+  for (let x = 3; x < SCREEN_WIDTH; x += 6) {
+    const h = hash(x, 7);
+    const top = groundTop(x);
+    if (h > 0.52) sites.push({ x, top, kind: h > 0.86 ? TUFT.tall : TUFT.short });
+    else if (h < 0.09) sites.push({ x, top, kind: TUFT.flower });
+  }
+  return sites;
+}
+
+// How far a tuft at x leans at time t, from -1 to 1.
+export function tuftLean(x: number, t: number): number {
+  return Math.sin(t * 1.4 + x * 0.21);
+}
+
 // Grass tufts every 6 px where the hash allows, top pixel swaying ±1; a red
 // flower pixel where it doesn't.
 export function paintTufts(g: Graphics, mood: TitleMood, t: number): void {

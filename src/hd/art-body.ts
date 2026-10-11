@@ -1,3 +1,4 @@
+import { paintGlow } from '@entities/glow';
 import { ART_KIND, draws, fineMotion, registerArt } from '@hd/art-mode';
 import { BakeCache, FineSprite } from '@hd/bake';
 import { type ClassicRecorder, record } from '@hd/classic-recorder';
@@ -39,8 +40,29 @@ export class ArtBody extends Container {
     if (draws(ART_KIND.hd) && key !== this.shownHd) {
       this.shownHd = key;
       this.hd.show(this.bakes.get(key, () => flatten(hd ? hd(recorded) : critterHd(recorded, this.options))));
+      showGlows(this.hd, recorded, this.options.softLight);
     }
   }
+}
+
+// Classic's soft light under an HD sprite, in its own logical space: the
+// rings of every light the drawing records, and with `soft` its translucent
+// rects too (the glowfish's halo). Light is the one thing HD draws with
+// alpha (glow.ts). A sprite with no light carries no Graphics.
+export function showGlows(sprite: FineSprite, recorded: ClassicRecorder, soft = false): void {
+  const rects = soft ? recorded.rects.filter((r) => r.alpha > 0 && r.alpha < 1) : [];
+  let layer = sprite.children[0] instanceof Graphics ? sprite.children[0] : null;
+  if (recorded.glows.length === 0 && rects.length === 0) {
+    layer?.clear();
+    return;
+  }
+  if (!layer) {
+    layer = new Graphics();
+    sprite.addChildAt(layer, 0);
+  }
+  layer.clear();
+  for (const glow of recorded.glows) paintGlow(layer, glow);
+  for (const r of rects) layer.rect(r.x, r.y, r.w, r.h).fill({ color: r.color, alpha: r.alpha });
 }
 
 function signature(recorded: ClassicRecorder): string {
@@ -81,6 +103,9 @@ export class ArtSwarm extends Container {
   private readonly hd = new Container();
   private readonly bakes: BakeCache;
   private readonly options: CritterHdOptions;
+  // What each member sprite shows, so a sprite is only re-shown, and its
+  // glow repainted, when its member's look changes.
+  private readonly shown: string[] = [];
 
   constructor(species: string, options: CritterHdOptions = {}) {
     super();
@@ -105,11 +130,15 @@ export class ArtSwarm extends Container {
       members.forEach((m, i) => {
         const sprite = this.sprite(i);
         const own = m.hd;
-        if (own) {
-          sprite.show(this.bakes.get(`hd:${own.key}`, () => flatten(own.draw())));
-        } else {
+        const key = own ? `hd:${own.key}` : null;
+        if (key === null || this.shown[i] !== key) {
           const recorded = record(m.draw);
-          sprite.show(this.bakes.get(signature(recorded), () => flatten(critterHd(recorded, this.options))));
+          const bakeKey = key ?? signature(recorded);
+          if (this.shown[i] !== bakeKey) {
+            sprite.show(this.bakes.get(bakeKey, () => flatten(own ? own.draw() : critterHd(recorded, this.options))));
+            showGlows(sprite, recorded, this.options.softLight);
+            this.shown[i] = bakeKey;
+          }
         }
         sprite.position.set(Math.round(m.x * step) / step, Math.round(m.y * step) / step);
         sprite.visible = true;

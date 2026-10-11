@@ -1,4 +1,5 @@
 import { DB32 } from '@constants';
+import { showGlows } from '@hd/art-body';
 import { BakeCache, FineSprite } from '@hd/bake';
 import { record } from '@hd/classic-recorder';
 import { flatten, portraitHd } from '@hd/critter-hd';
@@ -27,5 +28,6 @@ export function shownLarge(draw: (g: Graphics) => void, scale: number): FineSpri
   const key = [scale, ...rects, '|', ...glows].join(';');
   const sprite = new FineSprite();
   sprite.show(bakes.get(key, () => flatten(portraitHd({ native, scaled, scale }, { emissive: LIGHTS }))));
+  showGlows(sprite, scaled, true);
   return sprite;
 }

@@ -74,6 +74,45 @@ describe('smoothScale', () => {
   });
 });
 
+describe('smoothScale, eyes', () => {
+  it('draws a lone eye pixel on a corner as a round pupil in the colour around it, not a cut triangle', () => {
+    const EYE = 0x222034;
+    // A 2×2 bump with the eye on its top-right corner, like the frog's.
+    const out = smoothScale(
+      canvas([
+        [0, 0, A],
+        [1, 0, EYE],
+        [0, 1, A],
+        [1, 1, A],
+      ]),
+      15,
+      [EYE],
+    );
+    // The eye's middle is the pupil, its far corner is cut away like the
+    // bump's own, and the corner it shares with the bump is the bump's.
+    expect(out.get(22, 7)).toBe(EYE);
+    expect(out.ink(29, 0)).toBe(false);
+    expect(out.get(15, 14)).toBe(A);
+    // Large enough to carry a catch-light, up and to the left.
+    expect(out.get(20, 5)).toBe(0xffffff);
+  });
+
+  it('leaves an eye tone that is part of a larger shape to the corner rule', () => {
+    const out = smoothScale(
+      canvas([
+        [0, 0, B],
+        [1, 0, B],
+        [0, 1, B],
+        [1, 1, B],
+      ]),
+      9,
+      [B],
+    );
+    expect(out.ink(0, 0)).toBe(false);
+    expect(out.get(4, 4)).toBe(B);
+  });
+});
+
 describe('toLogical', () => {
   it('reads each logical pixel at its centre', () => {
     const fine = new FineCanvas({ x: -3, y: -3, w: 6, h: 6 });

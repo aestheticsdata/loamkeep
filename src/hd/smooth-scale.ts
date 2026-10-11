@@ -1,3 +1,4 @@
+import { DB32 } from '@constants';
 import { FineCanvas } from '@hd/fine-canvas';
 
 // A small drawing enlarged for a greeting or a page, without the blocks:
@@ -8,7 +9,12 @@ import { FineCanvas } from '@hd/fine-canvas';
 // lone eye keeps its shape. Empty counts as a colour: an outer corner of the
 // silhouette is cut away, an inner one filled. Staircases become 45° edges
 // at the size the drawing is seen; no tone is added, no alpha.
-export function smoothScale(source: FineCanvas, factor: number): FineCanvas {
+//
+// An eye — a lone pixel of one of the `eyes` tones, with none of its own
+// tone beside it — is not cut: it becomes a round pupil, with a catch-light
+// up and to the left once it is large enough to carry one, sitting in the
+// colour around it (the frog's eyes on the corners of their bumps).
+export function smoothScale(source: FineCanvas, factor: number, eyes: readonly number[] = []): FineCanvas {
   const out = new FineCanvas({
     x: source.x0 * factor,
     y: source.y0 * factor,
@@ -17,11 +23,14 @@ export function smoothScale(source: FineCanvas, factor: number): FineCanvas {
   });
   for (let sy = source.y0; sy < source.y0 + source.h; sy++) {
     for (let sx = source.x0; sx < source.x0 + source.w; sx++) {
-      const p = source.get(sx, sy);
+      const own = source.get(sx, sy);
       const n = source.get(sx, sy - 1);
       const s = source.get(sx, sy + 1);
       const w = source.get(sx - 1, sy);
       const e = source.get(sx + 1, sy);
+      const eye = eyes.includes(own) && ![n, s, w, e].includes(own);
+      // Under an eye, the cell is painted as the colour around it would be.
+      const p = eye ? surrounding([n, s, w, e]) : own;
       for (let j = 0; j < factor; j++) {
         const v = (j + 0.5) / factor;
         const top = v < 0.5;
@@ -35,13 +44,43 @@ export function smoothScale(source: FineCanvas, factor: number): FineCanvas {
           const opposite = left ? e : w;
           const du = left ? u : 1 - u;
           const cut = vertical === horizontal && vertical !== p && vertical !== opposite && horizontal !== across;
-          const c = cut && du + dv < 0.5 ? vertical : p;
+          let c = cut && du + dv < 0.5 ? vertical : p;
+          if (eye) c = pupil({ u, v, factor }) ?? c;
+          if (c === GLINT) c = DB32.white;
+          else if (c === PUPIL) c = own;
           if (c >= 0) out.set(sx * factor + i, sy * factor + j, c);
         }
       }
     }
   }
   return out;
+}
+
+const EMPTY = -1;
+const PUPIL = -2;
+const GLINT = -3;
+
+// The colour an eye sits in: the most common ink among its four neighbours,
+// or none.
+function surrounding(around: readonly number[]): number {
+  const ink = around.filter((c) => c >= 0);
+  if (ink.length === 0) return EMPTY;
+  return ink.reduce((best, c) => (ink.filter((x) => x === c).length > ink.filter((x) => x === best).length ? c : best));
+}
+
+// Where a point of an eye's cell falls (u, v from 0 to 1 across it): in the
+// round pupil, on its catch-light, or outside both (null).
+interface EyePoint {
+  u: number;
+  v: number;
+  factor: number;
+}
+
+function pupil(at: EyePoint): number | null {
+  const d = Math.hypot(at.u - 0.5, at.v - 0.5);
+  if (d > 0.42) return null;
+  if (at.factor >= 9 && Math.hypot(at.u - 0.36, at.v - 0.36) < 0.1) return GLINT;
+  return PUPIL;
 }
 
 // A drawing on the fine grid brought back to one pixel per logical pixel,

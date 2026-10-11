@@ -4,12 +4,14 @@ import type { LogicalRect } from '@hd/chunk-layer';
 import { type ClassicRecorder, up } from '@hd/classic-recorder';
 import { type CritterLayers, haloFromClassic } from '@hd/critter-hd';
 import { FINE, FineCanvas } from '@hd/fine-canvas';
-import { bayer } from '@hd/palette';
+import { bayer, hiOf } from '@hd/palette';
 import { smoothScale } from '@hd/smooth-scale';
 import {
   type CloudStreak,
   hash,
   type TitleMood,
+  TUFT,
+  type Tuft,
   type WandererFrame,
   WORDMARK_DOT,
   WORDMARK_Y,
@@ -206,4 +208,54 @@ export function cursorHd(color: number): FineCanvas {
   const dots = new FineCanvas({ x: 0, y: 0, w: 3, h: 5 });
   dots.rect({ x: 0, y: 0, w: 1, h: 5 }, color).rect({ x: 1, y: 1, w: 1, h: 3 }, color).set(2, 2, color);
   return smoothScale(dots, FINE);
+}
+
+// A grass tuft on the fine grid, its foot at (0, 0) on the ground's top:
+// three 1-fine blades — the middle one tallest, the outer two splayed — each
+// bent `sway` fine at its tip and less toward its foot, the tips a step
+// lighter. A flower is a stem with a plus-shaped head and a lit centre.
+export interface TuftPose {
+  kind: Tuft;
+  // Fine px the tips lean, -2 to 2.
+  sway: number;
+}
+
+const BLADES: Record<Tuft, readonly (readonly [number, number])[]> = {
+  // [foot x, height] per blade, fine px.
+  [TUFT.short]: [
+    [0, 4],
+    [1, 6],
+    [2, 4],
+  ],
+  [TUFT.tall]: [
+    [0, 5],
+    [1, 9],
+    [2, 6],
+  ],
+  [TUFT.flower]: [[1, 6]],
+};
+
+export function tuftHd(pose: TuftPose, tones: TuftTones): FineCanvas {
+  const s = new FineCanvas({ x: -4, y: -12, w: 11, h: 12 });
+  const splay = [-1, 0, 1];
+  BLADES[pose.kind].forEach(([foot, height], i) => {
+    const out = pose.kind === TUFT.flower ? 0 : splay[i];
+    for (let k = 0; k < height; k++) {
+      const bend = Math.round(((pose.sway + out) * k * k) / (height * height));
+      s.set(foot + bend, -1 - k, k === height - 1 && pose.kind !== TUFT.flower ? hiOf(tones.grass) : tones.grass);
+    }
+  });
+  if (pose.kind === TUFT.flower) {
+    const [foot, height] = BLADES[TUFT.flower][0];
+    const x = foot + Math.round(pose.sway / 2);
+    const y = -height - 2;
+    s.rect({ x: x - 1, y, w: 3, h: 1 }, tones.flower).rect({ x, y: y - 1, w: 1, h: 3 }, tones.flower);
+    s.set(x, y, DB32.goldenFizz);
+  }
+  return s;
+}
+
+export interface TuftTones {
+  grass: number;
+  flower: number;
 }

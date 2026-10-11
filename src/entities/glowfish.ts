@@ -67,7 +67,7 @@ export class Glowfish implements Entity {
     // Phase from x, so a shoal does not pulse in step.
     this.elapsedTime = spec.x * 0.11;
     this.sprite = new Container();
-    this.body = new ArtBody('glowfish');
+    this.body = new ArtBody('glowfish', { softLight: true });
     this.sprite.addChild(this.body);
     this.update(0);
   }

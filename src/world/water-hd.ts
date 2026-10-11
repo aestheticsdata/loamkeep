@@ -37,10 +37,30 @@ function bodyTone(at: WaterPixel): number {
   return bayer(at.x, at.y) < Math.min(0.5, dd * 0.5) ? DB32.deepKoamaru : DB32.venice;
 }
 
-function depthOf(map: Tilemap, tx: number, ty: number): number {
+// How many water tiles lie above (tx, ty), up to the open surface. Under a
+// pillar or a ledge standing in the water the column is capped by stone, so
+// its depth is taken from the nearest column at that row whose water runs up
+// to open air: counted from the stone, it started over and left a pale
+// column under every pillar.
+const DEPTH_REACH = 12;
+
+function runAbove(map: Tilemap, tx: number, ty: number): number {
   let d = 0;
   while (map.at(tx, ty - d - 1) === Tile.Water) d++;
   return d;
+}
+
+function depthOf(map: Tilemap, tx: number, ty: number): number {
+  const own = runAbove(map, tx, ty);
+  if (map.at(tx, ty - own - 1) === Tile.Empty) return own;
+  for (let k = 1; k <= DEPTH_REACH; k++) {
+    for (const x of [tx - k, tx + k]) {
+      if (map.at(x, ty) !== Tile.Water) continue;
+      const run = runAbove(map, x, ty);
+      if (map.at(x, ty - run - 1) === Tile.Empty) return run;
+    }
+  }
+  return own;
 }
 
 // The still body of every water tile in the canvas: the whole tile when it
