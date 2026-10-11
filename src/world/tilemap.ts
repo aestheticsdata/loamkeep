@@ -15,6 +15,19 @@ const CRYPT_LO = 0x000000; // pure black mortar
 const GROTTO_ROCK = 0x1a2030;
 const GROTTO_GRAIN = 0x2a3346;
 
+// The observatory hill at night. Moss gone blue-black under the moon, peat
+// darker still, and granite the colour of the sky an hour after sunset.
+const HEATH_MOSS = 0x26332f;
+const HEATH_FROST = 0x9fb0cc;
+const HEATHER = 0x6a4a7e;
+const HEATHER_HI = 0x9a6aa8;
+const PEAT = 0x241c22;
+const PEAT_ROOT = 0x3a2c32;
+const GRANITE = 0x3b4354;
+const GRANITE_HI = 0x58627a;
+const GRANITE_CRACK = 0x232836;
+const LICHEN = 0x7d8a6a;
+
 // Tile type. Uses a const object (not enum) so it plays nicely with
 // `isolatedModules` in tsconfig.
 //
@@ -32,6 +45,10 @@ const GROTTO_GRAIN = 0x2a3346;
 //              only light in the cave is what grows there.
 //   - Library: Bookcase (solid — the stacks are climbed on top of) and
 //              Ladder (not solid — climbed up the face of, see Player).
+//   - Upland:  Heath / Peat / Granite, the observatory hill at night. Drawn
+//              in night colours rather than tinted, and not the meadow's
+//              grass, earth and brick: frost on the heath, roots in the
+//              peat, granite in irregular blocks with lichen on it.
 //   - Timber:  the belfry's beams and plank floors. Warm brown against
 //              the tower's grey brick, so a ledge reads as "something to
 //              stand on" before the eye has found its edge.
@@ -52,6 +69,9 @@ export const Tile = {
   GrottoRock: 12,
   Bookcase: 13,
   Ladder: 14,
+  Heath: 15,
+  Peat: 16,
+  Granite: 17,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -73,6 +93,9 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   R: Tile.GrottoRock,
   L: Tile.Bookcase,
   H: Tile.Ladder,
+  h: Tile.Heath,
+  p: Tile.Peat,
+  g: Tile.Granite,
 };
 
 const TILE_COLORS: Record<Tile, number> = {
@@ -118,6 +141,9 @@ const TILE_COLORS: Record<Tile, number> = {
   // Ladder — never used as a fill: a ladder is two rails and its rungs over
   // whatever is behind it (see drawTile).
   [Tile.Ladder]: DB32.rope,
+  [Tile.Heath]: HEATH_MOSS,
+  [Tile.Peat]: PEAT,
+  [Tile.Granite]: GRANITE,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -143,6 +169,9 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.GrottoRock]: true,
   [Tile.Bookcase]: true,
   [Tile.Ladder]: false,
+  [Tile.Heath]: true,
+  [Tile.Peat]: true,
+  [Tile.Granite]: true,
 };
 
 export class Tilemap {
@@ -449,6 +478,15 @@ function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: nu
       break;
     case Tile.Bookcase:
       drawBookcase(g, x, y, tx, ty);
+      break;
+    case Tile.Heath:
+      drawHeath(g, x, y, tx, ty);
+      break;
+    case Tile.Peat:
+      drawPeat(g, x, y, tx, ty);
+      break;
+    case Tile.Granite:
+      drawGranite(g, x, y, tx, ty);
       break;
   }
 }
@@ -768,6 +806,64 @@ function drawBookcase(g: Graphics, x: number, y: number, tx: number, ty: number)
   }
   g.rect(x, y + TILE_SIZE - 2, TILE_SIZE, 2).fill(DB32.rope);
   g.rect(x, y, TILE_SIZE, 1).fill(DB32.twine);
+}
+
+// Heath: the surface of the hill. A line of frost along the top, moss under
+// it, and sprigs of heather standing up out of it — two to four per tile,
+// placed by hash, so the skyline of a run of heath is ragged, not ruled.
+function drawHeath(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  g.rect(x, y, TILE_SIZE, 1).fill(HEATH_FROST);
+  g.rect(x, y + TILE_SIZE - 5, TILE_SIZE, 5).fill(PEAT);
+  for (let i = 0; i < TILE_SIZE; i += 3) {
+    g.rect(x + i + (ty & 1), y + TILE_SIZE - 6, 1, 1).fill(PEAT);
+  }
+  const sprigs = 2 + Math.floor(tileHash(tx, ty, 210) * 3);
+  for (let i = 0; i < sprigs; i++) {
+    const sx = 1 + Math.floor(tileHash(tx, ty, 211 + i) * (TILE_SIZE - 2));
+    const h = 2 + Math.floor(tileHash(tx, ty, 216 + i) * 3);
+    g.rect(x + sx, y - h + 1, 1, h).fill(HEATHER);
+    g.rect(x + sx, y - h + 1, 1, 1).fill(HEATHER_HI);
+  }
+  if (tileHash(tx, ty, 220) < 0.3) {
+    g.rect(x + 4 + Math.floor(tileHash(tx, ty, 221) * 8), y + 4, 2, 1).fill(HEATH_FROST);
+  }
+}
+
+// Peat: near-black, with pale roots threading through it sideways.
+function drawPeat(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  for (let i = 0; i < 2; i++) {
+    const ry = 2 + Math.floor(tileHash(tx, ty, 230 + i) * (TILE_SIZE - 4));
+    const rx = Math.floor(tileHash(tx, ty, 232 + i) * 6);
+    const len = 4 + Math.floor(tileHash(tx, ty, 234 + i) * 8);
+    g.rect(x + rx, y + ry, Math.min(len, TILE_SIZE - rx), 1).fill(PEAT_ROOT);
+  }
+}
+
+// Granite: no running bond. Each tile decides from its hash whether its right
+// and bottom edges are a crack, so blocks come out in odd sizes — one tile,
+// two, a long slab — the way a weathered outcrop splits. A lit edge sits
+// above and left of each crack, and lichen spots the faces.
+function drawGranite(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  const crackRight = tileHash(tx, ty, 240) < 0.4;
+  const crackBottom = tileHash(tx, ty, 241) < 0.45;
+  if (crackRight) {
+    g.rect(x + TILE_SIZE - 1, y, 1, TILE_SIZE).fill(GRANITE_CRACK);
+    g.rect(x + TILE_SIZE - 2, y + 1, 1, TILE_SIZE - 2).fill(GRANITE_HI);
+  }
+  if (crackBottom) {
+    g.rect(x, y + TILE_SIZE - 1, TILE_SIZE, 1).fill(GRANITE_CRACK);
+  }
+  if (tileHash(tx, ty - 1, 241) < 0.45) {
+    g.rect(x + 1, y, TILE_SIZE - 2, 1).fill(GRANITE_HI);
+  }
+  for (let i = 0; i < 2; i++) {
+    if (tileHash(tx, ty, 244 + i) < 0.5) {
+      const lx = 2 + Math.floor(tileHash(tx, ty, 246 + i) * (TILE_SIZE - 5));
+      const ly = 2 + Math.floor(tileHash(tx, ty, 248 + i) * (TILE_SIZE - 5));
+      g.rect(x + lx, y + ly, 2, 1).fill(LICHEN);
+      g.rect(x + lx + 1, y + ly + 1, 1, 1).fill(LICHEN);
+    }
+  }
 }
 
 // Golden classical column. Vertical "round column" shading per tile: a

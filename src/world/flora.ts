@@ -4,7 +4,7 @@ import type { Graphics } from 'pixi.js';
 
 // The flora sketchbook's table of contents: one page per species, largest
 // tree last, then the two things that grow under them, then the glow
-// grotto's three, then the kitchen garden's.
+// grotto's three, the kitchen garden's, and the heather on the hill.
 //
 // Authored rather than derived, like the creatures book — a species is not
 // registered anywhere the way a landmark is registered on a level, and one
@@ -165,6 +165,17 @@ export const FLORA_PAGES: readonly FloraPage[] = [
         'Taller than you and too heavy now to hold its head up. It has turned ' +
         'to face the last of the light, low over the wall, and will not turn back.',
       drawSketch: plantSketch('sunflower', TREE_SCALE),
+    },
+  },
+  {
+    id: 'heather',
+    page: {
+      name: 'Heather',
+      description:
+        'Low and tough, the only thing that flowers this high, and it does it ' +
+        'at night as readily as by day. Frost sits on every spike. The whole ' +
+        'hill smells faintly of honey.',
+      drawSketch: plantSketch('heather', UNDERSTOREY_SCALE),
     },
   },
 ];

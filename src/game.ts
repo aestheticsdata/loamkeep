@@ -501,8 +501,6 @@ export class Game {
   private mountLevelContent(): void {
     const level = this.currentLevel;
     const tilemap = level.tilemap;
-    const mapWidthPx = tilemap.width * TILE_SIZE;
-    const mapHeightPx = tilemap.height * TILE_SIZE;
 
     // Backdrop — sits behind everything in the level layer. The renderer
     // depends on the level's flavor:
@@ -512,20 +510,30 @@ export class Game {
     //                   where the rock texture would read as "dirt on the
     //                   walls" (this was an actual user complaint in the
     //                   first cut of the keep).
-    const startY = level.spec.rockBgStartRow * TILE_SIZE;
-    let backdrop: Graphics;
-    if (level.spec.backdrop === 'cave') {
-      backdrop = renderRockBackground(mapWidthPx, startY, mapHeightPx);
-    } else if (level.spec.backdrop === 'crypt-black') {
-      backdrop = renderCryptBackdrop(mapWidthPx, startY, mapHeightPx);
-    } else {
-      backdrop = renderIndoorBackdrop(mapWidthPx, startY, mapHeightPx);
+    // Either one band, full width, from rockBgStartRow down; or, when the
+    // level names regions, only behind those — a hill with caves inside it
+    // and open sky either side of it.
+    const regions = level.spec.backdropRegions ?? [
+      { col: 0, row: level.spec.rockBgStartRow, cols: tilemap.width, rows: tilemap.height - level.spec.rockBgStartRow },
+    ];
+    for (const region of regions) {
+      const top = region.row * TILE_SIZE;
+      const bottom = (region.row + region.rows) * TILE_SIZE;
+      const width = region.cols * TILE_SIZE;
+      let backdrop: Graphics;
+      if (level.spec.backdrop === 'cave') {
+        backdrop = renderRockBackground(width, top, bottom);
+      } else if (level.spec.backdrop === 'crypt-black') {
+        backdrop = renderCryptBackdrop(width, top, bottom);
+      } else {
+        backdrop = renderIndoorBackdrop(width, top, bottom);
+      }
+      backdrop.x = region.col * TILE_SIZE;
+      this.levelLayer.addChild(backdrop);
     }
-    this.levelLayer.addChild(backdrop);
 
     // Static tilemap (everything except water).
     this.levelLayer.addChild(renderTilemap(tilemap));
-    this.levelLayer.tint = level.spec.tint ?? 0xffffff;
 
     // Water — body + animated surface. Body goes first so surface renders
     // over it. The waterSurface field is REASSIGNED here — the old Graphics

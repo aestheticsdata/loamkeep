@@ -35,6 +35,14 @@ export type ParallaxFlavor = 'meadow' | 'keep' | 'night' | 'autumn' | 'zenith';
 //                   underground" — you can't see the back of the room.
 export type BackdropKind = 'cave' | 'indoor-dark' | 'crypt-black';
 
+// A rectangle of the level in tiles: top-left (col, row) and its size.
+export interface TileRect {
+  col: number;
+  row: number;
+  cols: number;
+  rows: number;
+}
+
 // Authored description of a level. Pure data + factory functions — the
 // runtime `Level` (below) is built from this and mounted by Game.
 //
@@ -70,14 +78,13 @@ export interface LevelSpec {
   // row (so cave-gaps above ground reveal rock from above); for indoor
   // levels this is row 0 (the whole level wants the indoor backdrop).
   rockBgStartRow: number;
+  // When present, the backdrop is drawn only behind these rectangles instead
+  // of the full-width band from rockBgStartRow down: for caves inside a hill
+  // that has open sky on both sides of it.
+  backdropRegions?: readonly TileRect[];
   // True when sky lies above the top row, so the camera may follow a jump
   // above it. False under a ceiling: the camera stops at row 0.
   openSky: boolean;
-  // A colour multiplied over everything the level draws (tiles, props,
-  // creatures — not the player, not the sky). For light the tiles were not
-  // painted in: the meadow's grass is daytime green, and on a hill at night
-  // it has to be moonlit. Absent means the level's own colours.
-  tint?: number;
 }
 
 // Materialised level: spec + built Tilemap. Mounting still happens in Game,

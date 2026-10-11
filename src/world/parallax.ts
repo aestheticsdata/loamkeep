@@ -45,10 +45,10 @@ const AUTUMN_HORIZON_Y = 14 * 16;
 // The observatory's sky. Screen-space like the night's, but deeper and far
 // fuller, with a band of faint dust across it and the spiral constellation
 // overhead — placed, in screen coordinates, so that from the summit (camera
-// at about x 320, y 16) it hangs centred above the Sighting Stone.
+// at about x 552, y -40) it hangs centred above the Sighting Stone.
 const ZENITH_SKY = 0x0c0b1a;
 const ZENITH_FACTOR = 0.05;
-const SPIRAL_CENTRE_X = 184;
+const SPIRAL_CENTRE_X = 196;
 const SPIRAL_CENTRE_Y = 58;
 const AUTUMN_BANDS: readonly (readonly [number, number])[] = [
   // [height above the horizon where the band starts, colour]

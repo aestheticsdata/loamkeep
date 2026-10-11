@@ -31,7 +31,8 @@ export type FloraId =
   | 'glow-moss'
   | 'squash'
   | 'bean-trellis'
-  | 'sunflower';
+  | 'sunflower'
+  | 'heather';
 
 function drawSmallTree(g: Graphics): void {
   const trunk = DB32.oiledCedar;
@@ -288,6 +289,25 @@ function drawSunflower(g: Graphics): void {
   g.rect(0, -24, 2, 1).fill(DB32.tahitiGold);
 }
 
+// Heather — the observatory hill's. A low clump of woody stems with purple
+// flower spikes, frosted at the tips. 10 wide × 6 tall.
+function drawHeather(g: Graphics): void {
+  g.rect(-5, -2, 10, 2).fill(0x26332f);
+  for (const [x, h] of [
+    [-4, 4],
+    [-2, 6],
+    [0, 5],
+    [2, 6],
+    [4, 3],
+  ] as const) {
+    g.rect(x, -h, 1, h).fill(0x6a4a7e);
+    g.rect(x, -h, 1, 2).fill(0x9a6aa8);
+    g.rect(x, -h, 1, 1).fill(0x9fb0cc);
+  }
+  g.rect(-3, -1, 1, 1).fill(DB32.rope);
+  g.rect(1, -1, 1, 1).fill(DB32.rope);
+}
+
 // Every species by id, so a plant is placed by name and can never be handed
 // the wrong drawing — and so the book and the world are guaranteed to show
 // the same thing.
@@ -313,4 +333,5 @@ export const PLANTS: Record<FloraId, PlantDrawing> = {
   squash: { draw: drawSquash, height: 6 },
   'bean-trellis': { draw: drawBeanTrellis, height: 19 },
   sunflower: { draw: drawSunflower, height: 24 },
+  heather: { draw: drawHeather, height: 6 },
 };

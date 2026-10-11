@@ -117,7 +117,7 @@ src/
       glow-grotto.ts     # The mushroom-lit cave past the meadow maze
       kitchen-garden.ts  # The walled autumn garden, the pumpkin's home
       old-keep-library.ts  # Behind the bookshelf: stacks and ladders
-      cairn-observatory.ts # The hill at night; the spiral in the stars
+      cairn-observatory.ts # The hill at night: chimney, caves, flooded shaft, ridge — the spiral in the stars
     parallax.ts     # Procedural parallax background (per-flavor)
 ```
 
@@ -166,9 +166,9 @@ src/
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
   under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old
   name so no save is orphaned; a v1 blob migrates into the `landmarks` book on
-  read). A book's entry reads `LANDMARKS 3/19` and opens a gallery of them,
+  read). A book's entry reads `LANDMARKS 3/21` and opens a gallery of them,
   ending on a count of the pages still blank — never their names. The count is
-  there from the start: a book nothing has been found in reads `LANDMARKS 0/19`,
+  there from the start: a book nothing has been found in reads `LANDMARKS 0/21`,
   dimmed and skipped by the cursor, because the denominator is what tells a new
   player how much there is to find.
 - **Per-level visual flavor**: each level picks its own parallax flavor
@@ -178,13 +178,14 @@ src/
   `zenith` the observatory's dense stars with the spiral picked out in them)
   and backdrop kind (`cave`
   rock texture, `indoor-dark` flat near-black, `crypt-black` pure black for
-  candle-lit underground). A level may also lay a `tint` over everything it
-  draws: the observatory reuses the meadow's daytime grass and stone, and
-  tints them moonlight blue.
+  candle-lit underground). The backdrop is normally one band from a given row
+  down; a level can instead name `backdropRegions`, so the observatory's caves
+  are black inside a hill with open sky either side of it.
 - **Expanded tile palette**: grass / dirt / stone / dark stone (outdoor),
   castle brick / castle floor / gold pillar (castle interior), crypt brick /
   crypt floor (deep underground), timber beams and plank floors (the belfry),
-  grotto rock, bookcases and ladders (the library), plus water. Authored in ASCII — each
+  grotto rock, bookcases and ladders (the library), heath, peat and granite
+  (the observatory hill, drawn in night colours), plus water. Authored in ASCII — each
   character maps to one tile type.
 - **Water mechanics**: wade on submerged ground at reduced speed, swim freely
   off-ground, hold jump to rise, hold down to dive. Exit-pop boost when
@@ -229,7 +230,7 @@ src/
   character is a tile type (`.` sky, `G` grass, `D` dirt, `S` stone,
   `K` dark stone, `W` water, `B`/`F`/`P` castle bricks/floor/pillar,
   `c`/`v` crypt bricks/floor, `T` timber, `R` grotto rock, `L` bookcase,
-  `H` ladder). Easy to hand-edit and read.
+  `H` ladder, `h`/`p`/`g` heath/peat/granite). Easy to hand-edit and read.
 - **Logical resolution is 320×224.** The PixiJS stage upscales it ×3 to a
   fixed 960×672 canvas — the same size in every window, centred on the page's
   near-black ground, so a logical pixel is always exactly three of them.
