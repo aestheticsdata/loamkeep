@@ -148,9 +148,9 @@ src/
   walks into a rabbit, fish, bird or pumpkin, the greeting popup opens *and*
   the page is written. The popup is the event and the page is the record — the
   speech is the creature talking, the page is the wanderer's note about it. The
-  page suppresses the popup on every later visit; the memory-only `WorldState`
-  flag beside it covers the session when storage is blocked and the page cannot
-  be written at all. Creature sketches reuse the in-world drawings, scaled up
+  page suppresses the popup on every later visit (except the rabbit's, which
+  greets once per session); the memory-only `WorldState` flag beside it covers
+  the session when storage is blocked and the page cannot be written at all. Creature sketches reuse the in-world drawings, scaled up
   through the graphics context rather than redrawn.
 - **Discoveries persist**: written pages are the only state kept between
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
@@ -185,8 +185,9 @@ src/
   parchment popup pauses gameplay with a small line of speech ("Got a carrot
   for me, buddy?"). One-shot for good, not per session: the creature's page,
   written at the same moment, keeps it from opening again after a reload
-  (`WorldState` covers the session when storage is blocked). Closes on any
-  movement-key press.
+  (`WorldState` covers the session when storage is blocked). The rabbit is
+  the exception — it says hello once every session, the game's greeting at
+  the spawn. Closes on any movement-key press.
 - **Per-tile procedural detail**: a stable hash per `(tx, ty)` seeds grass
   tufts and sparse red wildflowers, dirt speckles, dark-stone speckles, brick
   mortar joints — consistent under camera scroll, no per-frame randomness.

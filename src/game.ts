@@ -638,14 +638,19 @@ export class Game {
     }
   }
 
-  // Detect the FIRST time the player overlaps any Rabbit. Sets the
-  // 'rabbit-greeted' world-state flag and opens the greeting popup
-  // with the rabbit subject. Subsequent calls do nothing because the
-  // flag short-circuits the search. Cross-level: the flag survives
-  // transitions, so meeting a rabbit in the meadow won't fire again
-  // if a rabbit ever shows up in another level.
+  // Detect the first time IN THIS SESSION the player overlaps any Rabbit.
+  // Sets the 'rabbit-greeted' world-state flag and opens the greeting popup
+  // with the rabbit subject. Cross-level: the flag survives transitions, so
+  // meeting a rabbit in the meadow won't fire again if a rabbit ever shows
+  // up in another level.
+  //
+  // The one creature that greets every session rather than once for good:
+  // the rabbit is the first thing the player meets, a few steps from the
+  // spawn, and its "hey buddy" is the game saying hello. So it checks only
+  // the memory-only flag, not the written page — the page is still written
+  // the first time, and writing it again on a later session changes nothing.
   private checkRabbitEncounter(): void {
-    if (this.metCreature('rabbit', 'rabbit-greeted')) return;
+    if (this.worldState.get('rabbit-greeted')) return;
     for (const entity of this.currentEntities) {
       if (!(entity instanceof Rabbit)) continue;
       if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
