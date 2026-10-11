@@ -8,6 +8,8 @@ import type { LandmarkSpec } from '@entities/landmark';
 import { type FloraId, PLANTS } from '@entities/plants';
 import { Rabbit } from '@entities/rabbit';
 import type { LevelSpec, SpawnPoint } from '@world/level';
+import { drawTrailGate } from '@world/levels/cairn-observatory';
+import { drawGrottoCrack } from '@world/levels/glow-grotto';
 import type { Graphics } from 'pixi.js';
 
 // Meadow level — the outdoor starting biome.
@@ -21,6 +23,8 @@ import type { Graphics } from 'pixi.js';
 //     stone maze off its west side (rows 22-26). Swim up out of the lake at
 //     col 33 into a one-tile tunnel and work west; the Spiral Fossil is in
 //     the far pocket (col 13). Every step in it is one tile, with headroom.
+//     In the dip at the pocket's west end (cols 10-11) a crack in the rock
+//     goes on, into the Glow Grotto.
 //
 // The castle door sits at the bottom of the right-side cliff-fall: the
 // player leaps off the surface gap at col 47-55, falls through the open
@@ -524,8 +528,25 @@ const KEEP_DOOR_ROW = 21;
 const KEEP_DOOR_X = KEEP_DOOR_COL * TILE_SIZE + 8;
 const KEEP_DOOR_Y = KEEP_DOOR_ROW * TILE_SIZE;
 
+// The crack into the Glow Grotto, in the dip at the west end of the fossil's
+// pocket (cols 10-11, floor at row 27). The dip is two tiles high: room for
+// the crack and for the player, nothing to spare.
+const GROTTO_CRACK_X = 11 * TILE_SIZE;
+const GROTTO_CRACK_Y = 27 * TILE_SIZE;
+
+// The trail head up to the observatory, at the east end of the row-5
+// platform (cols 47-49) — beside the highest ground on the meadow and clear
+// of the Crystal Vein's zone on the row-3 platform above it.
+const TRAIL_GATE_X = 49 * TILE_SIZE + 8;
+const TRAIL_GATE_Y = 5 * TILE_SIZE;
+
 const MEADOW_SPAWNS: SpawnPoint[] = [
   { id: 'default', x: MEADOW_SPAWN_X, y: MEADOW_SPAWN_Y },
+  // Back out of the grotto: on the pocket floor east of the fossil (col 15),
+  // clear of both the crack's and the fossil's interaction zones.
+  { id: 'from-grotto', x: 15 * TILE_SIZE + 2, y: GROTTO_CRACK_Y - TILE_SIZE },
+  // Back down the trail: the west end of the row-5 platform.
+  { id: 'from-observatory', x: 47 * TILE_SIZE + 2, y: TRAIL_GATE_Y - TILE_SIZE },
   // 10 px to the RIGHT of the door (one column over, into the open cavern
   // at col 53 rows 17-20). Three reasons for the right rather than the left:
   //   (1) The left side (col 51) has a K stone overhang at row 19 — the
@@ -583,6 +604,24 @@ export const meadowLevel: LevelSpec = {
         targetLevelId: 'old-keep',
         targetSpawnId: 'from-meadow',
         promptLabel: 'enter',
+      }),
+      new Door({
+        id: 'meadow-grotto-crack',
+        x: GROTTO_CRACK_X,
+        y: GROTTO_CRACK_Y,
+        targetLevelId: 'glow-grotto',
+        targetSpawnId: 'from-meadow',
+        promptLabel: 'squeeze through',
+        drawBody: drawGrottoCrack,
+      }),
+      new Door({
+        id: 'meadow-trail-gate',
+        x: TRAIL_GATE_X,
+        y: TRAIL_GATE_Y,
+        targetLevelId: 'cairn-observatory',
+        targetSpawnId: 'from-meadow',
+        promptLabel: 'climb the hill',
+        drawBody: drawTrailGate,
       }),
 
       // Rabbit on the player's spawn platform. Walks at 32 px/s — slow

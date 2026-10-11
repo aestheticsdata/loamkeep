@@ -2,6 +2,7 @@ import { DB32 } from '@constants';
 import { drawBird } from '@entities/bird';
 import { drawFishLarge } from '@entities/fish';
 import { drawGlowfishLarge } from '@entities/glowfish';
+import { drawMothLarge } from '@entities/moth';
 import { drawOwl } from '@entities/owl';
 import { drawPumpkin } from '@entities/pumpkin';
 import { drawRabbit } from '@entities/rabbit';
@@ -9,7 +10,8 @@ import { type SketchbookPage, scaledSketch } from '@systems/sketchbook';
 
 // The creatures sketchbook's table of contents: one page per species, in the
 // order the wanderer is likely to meet them — the meadow's three, the one
-// that lives indoors, then the belfry's owl and the cistern's glowfish.
+// in the keep's garden, then the belfry's owl, the cistern's glowfish and the
+// grotto's moth.
 //
 // Keyed by species, not by level. Meeting a rabbit is meeting rabbits, and the
 // meadow has two of them; the ids are bare where the landmarks book's are
@@ -18,7 +20,7 @@ import { type SketchbookPage, scaledSketch } from '@systems/sketchbook';
 // The pages are a record, never the event. The greeting popup is what fires
 // when the player touches one — it lives in Game, next to the WorldState flag
 // that stops it firing twice.
-export type CreatureId = 'rabbit' | 'fish' | 'bird' | 'pumpkin' | 'owl' | 'glowfish';
+export type CreatureId = 'rabbit' | 'fish' | 'bird' | 'pumpkin' | 'owl' | 'glowfish' | 'moth';
 
 export interface CreaturePage {
   id: CreatureId;
@@ -69,8 +71,9 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
     page: {
       name: 'Pumpkin',
       description:
-        'A gourd the size of a fist, hopping. It keeps to one hall of the keep ' +
-        'and turns back at the same two places, as though the floor ended there.',
+        'A gourd the size of a fist, hopping. It keeps to its own row of the ' +
+        'kitchen garden and turns back at the same two places, as though the ' +
+        'ground ended there.',
       drawSketch: scaledSketch(drawPumpkin, 4, -8, 0),
     },
   },
@@ -92,6 +95,16 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
         'Pale enough to see through, and lit from inside with a cold blue light that comes and goes like ' +
         'breathing. Down in the cistern it is the only light there is, and it seems to know it.',
       drawSketch: scaledSketch(drawGlowfishLarge, 3, -14, 0),
+    },
+  },
+  {
+    id: 'moth',
+    page: {
+      name: 'Moth',
+      description:
+        'Pale, soft and never still, flying the same loop round the same glowcap until you could draw it. ' +
+        'Two dark spots on its wings, like eyes, and it is the one doing the watching.',
+      drawSketch: scaledSketch(drawMothLarge, 5, -10, 0),
     },
   },
 ];

@@ -33,7 +33,7 @@ import type { Page } from "@playwright/test";
  *
  * IT WRITES TWO SKETCHBOOK PAGES, AND NOTHING ELSE LEAVES THE BROWSER. `loamkeep.sketchbook.v1`
  * in localStorage is the game's only persistence; Playwright's context is cold on every run, so
- * chapter one always opens on LANDMARKS 0/15 and the last chapter always finds exactly the
+ * chapter one always opens on LANDMARKS 0/19 and the last chapter always finds exactly the
  * pages this take wrote.
  */
 
@@ -262,10 +262,11 @@ test("loamkeep, end to end", async ({ demo }) => {
    * the column *or* on the parchment, and a parchment is held long enough to be read, tapped away
    * with the same key that carries the walk on, and the walk goes again.
    *
-   * Whether the meeting happens at all is deliberately not decided here. The keep's pumpkin hops
-   * cols 8-28 and this walk crosses all of it, but the pumpkin spends half its time in the air and
-   * the player can pass under a hop — so waiting for the greeting outright would fail every take
-   * where it never fired, which is the mirror of the bug this replaced.
+   * Whether the meeting happens at all is deliberately not decided here: waiting for the greeting
+   * outright would fail every take where it never fired, which is the mirror of the bug this
+   * replaced. It was written for the pumpkin that hopped the keep's entry hall; that one lives in
+   * the kitchen garden now, so on today's route the walk meets no one, and this is the guard that
+   * keeps a creature added to the hall later from killing a take.
    */
   const walkRightMeeting = async (x: number): Promise<void> => {
     // A creature greets once and the flag that says so outlives the level, so two parchments on one
@@ -310,7 +311,7 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.chapter("The title");
   // The game boots on a painted dawn: seven sky bands, the sun coming up behind the keep, a rabbit
   // on the ground that is the same rabbit the meadow has. Nothing is pressed for a few seconds —
-  // the cursor blinks, the sun climbs, and the second entry reads LANDMARKS 0/15 because
+  // the cursor blinks, the sun climbs, and the second entry reads LANDMARKS 0/19 because
   // Playwright's browser is cold and the book is the one thing this game keeps. The zero is the
   // take's, not the game's: your own tab has whatever you have found.
   await demo.dwell(4200);
@@ -412,8 +413,8 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.dwell(1600);
   await demo.still("the-old-keep");
   // Cool grey brick, a polished floor, gold pillars and candles the length of the hall — walked
-  // end to end, because the only way down is the hole at the far end of it. The hall is also where
-  // the pumpkin hops, so this walk is the one that may be interrupted to be introduced.
+  // end to end, because the only way down is the hole at the far end of it. The walk is still the
+  // meeting kind: the hall is where a creature would stop it.
   await walkRightMeeting(KEEP.floorHole);
   await whenLanded(page, 0, KEEP.plinthY);
   await demo.dwell(1200);

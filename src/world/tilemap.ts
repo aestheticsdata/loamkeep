@@ -10,6 +10,11 @@ const CRYPT_FLOOR = 0x303030; // slightly lighter neutral grey (floor base)
 const CRYPT_HI = 0xcfcfcf; // bright cool-white "reflet" highlight
 const CRYPT_LO = 0x000000; // pure black mortar
 
+// The glow grotto's rock: blue-black base, a lighter grain, and the odd
+// cyan fleck of the same light the glowcaps give off.
+const GROTTO_ROCK = 0x1a2030;
+const GROTTO_GRAIN = 0x2a3346;
+
 // Tile type. Uses a const object (not enum) so it plays nicely with
 // `isolatedModules` in tsconfig.
 //
@@ -23,6 +28,10 @@ const CRYPT_LO = 0x000000; // pure black mortar
 //              VERY dark palette — almost-black masonry that catches just
 //              enough candlelight to read. The crypt is meant to feel
 //              like a cosy hideout deep underground.
+//   - Grotto:  GrottoRock, the glow grotto's walls. Blue-black, so the
+//              only light in the cave is what grows there.
+//   - Library: Bookcase (solid — the stacks are climbed on top of) and
+//              Ladder (not solid — climbed up the face of, see Player).
 //   - Timber:  the belfry's beams and plank floors. Warm brown against
 //              the tower's grey brick, so a ledge reads as "something to
 //              stand on" before the eye has found its edge.
@@ -40,6 +49,9 @@ export const Tile = {
   CryptBrick: 9,
   CryptFloor: 10,
   Timber: 11,
+  GrottoRock: 12,
+  Bookcase: 13,
+  Ladder: 14,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -58,6 +70,9 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   c: Tile.CryptBrick,
   v: Tile.CryptFloor,
   T: Tile.Timber,
+  R: Tile.GrottoRock,
+  L: Tile.Bookcase,
+  H: Tile.Ladder,
 };
 
 const TILE_COLORS: Record<Tile, number> = {
@@ -94,6 +109,15 @@ const TILE_COLORS: Record<Tile, number> = {
   [Tile.CryptFloor]: CRYPT_FLOOR,
   // Timber — oiled cedar, the same wood as the keep's door and bookshelf.
   [Tile.Timber]: DB32.oiledCedar,
+  // GrottoRock — blue-black, outside DB32 like the crypt's greys: valhalla
+  // is close but reads purple at this size next to the glowcaps' cyan.
+  [Tile.GrottoRock]: GROTTO_ROCK,
+  // Bookcase — the cedar of the keep's own bookshelf; the books are drawn
+  // over it per tile.
+  [Tile.Bookcase]: DB32.oiledCedar,
+  // Ladder — never used as a fill: a ladder is two rails and its rungs over
+  // whatever is behind it (see drawTile).
+  [Tile.Ladder]: DB32.rope,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -116,6 +140,9 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.CryptBrick]: true,
   [Tile.CryptFloor]: true,
   [Tile.Timber]: true,
+  [Tile.GrottoRock]: true,
+  [Tile.Bookcase]: true,
+  [Tile.Ladder]: false,
 };
 
 export class Tilemap {
@@ -376,6 +403,12 @@ export function renderWaterSurfaceInto(g: Graphics, map: Tilemap, surfaceOffset:
 }
 
 function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: number): void {
+  // A ladder has no fill — the backdrop shows between its rungs.
+  if (t === Tile.Ladder) {
+    drawLadder(g, x, y);
+    return;
+  }
+
   // Base fill — every non-empty tile starts with this. (Water is excluded by
   // the caller in renderTilemap; it has its own renderer.)
   g.rect(x, y, TILE_SIZE, TILE_SIZE).fill(TILE_COLORS[t]);
@@ -410,6 +443,12 @@ function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: nu
       break;
     case Tile.Timber:
       drawTimber(g, x, y, tx, ty);
+      break;
+    case Tile.GrottoRock:
+      drawGrottoRock(g, x, y, tx, ty);
+      break;
+    case Tile.Bookcase:
+      drawBookcase(g, x, y, tx, ty);
       break;
   }
 }
@@ -666,6 +705,69 @@ function drawTimber(g: Graphics, x: number, y: number, tx: number, ty: number): 
   if (tileHash(tx, ty, 163) < 0.25) {
     g.rect(x + 7, y + 3, 2, 2).fill(DB32.twine);
   }
+}
+
+// Grotto rock. Not masonry — no running bond — just grain: a few lighter
+// pixels and short streaks per tile, seeded by position, and about one tile
+// in fourteen holding a cyan fleck that catches the glow.
+function drawGrottoRock(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  for (let i = 0; i < 5; i++) {
+    const px = Math.floor(tileHash(tx, ty, 170 + i) * TILE_SIZE);
+    const py = Math.floor(tileHash(tx, ty, 180 + i) * TILE_SIZE);
+    const w = i < 2 ? 3 : 1;
+    g.rect(x + Math.min(px, TILE_SIZE - w), y + py, w, 1).fill(GROTTO_GRAIN);
+  }
+  if (tileHash(tx, ty, 190) < 0.07) {
+    const px = 2 + Math.floor(tileHash(tx, ty, 191) * (TILE_SIZE - 4));
+    const py = 2 + Math.floor(tileHash(tx, ty, 192) * (TILE_SIZE - 4));
+    g.rect(x + px, y + py, 1, 1).fill(DB32.viking);
+  }
+}
+
+// Library ladder: two rails and two rungs per tile, so a column of them
+// reads as one ladder with even rungs. Rails at 3 and 12 leave the player's
+// 12-px body room to stand inside them.
+function drawLadder(g: Graphics, x: number, y: number): void {
+  g.rect(x + 2, y, 2, TILE_SIZE).fill(DB32.rope);
+  g.rect(x + 12, y, 2, TILE_SIZE).fill(DB32.rope);
+  g.rect(x + 2, y, 1, TILE_SIZE).fill(DB32.twine);
+  g.rect(x + 12, y, 1, TILE_SIZE).fill(DB32.twine);
+  for (const ry of [3, 11]) {
+    g.rect(x + 4, y + ry, 8, 1).fill(DB32.twine);
+    g.rect(x + 4, y + ry + 1, 8, 1).fill(DB32.oiledCedar);
+  }
+}
+
+// One tile of bookcase: a shelf board across the bottom and a row of spines
+// above it, colours and heights picked per spine from the tile's hash, so a
+// wall of these never repeats. The top edge is lit, like timber, because the
+// tops of the stacks are walked on.
+function drawBookcase(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  const spines = [
+    DB32.clairvoyant,
+    DB32.eltGreen,
+    DB32.deepKoamaru,
+    DB32.rainforest,
+    DB32.venice,
+    DB32.loulou,
+    DB32.dell,
+    DB32.brown,
+  ];
+  g.rect(x, y + 1, TILE_SIZE, TILE_SIZE - 3).fill(DB32.valhalla);
+  let cx = x + 1;
+  let i = 0;
+  while (cx < x + TILE_SIZE - 1) {
+    const w = 1 + Math.floor(tileHash(tx * 7 + i, ty, 200) * 2);
+    const top = 2 + Math.floor(tileHash(tx * 7 + i, ty, 201) * 4);
+    const color = spines[Math.floor(tileHash(tx * 7 + i, ty, 202) * spines.length)];
+    const width = Math.min(w, x + TILE_SIZE - 1 - cx);
+    g.rect(cx, y + top, width, TILE_SIZE - 3 - top).fill(color);
+    g.rect(cx, y + top, width, 1).fill(DB32.pancho);
+    cx += w + (tileHash(tx * 7 + i, ty, 203) < 0.15 ? 1 : 0);
+    i += 1;
+  }
+  g.rect(x, y + TILE_SIZE - 2, TILE_SIZE, 2).fill(DB32.rope);
+  g.rect(x, y, TILE_SIZE, 1).fill(DB32.twine);
 }
 
 // Golden classical column. Vertical "round column" shading per tile: a

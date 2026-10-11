@@ -35,6 +35,31 @@ const NIGHT_HILLS_FY = 0.3;
 const NIGHT_STARS_FY = 0.06;
 const NIGHT_MOON_FY = 0.03;
 
+// The kitchen garden's evening. Its layers track the camera 1:1 vertically
+// like the meadow's, so the horizon stays glued to the garden's soil row
+// (row 14), which is what AUTUMN_HORIZON_Y is. The sky is bands of warm to
+// cool from the horizon up, dithered at each seam: the copper bars the meadow
+// gave up for a flat blue, which an evening needs.
+const AUTUMN_HORIZON_Y = 14 * 16;
+
+// The observatory's sky. Screen-space like the night's, but deeper and far
+// fuller, with a band of faint dust across it and the spiral constellation
+// overhead — placed, in screen coordinates, so that from the summit (camera
+// at about x 320, y 16) it hangs centred above the Sighting Stone.
+const ZENITH_SKY = 0x0c0b1a;
+const ZENITH_FACTOR = 0.05;
+const SPIRAL_CENTRE_X = 184;
+const SPIRAL_CENTRE_Y = 58;
+const AUTUMN_BANDS: readonly (readonly [number, number])[] = [
+  // [height above the horizon where the band starts, colour]
+  [0, 0xf4cf7a],
+  [24, 0xeaa25f],
+  [52, 0xc97a63],
+  [88, 0x9a6474],
+  [132, 0x6b5a82],
+  [190, 0x45466e],
+];
+
 // A stack of distant hill silhouettes. Each layer is a single Graphics polygon;
 // its x/y is offset every frame by a fraction of the camera position to fake
 // depth. Far layer is drawn first (behind), near layer on top.
@@ -65,6 +90,10 @@ export class ParallaxBackground {
 
     if (flavor === 'meadow') {
       this.buildMeadowLayers(levelWidthPx);
+    } else if (flavor === 'zenith') {
+      this.buildZenithLayers(levelWidthPx);
+    } else if (flavor === 'autumn') {
+      this.buildAutumnLayers(levelWidthPx);
     } else if (flavor === 'night') {
       this.buildNightLayers(levelWidthPx);
     } else if (flavor === 'keep') {
@@ -132,6 +161,51 @@ export class ParallaxBackground {
         color: NIGHT_HILLS_NEAR,
       }),
       { x: 0.3, y: NIGHT_HILLS_FY + 0.08 },
+    );
+  }
+
+  private buildZenithLayers(levelWidthPx: number): void {
+    const width = levelWidthPx + SCREEN_WIDTH;
+    // One flat colour: a lighter horizon band, glued to the screen as the
+    // sky is, showed as a box behind the terraces. The dust band is the
+    // variation this sky has.
+    const sky = new Graphics();
+    sky.rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT).fill(ZENITH_SKY);
+    this.addLayer(sky, { x: 0, y: 0 });
+    this.addLayer(makeDustBand(width), { x: ZENITH_FACTOR, y: ZENITH_FACTOR });
+    this.addLayer(makeStarField(width, 0x51a7), { x: ZENITH_FACTOR, y: ZENITH_FACTOR });
+    this.addLayer(makeStarField(width, 0x0b5e), { x: ZENITH_FACTOR * 1.6, y: ZENITH_FACTOR * 1.6 });
+    this.addLayer(makeSpiralConstellation(), { x: ZENITH_FACTOR, y: ZENITH_FACTOR });
+  }
+
+  private buildAutumnLayers(levelWidthPx: number): void {
+    const width = levelWidthPx;
+    this.addLayer(makeAutumnSky(SCREEN_WIDTH), { x: 0, y: 1 });
+    this.addLayer(makeLowSun(), { x: 0.05, y: 1 });
+    this.addLayer(
+      makeHillSilhouette({
+        width,
+        horizonY: AUTUMN_HORIZON_Y,
+        maxHeight: 26,
+        pointSpacing: 40,
+        frequency: 0.45,
+        seed: 2.2,
+        color: 0xa8686e,
+      }),
+      { x: 0.15, y: 1 },
+    );
+    this.addLayer(
+      makeHillSilhouette({
+        width,
+        horizonY: AUTUMN_HORIZON_Y,
+        maxHeight: 40,
+        pointSpacing: 24,
+        frequency: 0.6,
+        seed: 5.1,
+        color: DB32.loulou,
+        rimColor: 0xd98a5a,
+      }),
+      { x: 0.3, y: 1 },
     );
   }
 
@@ -350,5 +424,104 @@ function makeMoon(): Graphics {
   // Two craters on the lit side.
   g.rect(cx + 4, cy - 4, 2, 2).fill(DB32.twine);
   g.rect(cx + 6, cy + 3, 1, 1).fill(DB32.twine);
+  return g;
+}
+
+// The garden's evening sky: AUTUMN_BANDS from the horizon up, each seam
+// dithered one pixel into the band below, and the topmost band running on
+// far above any camera position, as the meadow's does.
+function makeAutumnSky(width: number): Graphics {
+  const g = new Graphics();
+  const top = AUTUMN_HORIZON_Y - 420;
+  for (let i = 0; i < AUTUMN_BANDS.length; i++) {
+    const [start, color] = AUTUMN_BANDS[i];
+    const end = i + 1 < AUTUMN_BANDS.length ? AUTUMN_BANDS[i + 1][0] : AUTUMN_HORIZON_Y - top;
+    g.rect(0, AUTUMN_HORIZON_Y - end, width, end - start).fill(color);
+    if (i + 1 < AUTUMN_BANDS.length) {
+      const seam = AUTUMN_HORIZON_Y - end;
+      for (let x = 0; x < width; x += 2) {
+        g.rect(x + ((x >> 1) & 1), seam, 1, 1).fill(AUTUMN_BANDS[i + 1][1]);
+      }
+    }
+  }
+  return g;
+}
+
+// A big low sun half behind the hills, built from pixel rows like the moon.
+function makeLowSun(): Graphics {
+  const g = new Graphics();
+  const cx = 220;
+  const cy = AUTUMN_HORIZON_Y - 14;
+  for (const [r, color] of [
+    [22, 0xf6dc8c],
+    [17, DB32.goldenFizz],
+    [14, 0xfff6c8],
+  ] as const) {
+    for (let dy = -r; dy <= r; dy++) {
+      const half = Math.round(Math.sqrt(r * r - dy * dy));
+      g.rect(cx - half, cy + dy, half * 2 + 1, 1).fill(color);
+    }
+  }
+  return g;
+}
+
+// A diagonal band of faint dust across the zenith sky: the milky way, done
+// as sparse dim pixels so it reads as a haze of stars rather than a stripe.
+function makeDustBand(width: number): Graphics {
+  const g = new Graphics();
+  let state = 0x2b1d;
+  const next = (): number => {
+    state = (state * 1103515245 + 12345) & 0x7fffffff;
+    return state / 0x7fffffff;
+  };
+  for (let i = 0; i < width * 3; i++) {
+    const x = next() * width;
+    const across = (next() + next() + next() - 1.5) * 22;
+    const y = 150 - x * 0.35 + across;
+    g.rect(Math.floor(x), Math.floor(y), 1, 1).fill({ color: DB32.deepKoamaru, alpha: 0.9 });
+  }
+  return g;
+}
+
+// The spiral, in stars: the square coil carved on the Marker, the Throne and
+// the tomb, its corners marked by the brightest stars in the sky and its
+// runs by fainter ones, with a dotted line between — the way a chart would
+// draw it. Outside in, the same turn the carvings take.
+function makeSpiralConstellation(): Graphics {
+  const g = new Graphics();
+  const corners: readonly (readonly [number, number])[] = [
+    [-60, -34],
+    [60, -34],
+    [60, 34],
+    [-44, 34],
+    [-44, -18],
+    [44, -18],
+    [44, 18],
+    [-28, 18],
+    [-28, -2],
+    [12, -2],
+  ];
+  const at = (x: number, y: number): [number, number] => [SPIRAL_CENTRE_X + x, SPIRAL_CENTRE_Y + y];
+  for (let i = 0; i + 1 < corners.length; i++) {
+    const [ax, ay] = at(...corners[i]);
+    const [bx, by] = at(...corners[i + 1]);
+    const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+    for (let s = 3; s < steps - 2; s += 4) {
+      const x = Math.round(ax + ((bx - ax) * s) / steps);
+      const y = Math.round(ay + ((by - ay) * s) / steps);
+      g.rect(x, y, 1, 1).fill({ color: DB32.royalBlue, alpha: 0.7 });
+    }
+    // A fainter star midway along each run.
+    const mx = Math.round((ax + bx) / 2);
+    const my = Math.round((ay + by) / 2);
+    g.rect(mx, my, 1, 1).fill(DB32.lightSteel);
+  }
+  for (const corner of corners) {
+    const [x, y] = at(...corner);
+    g.rect(x - 1, y - 1, 3, 3).fill({ color: DB32.lightSteel, alpha: 0.35 });
+    g.rect(x, y - 2, 1, 5).fill(DB32.heather);
+    g.rect(x - 2, y, 5, 1).fill(DB32.heather);
+    g.rect(x, y, 1, 1).fill(DB32.white);
+  }
   return g;
 }

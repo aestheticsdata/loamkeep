@@ -5,6 +5,7 @@ import type { Entity, InteractContext } from '@entities/entity';
 import { drawFishLarge, Fish } from '@entities/fish';
 import { drawGlowfishLarge, Glowfish } from '@entities/glowfish';
 import { Landmark } from '@entities/landmark';
+import { drawMothLarge, Moth } from '@entities/moth';
 import { drawOwl, Owl } from '@entities/owl';
 import { Player } from '@entities/player';
 import { drawPumpkin, Pumpkin } from '@entities/pumpkin';
@@ -385,6 +386,7 @@ export class Game {
       this.checkPumpkinEncounter();
       this.checkOwlEncounter();
       this.checkGlowfishEncounter();
+      this.checkMothEncounter();
       this.noticeNearbyPlants();
 
       this.runInteractionLoop();
@@ -523,6 +525,7 @@ export class Game {
 
     // Static tilemap (everything except water).
     this.levelLayer.addChild(renderTilemap(tilemap));
+    this.levelLayer.tint = level.spec.tint ?? 0xffffff;
 
     // Water — body + animated surface. Body goes first so surface renders
     // over it. The waterSurface field is REASSIGNED here — the old Graphics
@@ -719,8 +722,8 @@ export class Game {
   }
 
   // The pumpkin, which until now was the one creature the player could walk
-  // straight through. Same one-shot semantics as the rabbit: it lives on the
-  // keep's entry-hall floor and is the book's one reason to go indoors.
+  // straight through. Same one-shot semantics as the rabbit: it lives in the
+  // kitchen garden, out through the keep's entry hall.
   private checkPumpkinEncounter(): void {
     if (this.metCreature('pumpkin', 'pumpkin-greeted')) return;
     for (const entity of this.currentEntities) {
@@ -774,6 +777,26 @@ export class Game {
           drawSubject: drawGlowfishLarge,
           subjectScale: 3,
           speech: "Shh. You're swimming in my light.",
+        });
+        return;
+      }
+    }
+  }
+
+  // The grotto's moths. Grounded only, as with the bird and the owl: they
+  // fly, and a jump through a loop must not hang the player in mid-air.
+  private checkMothEncounter(): void {
+    if (this.metCreature('moth', 'moth-greeted')) return;
+    if (!this.player.onGround) return;
+    for (const entity of this.currentEntities) {
+      if (!(entity instanceof Moth)) continue;
+      if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
+        this.worldState.set('moth-greeted', true);
+        this.sketchbookStore.add(CREATURES_BOOK_ID, 'moth');
+        this.greeting.show({
+          drawSubject: drawMothLarge,
+          subjectScale: 5,
+          speech: "Mind the light, it's mine. I saw it first.",
         });
         return;
       }

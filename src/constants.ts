@@ -133,6 +133,17 @@ export const SWIM_STROKE_INTERVAL = 0.55;
 // pure white down to (96, 144, 232) — clearly blue, not pale-white.
 export const SUBMERGED_TINT = 0x6090e8;
 
+// Ladders — the library's. One rule, like water's: on a ladder tile and
+// holding up or down, the player climbs at CLIMB_SPEED and hangs still with
+// neither held; gravity is off until they leave the ladder. Off the top with
+// upward speed, the same pop as leaving water lifts them onto the ledge the
+// ladder leans against.
+export const CLIMB_SPEED = 64;
+export const CLIMB_SIDE_SPEED = 40; // sideways, to step off a ladder
+export const LADDER_EXIT_BOOST = 225;
+// Distance climbed between two rung footsteps.
+export const CLIMB_STEP_DISTANCE = 14;
+
 // Camera smoothing: higher = snappier follow. Time-based so it's framerate-independent.
 // f = 1 - exp(-RATE * dt). At 60fps with RATE=10, f ≈ 0.155 per frame.
 export const CAMERA_SMOOTHING_RATE = 10;

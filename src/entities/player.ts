@@ -1,9 +1,13 @@
 import {
+  CLIMB_SIDE_SPEED,
+  CLIMB_SPEED,
+  CLIMB_STEP_DISTANCE,
   COYOTE_TIME,
   DB32,
   JUMP_BUFFER,
   JUMP_RELEASE_MULT,
   JUMP_VELOCITY,
+  LADDER_EXIT_BOOST,
   SUBMERGED_TINT,
   SWIM_DOWN_SPEED,
   SWIM_HORIZONTAL_SPEED,
@@ -79,6 +83,10 @@ export class Player implements Body {
   // arm animation and the swim-stroke SFX. Setting this also tells the
   // physics pass to skip its own gravity so the entity controls vel.y.
   swimming = false;
+  // True while the player is on a ladder and has taken hold of it — pressed
+  // up or down there, and has not since stepped or climbed off. Like
+  // `swimming`, it tells stepPhysics to leave vel.y to us.
+  climbing = false;
 
   // Jump-feel timers (count DOWN; > 0 means active).
   private coyoteTimer = 0;
@@ -95,6 +103,8 @@ export class Player implements Body {
   // Countdown to the next automatic swim-stroke SFX. Counts DOWN while
   // moving in water; reset to the interval when not moving.
   private swimStrokeTimer = 0;
+  // Distance climbed since the last rung footstep.
+  private climbDistance = 0;
 
   constructor(x: number, y: number) {
     this.pos = { x, y };
@@ -181,6 +191,8 @@ export class Player implements Body {
       if (this.vel.y > WATER_ENTRY_VEL_CAP) this.vel.y = WATER_ENTRY_VEL_CAP;
     }
     this.inWater = nowInWater;
+    const onLadder = !nowInWater && tilemap.at(tx, midY) === Tile.Ladder;
+    const wasClimbing = this.climbing;
     // `swimming` is purely a visual + physics-bypass flag: in water AND
     // not standing on solid ground. Used by drawFigure to switch to the
     // swim arm pose and by stepPhysics to skip its own gravity.
@@ -194,7 +206,37 @@ export class Player implements Body {
     if (move > 0) this.facing = 1;
     else if (move < 0) this.facing = -1;
 
-    if (this.inWater) {
+    const upHeld = input.isAnyDown(KEYS_JUMP);
+    const downHeld = input.isAnyDown(KEYS_DOWN);
+    // Take hold of a ladder by pressing up or down on it; let go by leaving
+    // its column, or by standing at its foot with up released.
+    this.climbing = onLadder && (wasClimbing || upHeld || downHeld);
+    if (this.climbing && this.onGround && !upHeld) this.climbing = false;
+
+    if (this.climbing) {
+      // === LADDER MODE: up climbs, down descends, neither hangs.
+      if (upHeld) this.vel.y = -CLIMB_SPEED;
+      else if (downHeld) this.vel.y = CLIMB_SPEED;
+      else this.vel.y = 0;
+      if (move !== 0) {
+        this.vel.x = move * CLIMB_SIDE_SPEED;
+      } else {
+        // Hands on the rungs: with no sideways key held, drift to the middle
+        // of the ladder's column, never faster than a sideways step. Without
+        // it a player who took hold a pixel or two off-centre carries those
+        // pixels under the ledge at the top and climbs into its underside.
+        const centreX = tx * TILE_SIZE + (TILE_SIZE - this.size.x) / 2;
+        const dx = centreX - this.pos.x;
+        this.vel.x = Math.sign(dx) * Math.min(Math.abs(dx) / dt, CLIMB_SIDE_SPEED);
+      }
+      this.climbDistance += Math.abs(this.vel.y) * dt;
+      if (this.climbDistance >= CLIMB_STEP_DISTANCE) {
+        this.climbDistance -= CLIMB_STEP_DISTANCE;
+        this.didFootstepThisFrame = true;
+      }
+      this.coyoteTimer = 0;
+      this.jumpBufferTimer = 0;
+    } else if (this.inWater) {
       // === WATER MODE — one rule:
       //   on ground + no jump → walk at WADE_SPEED, vel.y = 0
       //   jump held           → swim UP at SWIM_UP_SPEED
@@ -271,6 +313,13 @@ export class Player implements Body {
       this.vel.y = Math.min(this.vel.y, -WATER_EXIT_BOOST);
     }
 
+    // Off the top of a ladder while climbing: the same pop as out of water,
+    // enough to land on the ledge the ladder leans against.
+    if (wasClimbing && !onLadder && this.vel.y < 0) {
+      this.vel.y = Math.min(this.vel.y, -LADDER_EXIT_BOOST);
+    }
+    if (!this.climbing) this.climbDistance = 0;
+
     // Gravity + position + tile collision. body.swimming = true makes
     // stepPhysics skip its own gravity — we own vel.y in water mode.
     stepPhysics(this, tilemap, dt);
@@ -312,8 +361,10 @@ export class Player implements Body {
     const walking = this.onGround && this.vel.x !== 0;
     this.sprite.clear();
     drawFigure(this.sprite, {
-      airborne: !this.onGround,
+      airborne: !this.onGround && !this.climbing,
       swimming: this.swimming,
+      climbing: this.climbing,
+      climbPhase: Math.floor(this.climbDistance / (CLIMB_STEP_DISTANCE / 2)) & 1,
       stepOffset: this.stepOffset,
       bodyBob: walking ? -Math.abs(this.stepOffset) : 0,
       swimPhase: Math.sin(this.elapsedTime * 5),
@@ -350,6 +401,10 @@ export interface FigurePose {
   bodyBob: number;
   // -1..1 driver for the front-crawl arms while swimming.
   swimPhase: number;
+  // On a ladder: back to the viewer, hands up on the rungs, which hand is
+  // higher alternating with `climbPhase` (0 or 1) as the player climbs.
+  climbing?: boolean;
+  climbPhase?: number;
 }
 
 // The hooded wanderer, drawn around (0, 0) with the feet at the origin and
@@ -419,7 +474,11 @@ export function drawFigure(g: Graphics, pose: FigurePose): void {
   //              alternating front/back so the figure reads as paddling
   //              even though it isn't rotated.
   //   idle     : at base position
-  if (swimming) {
+  if (pose.climbing) {
+    const high = pose.climbPhase === 1 ? 1 : 0;
+    g.rect(-4, -14 - high, 1, 4).fill(strap);
+    g.rect(3, -13 - (1 - high), 1, 4).fill(strap);
+  } else if (swimming) {
     const frontLen = 3 + Math.round(pose.swimPhase * 2); // 1..5
     const backLen = 3 - Math.round(pose.swimPhase * 2); // 5..1
     for (let i = 0; i < frontLen; i++) {

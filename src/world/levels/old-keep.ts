@@ -3,7 +3,6 @@ import type { DecorationSpec } from '@entities/decoration';
 import { Door } from '@entities/door';
 import type { Entity } from '@entities/entity';
 import type { LandmarkSpec } from '@entities/landmark';
-import { Pumpkin } from '@entities/pumpkin';
 import { TallCandle } from '@entities/tall-candle';
 import type { LevelSpec, SpawnPoint } from '@world/level';
 import type { Graphics } from 'pixi.js';
@@ -18,6 +17,7 @@ import type { Graphics } from 'pixi.js';
 //   col 35) — the "balcony"
 //     - Belfry door at col 4, up to the bell tower
 //     - Stone Throne (col 14) + Bookshelf (col 20) + columns + candles
+//     - The bookshelf is a door: E swings it out onto the library
 //     - The gold columns are not solid; the player walks through them
 //
 //   East ledges — row 16 (cols 39-58), row 10 (cols 41-58), row 7 (cols 47-58)
@@ -34,6 +34,7 @@ import type { Graphics } from 'pixi.js';
 //
 //   Lower floor (row 18, cols 2-35 and 38-58) — the entry hall
 //     - Return door at col 3 (back to meadow)
+//     - Garden door at col 26, out to the kitchen garden
 //     - Hole in the floor at cols 36-37 — player drops to the basement
 //     - East of col 38 the row-16 ledge leaves one tile of headroom
 //
@@ -112,6 +113,13 @@ const DESCEND_DOOR_X = DESCEND_DOOR_COL * TILE_SIZE + 8;
 // Belfry door — UPPER floor, west end, past the throne: the tower is the
 // next climb after this one.
 const BELFRY_DOOR_X = 4 * TILE_SIZE + 8;
+
+// Garden door — LOWER floor, in the hall's back wall between the last
+// lower-room column (cols 22-23) and the Great Kettle (col 29).
+const GARDEN_DOOR_X = 26 * TILE_SIZE + 8;
+
+// The bookshelf on the upper floor, which is the way into the library.
+const BOOKSHELF_DOOR_X = 20 * TILE_SIZE + 8;
 const UPPER_SPAWN_Y = UPPER_FLOOR_Y - TILE_SIZE;
 
 // Spawns:
@@ -119,14 +127,20 @@ const UPPER_SPAWN_Y = UPPER_FLOOR_Y - TILE_SIZE;
 //   'from-crypt'  - BASEMENT floor, near the descend door (where the
 //                   player exited the crypt).
 //   'from-belfry' - UPPER floor, two tiles right of the belfry door.
+//   'from-garden' - LOWER floor, two tiles left of the garden door.
+//   'from-library' - UPPER floor, between the throne and the bookshelf.
 const SPAWN_FROM_MEADOW_X = 5 * TILE_SIZE + 2;
 const SPAWN_FROM_CRYPT_X = 11 * TILE_SIZE + 2;
 const SPAWN_FROM_BELFRY_X = 6 * TILE_SIZE + 2;
+const SPAWN_FROM_GARDEN_X = 24 * TILE_SIZE + 2;
+const SPAWN_FROM_LIBRARY_X = 17 * TILE_SIZE + 2;
 
 const OLD_KEEP_SPAWNS: SpawnPoint[] = [
   { id: 'from-meadow', x: SPAWN_FROM_MEADOW_X, y: LOWER_SPAWN_Y },
   { id: 'from-crypt', x: SPAWN_FROM_CRYPT_X, y: BASEMENT_SPAWN_Y },
   { id: 'from-belfry', x: SPAWN_FROM_BELFRY_X, y: UPPER_SPAWN_Y },
+  { id: 'from-garden', x: SPAWN_FROM_GARDEN_X, y: LOWER_SPAWN_Y },
+  { id: 'from-library', x: SPAWN_FROM_LIBRARY_X, y: UPPER_SPAWN_Y },
 ];
 
 // ---------------------------------------------------------------------------
@@ -351,8 +365,8 @@ const OLD_KEEP_LANDMARKS: LandmarkSpec[] = [
     },
   },
 
-  // Great Kettle — on the lower floor (col 29), at the end of the stretch
-  // the pumpkin hops along, under the passage floor.
+  // Great Kettle — on the lower floor (col 29), past the garden door,
+  // under the passage floor.
   {
     id: 'great-kettle',
     x: 29 * TILE_SIZE + 8,
@@ -519,16 +533,10 @@ function drawBookSpines(g: Graphics, x: number, y: number, width: number, palett
   }
 }
 
-// Convenience constructors for placing decorations.
-//   onUpper         - foot-anchored, stands on the upper floor.
+// Convenience constructor for placing decorations.
 //   hangFromCeiling - bottom-tip anchored, hangs from a known ceiling row.
 //                      (Used for both the top ceiling banner and the
 //                      upper-floor-underside banner — same anchor logic.)
-const onUpper = (col: number, draw: (g: Graphics) => void): DecorationSpec => ({
-  x: col * TILE_SIZE + 8,
-  y: UPPER_FLOOR_Y,
-  draw,
-});
 
 const hangFromCeiling = (col: number, bottomRow: number, draw: (g: Graphics) => void): DecorationSpec => ({
   x: col * TILE_SIZE + 8,
@@ -549,10 +557,6 @@ const OLD_KEEP_DECORATIONS: DecorationSpec[] = [
   // row 13 — clears the lower-room columns.
   hangFromCeiling(10, 13, drawBanner),
   hangFromCeiling(36, 13, drawBanner),
-
-  // Bookshelf on the UPPER floor — to the right of the throne, between
-  // the middle and right gold columns.
-  onUpper(20, drawBookshelf),
 ];
 
 export const oldKeepLevel: LevelSpec = {
@@ -597,6 +601,27 @@ export const oldKeepLevel: LevelSpec = {
         targetSpawnId: 'from-keep',
         promptLabel: 'climb',
       }),
+      // Garden door — LOWER floor, out to the kitchen garden.
+      new Door({
+        id: 'keep-garden-door',
+        x: GARDEN_DOOR_X,
+        y: LOWER_FLOOR_Y,
+        targetLevelId: 'kitchen-garden',
+        targetSpawnId: 'from-keep',
+        promptLabel: 'go outside',
+      }),
+      // The bookshelf on the UPPER floor — to the right of the throne,
+      // between the middle and right gold columns. It looks like furniture
+      // and is a door: behind it, the library.
+      new Door({
+        id: 'keep-bookshelf-door',
+        x: BOOKSHELF_DOOR_X,
+        y: UPPER_FLOOR_Y,
+        targetLevelId: 'old-keep-library',
+        targetSpawnId: 'from-keep',
+        promptLabel: 'pull a book',
+        drawBody: drawBookshelf,
+      }),
       // Candles — three on the lower floor, two on the upper floor (near
       // the throne and the bookshelf), two in the basement (one on each
       // side of the basement chamber). Each instance ticks on its own
@@ -610,16 +635,6 @@ export const oldKeepLevel: LevelSpec = {
       new TallCandle(26 * TILE_SIZE + 8, UPPER_FLOOR_Y),
       new TallCandle(14 * TILE_SIZE + 8, BASEMENT_FLOOR_Y),
       new TallCandle(30 * TILE_SIZE + 8, BASEMENT_FLOOR_Y),
-      // Small hopping pumpkin on the lower-floor entry hall. Stays in
-      // the LEFT half of the floor (cols 8-28) — well clear of the
-      // basement-entry hole at cols 36-37.
-      new Pumpkin({
-        x: 16 * TILE_SIZE,
-        y: LOWER_FLOOR_Y,
-        minX: 8 * TILE_SIZE + 4,
-        maxX: 28 * TILE_SIZE - 4,
-        facing: 1,
-      }),
     ];
   },
 };

@@ -6,11 +6,13 @@ mood, atmosphere, and discovery rather than challenge. You play a hooded
 wanderer exploring a small world; landmarks log into a sketchbook as you
 find them.
 
-> Status: playable vertical slice. Five connected levels (meadow → old keep,
-> then up the keep's belfry to its roof at night, or down through the crypt
-> to a flooded cistern) with doorway transitions, wildlife (rabbits, fish,
-> birds, a hopping pumpkin, owls, glowfish), water you can wade and swim
-> through, and a procedural Amiga-500 art direction. Everything ships as TypeScript — there are still no PNGs or
+> Status: playable vertical slice. Nine connected levels — the meadow, with a
+> glow grotto past its lower maze and a trail up to the cairn observatory on
+> the hill; the old keep, with its kitchen garden, the library behind the
+> bookshelf, the belfry up to the roof at night, and the crypt down to a
+> flooded cistern — with doorway transitions, wildlife (rabbits, fish, birds,
+> a hopping pumpkin, owls, glowfish, moths), water you can wade and swim
+> through, ladders, and a procedural Amiga-500 art direction. Everything ships as TypeScript — there are still no PNGs or
 > audio samples.
 
 ## Design constraints
@@ -81,6 +83,10 @@ src/
     fish.ts         # Swimming wildlife — colour-aware, lives in water bodies
     glowfish.ts     # The cistern's fish — carries its own pulsing light
     owl.ts          # Perched belfry wildlife — blinks, turns its head
+    moth.ts         # Grotto wildlife — circles a glowcap
+    falling-leaf.ts # The kitchen garden's leaves, drifting down
+    glow.ts         # Soft round light behind glowing things
+    plants.ts       # Every flora species, drawn once for world and book
     bird.ts         # Flying wildlife — silhouette + 2-frame flap
     pumpkin.ts      # Hopping pumpkin — gravity-driven arc with cooldown
   systems/
@@ -108,6 +114,10 @@ src/
       old-keep-crypt.ts  # Underground crypt
       old-keep-belfry.ts # The bell tower, climbed to the roof at night
       flooded-cistern.ts # The swimming level under the crypt
+      glow-grotto.ts     # The mushroom-lit cave past the meadow maze
+      kitchen-garden.ts  # The walled autumn garden, the pumpkin's home
+      old-keep-library.ts  # Behind the bookshelf: stacks and ladders
+      cairn-observatory.ts # The hill at night; the spiral in the stars
     parallax.ts     # Procedural parallax background (per-flavor)
 ```
 
@@ -140,7 +150,7 @@ src/
   contents. `landmarks` derives its own by walking the level registry, so
   adding a landmark anywhere updates its count and gallery order for free;
   `creatures` is authored in `world/creatures.ts`, one page per species —
-  rabbit, fish, bird, pumpkin, owl, glowfish — because a species is not registered on a level
+  rabbit, fish, bird, pumpkin, owl, glowfish, moth — because a species is not registered on a level
   the way a landmark is. Registering a book is the whole of adding one; the
   title screen has no per-book code. Four books is the comfortable ceiling
   before the menu plate reaches the key line.
@@ -156,30 +166,40 @@ src/
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
   under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old
   name so no save is orphaned; a v1 blob migrates into the `landmarks` book on
-  read). A book's entry reads `LANDMARKS 3/15` and opens a gallery of them,
+  read). A book's entry reads `LANDMARKS 3/19` and opens a gallery of them,
   ending on a count of the pages still blank — never their names. The count is
-  there from the start: a book nothing has been found in reads `LANDMARKS 0/15`,
+  there from the start: a book nothing has been found in reads `LANDMARKS 0/19`,
   dimmed and skipped by the cursor, because the denominator is what tells a new
   player how much there is to find.
 - **Per-level visual flavor**: each level picks its own parallax flavor
   (`meadow` rolling hills, `keep` indoor backdrop, `night` stars, a moon and
   dark hills that slide on both axes, behind the belfry's open chamber and
-  roof) and backdrop kind (`cave`
+  roof, `autumn` a low sun in banded evening sky over the kitchen garden,
+  `zenith` the observatory's dense stars with the spiral picked out in them)
+  and backdrop kind (`cave`
   rock texture, `indoor-dark` flat near-black, `crypt-black` pure black for
-  candle-lit underground).
+  candle-lit underground). A level may also lay a `tint` over everything it
+  draws: the observatory reuses the meadow's daytime grass and stone, and
+  tints them moonlight blue.
 - **Expanded tile palette**: grass / dirt / stone / dark stone (outdoor),
   castle brick / castle floor / gold pillar (castle interior), crypt brick /
   crypt floor (deep underground), timber beams and plank floors (the belfry),
-  plus water. Authored in ASCII — each
+  grotto rock, bookcases and ladders (the library), plus water. Authored in ASCII — each
   character maps to one tile type.
 - **Water mechanics**: wade on submerged ground at reduced speed, swim freely
   off-ground, hold jump to rise, hold down to dive. Exit-pop boost when
   leaving the surface with upward velocity (so you can climb a one-tile bank).
   Submerged pixels get a blue tint applied at render time, and the surface
   ripples ±1 px only on the body the player is currently inside.
+- **Ladders**: hold ↑ or ↓ on a ladder tile to take hold of it; climb, or
+  hang still with neither held. Gravity is off while climbing, the climber
+  drifts to the middle of the ladder's column, and leaving the top with
+  upward speed gets the same pop as leaving water, enough to step onto the
+  ledge the ladder leans against.
 - **Wildlife**: rabbits pacing platforms, fish swimming in water bodies, birds
   silhouetted across the sky, a hopping pumpkin with its own gravity, owls
-  perched in the belfry, glowfish lighting the cistern. None collide with the
+  perched in the belfry, glowfish lighting the cistern, moths circling the
+  grotto's glowcaps. None collide with the
   player; they just inhabit the world.
 - **First-encounter greetings**: the first time you bump into any creature, a
   parchment popup pauses gameplay with a small line of speech ("Got a carrot
@@ -208,7 +228,8 @@ src/
 - **Level data is plain ASCII**: each level is an array of strings where each
   character is a tile type (`.` sky, `G` grass, `D` dirt, `S` stone,
   `K` dark stone, `W` water, `B`/`F`/`P` castle bricks/floor/pillar,
-  `c`/`v` crypt bricks/floor, `T` timber). Easy to hand-edit and read.
+  `c`/`v` crypt bricks/floor, `T` timber, `R` grotto rock, `L` bookcase,
+  `H` ladder). Easy to hand-edit and read.
 - **Logical resolution is 320×224.** The PixiJS stage upscales it ×3 to a
   fixed 960×672 canvas — the same size in every window, centred on the page's
   near-black ground, so a logical pixel is always exactly three of them.
@@ -275,6 +296,7 @@ Other actions:
 - **Move**: ← → / A D / Q D (AZERTY)
 - **Jump / swim up**: Space / ↑ / W / Z (AZERTY)
 - **Dive (while in water)**: ↓ / S
+- **Climb a ladder**: ↑ / ↓ while on it
 - **Interact / close sketchbook**: E
 - **Turn the leaves of a long sketchbook page**: ← →
 - **Respawn at level's default spawn**: R

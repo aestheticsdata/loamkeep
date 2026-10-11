@@ -11,6 +11,8 @@ export interface Body {
   // If true, stepPhysics skips its normal gravity/terminal-velocity step —
   // the caller is responsible for applying swim physics to `vel.y` instead.
   swimming?: boolean;
+  // The same, for a body on a ladder: it owns vel.y while it climbs.
+  climbing?: boolean;
 }
 
 // Advance one body by dt:
@@ -33,7 +35,7 @@ export function stepPhysics(body: Body, tilemap: Tilemap, dt: number): void {
   // owned by the entity (see Player.update). stepPhysics still does the
   // position update and tile collision so swimming bodies bonk on walls
   // and floors the same way.
-  if (!body.swimming) {
+  if (!body.swimming && !body.climbing) {
     if (!wasGrounded) {
       // Airborne: normal asymmetric gravity.
       const g = body.vel.y < 0 ? GRAVITY : GRAVITY * GRAVITY_FALL_MULT;

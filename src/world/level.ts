@@ -17,8 +17,10 @@ export interface SpawnPoint {
 // silhouettes don't fit an indoor castle; the keep wants either nothing or
 // a dim interior backdrop. Add more flavors here as new biomes arrive.
 // 'night' is the belfry's sky: stars, a moon and dark hills, behind
-// whatever part of a level its backdrop leaves uncovered.
-export type ParallaxFlavor = 'meadow' | 'keep' | 'night';
+// whatever part of a level its backdrop leaves uncovered. 'autumn' is the
+// kitchen garden's: a low sun in a gold-to-violet evening sky. 'zenith' is
+// the observatory's: the clearest night in the game, and the spiral in it.
+export type ParallaxFlavor = 'meadow' | 'keep' | 'night' | 'autumn' | 'zenith';
 
 // What kind of solid backdrop sits at the back of the world container,
 // behind the tilemap.
@@ -71,6 +73,11 @@ export interface LevelSpec {
   // True when sky lies above the top row, so the camera may follow a jump
   // above it. False under a ceiling: the camera stops at row 0.
   openSky: boolean;
+  // A colour multiplied over everything the level draws (tiles, props,
+  // creatures — not the player, not the sky). For light the tiles were not
+  // painted in: the meadow's grass is daytime green, and on a hill at night
+  // it has to be moonlit. Absent means the level's own colours.
+  tint?: number;
 }
 
 // Materialised level: spec + built Tilemap. Mounting still happens in Game,

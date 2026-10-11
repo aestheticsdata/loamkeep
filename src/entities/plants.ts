@@ -1,4 +1,5 @@
 import { DB32 } from '@constants';
+import { drawGlow } from '@entities/glow';
 import type { Graphics } from 'pixi.js';
 
 // The meadow's growing things, drawn once and used twice: planted in the
@@ -18,7 +19,19 @@ import type { Graphics } from 'pixi.js';
 // down, so renaming one is forgetting every page already written — and it is
 // keyed by species, not by position: the same oak stands at two columns and
 // the mushroom grows down in the cavern.
-export type FloraId = 'small-tree' | 'pine-tree' | 'tall-oak' | 'giant-tree' | 'bush' | 'mushroom';
+export type FloraId =
+  | 'small-tree'
+  | 'pine-tree'
+  | 'tall-oak'
+  | 'giant-tree'
+  | 'bush'
+  | 'mushroom'
+  | 'glowcap'
+  | 'shelf-fungus'
+  | 'glow-moss'
+  | 'squash'
+  | 'bean-trellis'
+  | 'sunflower';
 
 function drawSmallTree(g: Graphics): void {
   const trunk = DB32.oiledCedar;
@@ -163,6 +176,118 @@ function drawMushroom(g: Graphics): void {
   g.rect(1, -3, 1, 1).fill(DB32.lightSteel);
 }
 
+// The glow grotto's three. Their light is a drawGlow halo behind them —
+// cyan, or amber for the shelf fungus; the moss has only its own bright
+// points. Static: a decoration is drawn once, and the grotto's movement is
+// the moths'.
+
+// Glowcap — a tall, thin-stemmed mushroom with a domed cap that gives off
+// cyan light. 7 wide × 10 tall, plus its halo.
+function drawGlowcap(g: Graphics): void {
+  drawGlow(g, { x: 0, y: -8, radius: 12, color: DB32.viking });
+  // Stem, pale and slightly bent.
+  g.rect(0, -5, 1, 5).fill(DB32.lightSteel);
+  g.rect(-1, -2, 1, 2).fill(DB32.lightSteel);
+  // Cap.
+  g.rect(-3, -8, 7, 2).fill(DB32.viking);
+  g.rect(-2, -9, 5, 1).fill(DB32.viking);
+  g.rect(-1, -10, 3, 1).fill(DB32.lightSteel);
+  // Gills under the cap, and the brightest point on its crown.
+  g.rect(-2, -6, 5, 1).fill(DB32.venice);
+  g.rect(0, -10, 1, 1).fill(DB32.white);
+}
+
+// Shelf fungus — a pair of amber brackets stacked on a stump of rock, with a
+// faint warm glow. 9 wide × 6 tall.
+function drawShelfFungus(g: Graphics): void {
+  drawGlow(g, { x: 1, y: -4, radius: 7, color: DB32.tahitiGold });
+  g.rect(-2, -6, 3, 6).fill(DB32.opal);
+  g.rect(-5, -3, 6, 1).fill(DB32.tahitiGold);
+  g.rect(-4, -2, 4, 1).fill(DB32.rope);
+  g.rect(0, -6, 5, 1).fill(DB32.tahitiGold);
+  g.rect(1, -5, 3, 1).fill(DB32.rope);
+  g.rect(-5, -3, 1, 1).fill(DB32.goldenFizz);
+  g.rect(4, -6, 1, 1).fill(DB32.goldenFizz);
+}
+
+// Glow moss — a low mat over the stone with green-cyan points of light in
+// it. 10 wide × 2 tall.
+function drawGlowMoss(g: Graphics): void {
+  g.rect(-5, -2, 10, 2).fill(DB32.dell);
+  g.rect(-4, -2, 1, 1).fill(DB32.atlantis);
+  g.rect(-1, -2, 1, 1).fill(DB32.viking);
+  g.rect(2, -2, 1, 1).fill(DB32.atlantis);
+  g.rect(4, -1, 1, 1).fill(DB32.viking);
+  g.rect(-3, -1, 2, 1).fill(DB32.eltGreen);
+}
+
+// The kitchen garden's three, in autumn: what is left at the end of the
+// season, not the summer version.
+
+// Squash — a sprawl of big leaves on a vine, with one ripe orange squash
+// lying in them. 14 wide × 7 tall.
+function drawSquash(g: Graphics): void {
+  const leaf = DB32.dell;
+  const leafHi = DB32.christi;
+  const vine = DB32.rainforest;
+  g.rect(-7, -1, 14, 1).fill(vine);
+  g.rect(-6, -5, 5, 4).fill(leaf);
+  g.rect(-5, -6, 3, 1).fill(leaf);
+  g.rect(-6, -5, 2, 1).fill(leafHi);
+  g.rect(3, -4, 4, 3).fill(leaf);
+  g.rect(4, -5, 2, 1).fill(leaf);
+  g.rect(3, -4, 1, 1).fill(DB32.rainforest);
+  // The squash itself, ribbed.
+  g.rect(-1, -4, 5, 4).fill(DB32.tahitiGold);
+  g.rect(-2, -3, 7, 2).fill(DB32.tahitiGold);
+  g.rect(0, -4, 1, 4).fill(DB32.rope);
+  g.rect(2, -4, 1, 4).fill(DB32.rope);
+  g.rect(-1, -4, 1, 1).fill(DB32.twine);
+  g.rect(1, -5, 1, 1).fill(vine);
+}
+
+// Bean trellis — three canes tied at the top in a wigwam, with a vine gone
+// yellow climbing them and a few pods left hanging. 10 wide × 20 tall.
+function drawBeanTrellis(g: Graphics): void {
+  const cane = DB32.rope;
+  for (let i = 0; i < 18; i++) {
+    const spread = Math.floor((18 - i) / 4);
+    g.rect(-spread - 1, -i - 1, 1, 1).fill(cane);
+    g.rect(spread, -i - 1, 1, 1).fill(cane);
+  }
+  g.rect(0, -19, 1, 19).fill(cane);
+  g.rect(-1, -19, 3, 1).fill(DB32.twine);
+  // The vine, yellowing, and the last pods.
+  for (const [x, y] of [
+    [-4, -3],
+    [3, -5],
+    [-3, -8],
+    [2, -10],
+    [-2, -13],
+    [1, -15],
+  ] as const) {
+    g.rect(x, y, 2, 2).fill(DB32.rainforest);
+    g.rect(x, y, 1, 1).fill(DB32.plum);
+  }
+  g.rect(-4, -7, 1, 3).fill(DB32.atlantis);
+  g.rect(3, -12, 1, 3).fill(DB32.atlantis);
+}
+
+// Sunflower — tall, its head heavy and bowed, the petals gone ragged. 9 wide
+// × 24 tall.
+function drawSunflower(g: Graphics): void {
+  g.rect(0, -18, 1, 18).fill(DB32.dell);
+  g.rect(-3, -9, 3, 2).fill(DB32.dell);
+  g.rect(1, -13, 3, 2).fill(DB32.dell);
+  // The bowed head, facing down and right.
+  g.rect(0, -23, 5, 5).fill(DB32.goldenFizz);
+  g.rect(-1, -22, 1, 3).fill(DB32.goldenFizz);
+  g.rect(5, -21, 1, 2).fill(DB32.tahitiGold);
+  g.rect(1, -22, 3, 3).fill(DB32.oiledCedar);
+  g.rect(2, -21, 1, 1).fill(DB32.stinger);
+  g.rect(0, -24, 2, 1).fill(DB32.tahitiGold);
+}
+
 // Every species by id, so a plant is placed by name and can never be handed
 // the wrong drawing — and so the book and the world are guaranteed to show
 // the same thing.
@@ -182,4 +307,10 @@ export const PLANTS: Record<FloraId, PlantDrawing> = {
   'giant-tree': { draw: drawGiantTree, height: 30 },
   bush: { draw: drawBush, height: 4 },
   mushroom: { draw: drawMushroom, height: 5 },
+  glowcap: { draw: drawGlowcap, height: 20 },
+  'shelf-fungus': { draw: drawShelfFungus, height: 11 },
+  'glow-moss': { draw: drawGlowMoss, height: 2 },
+  squash: { draw: drawSquash, height: 6 },
+  'bean-trellis': { draw: drawBeanTrellis, height: 19 },
+  sunflower: { draw: drawSunflower, height: 24 },
 };
