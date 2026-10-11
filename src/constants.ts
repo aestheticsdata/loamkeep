@@ -73,7 +73,9 @@ export const DB32 = {
 // Relationships (for tuning intuition):
 //   max jump height = JUMP_VELOCITY² / (2 * GRAVITY)
 //   time to apex   = JUMP_VELOCITY / GRAVITY
-// With current numbers: ~64px (4 tiles) high, ~0.43s up.
+// With current numbers: ~64px (4 tiles) high, ~0.43s up. Stepped at
+// PHYSICS_STEP the real apex is ~67 px: the take-off step moves at full
+// JUMP_VELOCITY before any gravity applies.
 export const GRAVITY = 700; // px/s² downward, while ascending
 export const GRAVITY_FALL_MULT = 1.6; // gravity multiplier while falling (snappy fall vs floaty rise)
 export const JUMP_VELOCITY = 300; // initial upward speed when jumping
@@ -82,6 +84,17 @@ export const TERMINAL_VELOCITY = 450; // max downward speed in px/s
 export const WALK_SPEED = 72; // horizontal max speed (was 96 — felt "100 à l'heure")
 export const COYOTE_TIME = 0.08; // grace period to still jump after walking off a ledge
 export const JUMP_BUFFER = 0.1; // grace period for jump press just before landing
+
+// The player's physics runs on a fixed step, not the display's frame time.
+// Semi-implicit Euler makes the jump arc depend on dt — a full jump measured
+// 69 px at 30 fps and 65 at 144 — while the levels are tuned to the inch: a
+// 4-tile ledge (64) is just within reach at 60 fps, with ~3 px to spare.
+// 1/60 keeps the arc the game was tuned on: ~67 px at every frame rate.
+export const PHYSICS_STEP = 1 / 60;
+// How far short of a whole step the accumulator may be and still take one.
+// A 60 Hz display's frame time jitters around 16.7 ms; without slack, a frame
+// that lands a hair short runs no step and the next runs two — a visible hitch.
+export const PHYSICS_STEP_SLACK = 0.001;
 
 // Water feel — one unified model:
 //   - In water on solid ground: walk at WADE_SPEED (slower than land).

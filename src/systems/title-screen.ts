@@ -199,12 +199,12 @@ export class TitleScreen {
   }
 
   // Rebuild the menu from the store: the meadow on top, then one row per
-  // book, each reading `3/8` — dimmed at `0/8`, because a book with nothing in
+  // book, each reading `3/13` — dimmed at `0/13`, because a book with nothing in
   // it cannot be opened, and fully lit once pages exist. Game calls this every
   // time the title is shown.
   //
   // The count is there at zero rather than the `(EMPTY)` this used to read,
-  // because the denominator is the useful half: eight landmarks, four
+  // because the denominator is the useful half: thirteen landmarks, four
   // creatures, six plants is what the game *is*, and a player who has found
   // none of them is exactly the player who needs telling how many there are.
   // `(EMPTY)` told them the opposite — three rows of nothing to do — and since

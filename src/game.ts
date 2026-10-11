@@ -1,4 +1,4 @@
-import { DB32, TILE_SIZE } from '@constants';
+import { DB32, PHYSICS_STEP, PHYSICS_STEP_SLACK, TILE_SIZE } from '@constants';
 import { Bird, drawBird } from '@entities/bird';
 import { Decoration } from '@entities/decoration';
 import type { Entity, InteractContext } from '@entities/entity';
@@ -19,6 +19,7 @@ import {
   KEYS_LEFT,
   KEYS_RESPAWN,
   KEYS_RIGHT,
+  StepInput,
 } from '@systems/input';
 import { ScreenFade } from '@systems/screen-fade';
 import type { SketchbookPage } from '@systems/sketchbook';
@@ -111,6 +112,10 @@ export interface GameSnapshot {
 export class Game {
   private readonly app: Application;
   private readonly input: Input;
+  // The keyboard as the player's fixed physics step reads it (see StepInput).
+  private readonly stepInput: StepInput;
+  // Display time not yet spent on physics steps, in seconds.
+  private physicsClock = 0;
   private readonly audio: Audio;
   private readonly sketchbook: Sketchbook;
   // Single greeting overlay reused for both first-rabbit and first-fish
@@ -164,6 +169,7 @@ export class Game {
   constructor(app: Application) {
     this.app = app;
     this.input = new Input();
+    this.stepInput = new StepInput(this.input);
     this.audio = new Audio();
     this.sketchbook = new Sketchbook();
     this.greeting = new Greeting();
@@ -194,7 +200,7 @@ export class Game {
 
     // Camera bound to the starting level's dimensions. setBounds() updates
     // these on transitions.
-    this.camera = new Camera(this.currentLevel.tilemap);
+    this.camera = new Camera(this.currentLevel.tilemap, this.currentLevel.spec.openSky);
 
     // Title screen above the world (it covers the whole viewport) and below
     // the modals, so the sketchbook gallery opens over it.
@@ -296,6 +302,11 @@ export class Game {
     const surfaceOffset = Math.round(Math.sin(this.waterAnimTime * WATER_BOB_FREQ) * WATER_BOB_AMPLITUDE);
     renderWaterSurfaceInto(this.waterSurface, tilemap, surfaceOffset, activeBodyId);
 
+    if (this.greeting.isVisible() || this.sketchbook.isVisible()) {
+      // Paused: a press latched just before the popup opened must not fire
+      // when it closes.
+      this.stepInput.consume();
+    }
     if (this.greeting.isVisible()) {
       // Greeting popup open: gameplay is paused (rabbits, fish,
       // birds, pumpkin, player — nothing updates). Closes on a fresh
@@ -343,17 +354,19 @@ export class Game {
         this.respawnAtDefault();
       }
 
-      this.player.update(this.input, dt, tilemap);
-
-      // SFX driven by player one-shot event flags (set during update()).
-      if (this.player.didJumpThisFrame) this.audio.jump();
-      if (this.player.didLandThisFrame) this.audio.land();
-      if (this.player.didFootstepThisFrame) {
-        if (this.player.inWater) this.audio.wadeStep();
-        else this.audio.footstep();
+      // The player on a fixed step: as many PHYSICS_STEPs as the frame's
+      // time covers (none on some frames of a fast display, two on a slow
+      // one), so the jump arc is the same at any frame rate. The SFX flags
+      // are read after every step — one set per step, none lost.
+      this.stepInput.latch();
+      this.physicsClock += dt;
+      while (this.physicsClock >= PHYSICS_STEP - PHYSICS_STEP_SLACK) {
+        this.physicsClock -= PHYSICS_STEP;
+        this.player.update(this.stepInput, PHYSICS_STEP, tilemap);
+        this.stepInput.consume();
+        this.playPlayerSounds();
       }
-      if (this.player.didEnterWaterThisFrame) this.audio.splash();
-      if (this.player.didSwimStrokeThisFrame) this.audio.swimStroke();
+      this.player.interpolate(Math.min(1, Math.max(0, this.physicsClock / PHYSICS_STEP)));
 
       // Per-frame entity update (e.g. animated decorations once we add
       // them, lever cooldowns, push-block physics). Doors have no update.
@@ -463,15 +476,12 @@ export class Game {
     this.mountLevelContent();
 
     // Reposition player at the spawn point.
-    this.player.pos.x = nextSpawn.x;
-    this.player.pos.y = nextSpawn.y;
-    this.player.vel.x = 0;
-    this.player.vel.y = 0;
+    this.player.placeAt(nextSpawn.x, nextSpawn.y);
 
     // Camera + parallax for the new level. The setBounds reconfigures the
     // clamp; snap+apply puts the viewport on the player immediately so
     // there's no smooth pan from the old position.
-    this.camera.setBounds(next.tilemap);
+    this.camera.setBounds(next.tilemap, next.spec.openSky);
     this.parallax.rebuild(next.spec.parallax, next.tilemap.width * TILE_SIZE);
     this.aimCameraAtPlayer();
     this.camera.snap();
@@ -757,16 +767,28 @@ export class Game {
 
   private respawnAtDefault(): void {
     const spawn = this.currentLevel.spawn(this.currentLevel.spec.defaultSpawnId);
-    this.player.pos.x = spawn.x;
-    this.player.pos.y = spawn.y;
-    this.player.vel.x = 0;
-    this.player.vel.y = 0;
+    this.player.placeAt(spawn.x, spawn.y);
     this.aimCameraAtPlayer();
     this.camera.snap();
   }
 
+  // Aimed at where the player is drawn, not where its body is, so the figure
+  // and the world move together between physics steps.
   private aimCameraAtPlayer(): void {
-    this.camera.follow(this.player.pos.x + this.player.size.x / 2, this.player.pos.y + this.player.size.y / 2);
+    const at = this.player.renderPos;
+    this.camera.follow(at.x + this.player.size.x / 2, at.y + this.player.size.y / 2);
+  }
+
+  // SFX driven by the player's one-shot event flags, set during update().
+  private playPlayerSounds(): void {
+    if (this.player.didJumpThisFrame) this.audio.jump();
+    if (this.player.didLandThisFrame) this.audio.land();
+    if (this.player.didFootstepThisFrame) {
+      if (this.player.inWater) this.audio.wadeStep();
+      else this.audio.footstep();
+    }
+    if (this.player.didEnterWaterThisFrame) this.audio.splash();
+    if (this.player.didSwimStrokeThisFrame) this.audio.swimStroke();
   }
 
   /**

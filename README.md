@@ -151,9 +151,9 @@ src/
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
   under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old
   name so no save is orphaned; a v1 blob migrates into the `landmarks` book on
-  read). A book's entry reads `LANDMARKS 3/8` and opens a gallery of them,
+  read). A book's entry reads `LANDMARKS 3/13` and opens a gallery of them,
   ending on a count of the pages still blank — never their names. The count is
-  there from the start: a book nothing has been found in reads `LANDMARKS 0/8`,
+  there from the start: a book nothing has been found in reads `LANDMARKS 0/13`,
   dimmed and skipped by the cursor, because the denominator is what tells a new
   player how much there is to find.
 - **Per-level visual flavor**: each level picks its own parallax flavor

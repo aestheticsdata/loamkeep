@@ -10,34 +10,41 @@ import type { Graphics } from 'pixi.js';
 
 // The Old Keep — THREE-storey great hall with floating staircase + basement.
 //
-// 50 wide × 26 tall. Three floors stacked vertically:
+// 61 wide × 26 tall (cols 0-1 and 59-60 are the outer walls). A full jump
+// peaks at ~67 px: 4 tiles (64) is only just within reach, with ~3 px to
+// spare, so no climb here asks for more than 3 tiles up.
 //
-//   Upper floor (row 8, cols 2-28) — the "balcony"
+//   Upper floor (row 8, cols 2-29, with a one-tile-lower lip at row 9 out to
+//   col 35) — the "balcony"
 //     - Stone Throne (col 14) + Bookshelf (col 20) + columns + candles
-//     - Reached by climbing the floating staircase from the lower floor
+//     - The gold columns are not solid; the player walks through them
 //
-//   Floating staircase (rows 10/12/14/16, cols 29-36) — connects lower to upper
-//     - 4 stone slabs, each 2 tiles wide × 1 tile tall, FLOATING
-//     - Each step is 2 tiles up + 2 tiles LEFT of the next-lower one
-//     - Player jumps from lower floor onto step 1 (col 35-36 row 16),
-//       then up-left onto each subsequent step, up to the upper floor
-//     - NOTHING under each step — lower floor remains fully walkable
+//   East ledges — row 16 (cols 39-58), row 10 (cols 41-58), row 7 (cols 47-58)
 //
-//   Lower floor (row 18, cols 2-47) — the entry hall
+//   The climb (every jump ≤3 tiles up, each with clear headroom):
+//     lower floor → hop the hole onto col 38 → up-right onto the row-16
+//     ledge → up-left onto the landing (row 14, cols 33-36) → up-right onto
+//     the step (row 11, cols 39-40) → up-left onto the upper floor's lip →
+//     up onto the upper floor. From the step, the row-10 ledge and then the
+//     row-7 ledge (Stained Glass) go on up to the right.
+//
+//   Hidden passage (rows 12-13, floor at row 14 cols 2-30) — a two-tile
+//     jump west off the landing; the Masons' Niche is at its far end.
+//
+//   Lower floor (row 18, cols 2-35 and 38-58) — the entry hall
 //     - Return door at col 3 (back to meadow)
 //     - Hole in the floor at cols 36-37 — player drops to the basement
-//     - Four gold columns, three candles, two hanging banners
+//     - East of col 38 the row-16 ledge leaves one tile of headroom
 //
-//   Basement chamber (rows 19-22) — the "souterrain"
+//   Basement chamber (rows 19-21, floor at row 22) — the "souterrain"
 //     - Reached by falling through the hole in the lower floor
-//     - Descend door at col 8 (down to the crypt) — far from the entry
-//       hole, so the player has to walk left through the basement to
-//       find it
-//     - One climbing step (col 41 row 20) on the east side: from the
-//       basement floor, jump onto the step, then jump up-left back to
-//       the lower floor (col 38, just east of the hole)
+//     - A plinth (row 21, cols 36-37) sits right under the hole. The fall
+//       lands on it; stepping off it reaches the basement floor. It is also
+//       the way back out: hop onto it (1 tile), then jump straight up
+//       through the hole (3 tiles) and drift onto the lower floor.
+//     - Descend door at col 8 (down to the crypt) — far from the hole, so
+//       the player has to walk left through the basement to find it
 //     - Two gold columns + two candles light the basement
-//     - Basement floor at row 22 (cols 2-47)
 //
 // Legend (see CHAR_TO_TILE in tilemap.ts):
 //   . empty   B CastleBrick   F CastleFloor   P GoldPillar
@@ -49,22 +56,22 @@ const OLD_KEEP_ROWS = [
   'BB.....PP......PP......PP..................................BB', //  4
   'BB.....PP......PP......PP..................................BB', //  5  upper-floor columns (capitals)
   'BB.....PP......PP......PP..................................BB', //  6
-  'BB.....PP......PP......PP......................FFFFFFFFFFFFBB', //  7  upper-floor columns (bases)
-  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFF....................PP.......BB', //  8  UPPER FLOOR (cols 2-28)
-  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF..............PP.......BB', //  9  lower room (above lower floor)
-  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFF...........FFFFFFFFFFFFFFFFFFBB', // 10  step 4 floating (cols 29-30)
-  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFF.........FF..................BB', // 11
-  'BB...................................FF....................BB', // 12  step 3 floating (cols 31-32)
-  'BB.................................FF......................BB', // 13
-  'BBFFFFFFFFFFFFFFFFFFFFFFFF.......FF........................BB', // 14  step 2 floating (cols 33-34)
+  'BB.....PP......PP......PP......................FFFFFFFFFFFFBB', //  7  upper-floor columns (bases) + high east ledge (cols 47-58)
+  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFF....................PP.......BB', //  8  UPPER FLOOR (cols 2-29)
+  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF..............PP.......BB', //  9  upper floor's lip (cols 30-35)
+  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFF...........FFFFFFFFFFFFFFFFFFBB', // 10  east ledge (cols 41-58)
+  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFF.........FF..................BB', // 11  step (cols 39-40)
+  'BB.........................................................BB', // 12  hidden passage (rows 12-13, over the row-14 floor)
+  'BB.........................................................BB', // 13
+  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFF..FFFF......................BB', // 14  passage floor (cols 2-30) + landing (cols 33-36)
   'BB....PP......PP......PP...................................BB', // 15
-  'BB....PP......PP......PP...............FFFFFFFFFFFFFFFFFFFFBB', // 16  step 1 floating (cols 35-36)
+  'BB....PP......PP......PP...............FFFFFFFFFFFFFFFFFFFFBB', // 16  east ledge (cols 39-58)
   'BB....PP......PP......PP...................................BB', // 17  lower-room columns
-  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF..FFFFFFFFFFFFFFFFFFFFFBB', // 18  LOWER FLOOR (cols 2-35, 38-47) — hole at 36-37
+  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF..FFFFFFFFFFFFFFFFFFFFFBB', // 18  LOWER FLOOR (cols 2-35, 38-58) — hole at 36-37
   'BB.....PP..............PP..................................BB', // 19  basement chamber (top)
-  'BB.....PP..............PP..................................BB', // 20  basement climb-out step (col 41)
-  'BB.....PP..............PP..................................BB', // 21  basement gold columns
-  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBB', // 22  BASEMENT FLOOR (cols 2-47)
+  'BB.....PP..............PP..................................BB', // 20
+  'BB.....PP..............PP...........FF.....................BB', // 21  basement gold columns + plinth under the hole (cols 36-37)
+  'BBFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFBB', // 22  BASEMENT FLOOR (cols 2-58)
   'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 23  foundation top
   'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 24  foundation
   'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 25  foundation
@@ -80,6 +87,11 @@ const LOWER_FLOOR_ROW = 18;
 const LOWER_FLOOR_Y = LOWER_FLOOR_ROW * TILE_SIZE;
 const LOWER_SPAWN_Y = LOWER_FLOOR_Y - TILE_SIZE;
 
+// The floor of the hidden passage between the storeys (row 14, cols 2-30),
+// and the high east ledge (row 7, cols 47-58).
+const PASSAGE_FLOOR_Y = 14 * TILE_SIZE;
+const HIGH_LEDGE_Y = 7 * TILE_SIZE;
+
 const BASEMENT_FLOOR_ROW = 22;
 const BASEMENT_FLOOR_Y = BASEMENT_FLOOR_ROW * TILE_SIZE;
 const BASEMENT_SPAWN_Y = BASEMENT_FLOOR_Y - TILE_SIZE;
@@ -89,8 +101,7 @@ const BASEMENT_SPAWN_Y = BASEMENT_FLOOR_Y - TILE_SIZE;
 //   - Descend door (down to the crypt) in the BASEMENT — far from the
 //     hole the player drops in through, so they have to walk through the
 //     basement chamber to find it.
-//   - Stone Throne + Bookshelf landmarks on the UPPER floor — the climb
-//     is the reward.
+//   - Stone Throne on the UPPER floor — the climb is the reward.
 const RETURN_DOOR_COL = 3;
 const RETURN_DOOR_X = RETURN_DOOR_COL * TILE_SIZE + 8;
 
@@ -110,8 +121,9 @@ const OLD_KEEP_SPAWNS: SpawnPoint[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Landmarks — keep-specific. Phase 3 ships with one (Stone Throne); more
-// arrive in phase 4 (Great Kettle, Stained Glass, Old Banner with lore).
+// Landmarks — keep-specific: the Stone Throne on the upper floor, the
+// Masons' Niche in the hidden passage, the Stained Glass on the high east
+// ledge, and the Great Kettle in the entry hall.
 // ---------------------------------------------------------------------------
 
 const inkFor = (discovered: boolean): number => (discovered ? DB32.opal : DB32.valhalla);
@@ -194,6 +206,196 @@ const OLD_KEEP_LANDMARKS: LandmarkSpec[] = [
       // Finial.
       g.rect(-10, -28, 20, 4).fill(stoneHi);
       g.rect(-3, -32, 6, 4).fill(accent);
+    },
+  },
+
+  // Masons' Niche — at the far west end of the hidden passage between the
+  // floors (rows 12-13, col 3). The only way in is the two-tile jump west
+  // off the landing, so finding it is the whole reward. Kept under 24 px
+  // tall: the passage is two tiles high.
+  {
+    id: 'masons-niche',
+    x: 3 * TILE_SIZE + 8,
+    y: PASSAGE_FLOOR_Y,
+    name: "Masons' Niche",
+    description:
+      'A low gap between the floors, left on purpose. At its end someone scratched a spiral into the mortar ' +
+      'and, beside it, a long row of tally marks — days, or steps, or names. ' +
+      'The dust here has not been disturbed in a very long time.',
+    drawBody(g, discovered) {
+      const ink = inkFor(discovered);
+      const stone = discovered ? DB32.dimGray : DB32.heather;
+      const stoneHi = discovered ? DB32.dimGray : DB32.lightSteel;
+      const tool = discovered ? DB32.opal : DB32.rope;
+
+      // A loose block of dressed stone, left where it was cut.
+      g.rect(-7, -6, 10, 6).fill(stone);
+      g.rect(-7, -6, 10, 1).fill(stoneHi);
+      g.rect(-7, -6, 1, 6).fill(ink);
+      g.rect(2, -6, 1, 6).fill(ink);
+      g.rect(-7, -1, 10, 1).fill(ink);
+      // The spiral scratched into its face.
+      g.rect(-5, -4, 4, 1).fill(ink);
+      g.rect(-5, -4, 1, 2).fill(ink);
+      g.rect(-2, -4, 1, 2).fill(ink);
+      g.rect(-4, -2, 3, 1).fill(ink);
+      // Tally marks on the wall behind it.
+      for (let i = 0; i < 4; i++) {
+        g.rect(-6 + i * 2, -12, 1, 4).fill(ink);
+      }
+      g.rect(-7, -10, 8, 1).fill(ink);
+      // A mason's chisel leaning against the block.
+      g.rect(4, -7, 1, 7).fill(tool);
+      g.rect(4, -8, 1, 1).fill(stoneHi);
+    },
+    drawSketch(g) {
+      const stone = DB32.heather;
+      const stoneHi = DB32.lightSteel;
+      const ink = DB32.valhalla;
+      // Block.
+      g.rect(-24, -2, 34, 22).fill(stone);
+      g.rect(-24, -2, 34, 2).fill(stoneHi);
+      // Spiral.
+      g.rect(-17, 4, 16, 1).fill(ink);
+      g.rect(-17, 4, 1, 10).fill(ink);
+      g.rect(-2, 4, 1, 10).fill(ink);
+      g.rect(-17, 14, 16, 1).fill(ink);
+      g.rect(-12, 8, 6, 1).fill(ink);
+      g.rect(-12, 8, 1, 4).fill(ink);
+      // Tallies — four strokes and a fifth across them, three times over.
+      for (let set = 0; set < 3; set++) {
+        for (let i = 0; i < 4; i++) {
+          g.rect(-24 + set * 16 + i * 3, -24, 1, 14).fill(ink);
+        }
+        g.rect(-25 + set * 16, -17, 12, 1).fill(ink);
+      }
+      // Chisel.
+      g.rect(16, -6, 3, 26).fill(DB32.rope);
+      g.rect(16, -10, 3, 4).fill(stoneHi);
+    },
+  },
+
+  // Stained Glass — on the high east ledge (row 7, col 54), the far end of
+  // the climb past the staircase. The window stands against the back wall
+  // with nothing but stone behind it.
+  {
+    id: 'stained-glass',
+    x: 54 * TILE_SIZE + 8,
+    y: HIGH_LEDGE_Y,
+    name: 'Stained Glass',
+    description:
+      'A window of coloured glass, set high where no one would think to look. There is no daylight behind it, ' +
+      'only stone — and still the glass glows faintly. At its heart, picked out in gold: the spiral.',
+    drawBody(g, discovered) {
+      const ink = inkFor(discovered);
+      const frame = discovered ? DB32.dimGray : DB32.heather;
+      const blue = discovered ? DB32.opal : DB32.cornflower;
+      const red = discovered ? DB32.dimGray : DB32.clairvoyant;
+      const green = discovered ? DB32.opal : DB32.eltGreen;
+      const gold = discovered ? DB32.heather : DB32.goldenFizz;
+
+      // Sill.
+      g.rect(-8, -2, 16, 2).fill(frame);
+      g.rect(-8, -2, 16, 1).fill(ink);
+      // Pointed-arch frame, 12 wide × 26 tall.
+      g.rect(-6, -24, 12, 22).fill(frame);
+      g.rect(-4, -26, 8, 2).fill(frame);
+      g.rect(-2, -28, 4, 2).fill(frame);
+      // Glass panes inside the frame, in bands.
+      g.rect(-4, -22, 8, 6).fill(blue);
+      g.rect(-4, -16, 8, 6).fill(red);
+      g.rect(-4, -10, 8, 6).fill(green);
+      g.rect(-2, -25, 4, 3).fill(blue);
+      // Lead lines.
+      g.rect(0, -25, 1, 21).fill(ink);
+      g.rect(-4, -16, 8, 1).fill(ink);
+      g.rect(-4, -10, 8, 1).fill(ink);
+      // The gold spiral at the centre.
+      g.rect(-2, -15, 4, 1).fill(gold);
+      g.rect(-2, -15, 1, 3).fill(gold);
+      g.rect(1, -15, 1, 3).fill(gold);
+      g.rect(-1, -13, 2, 1).fill(gold);
+    },
+    drawSketch(g) {
+      const frame = DB32.heather;
+      const ink = DB32.valhalla;
+      const gold = DB32.goldenFizz;
+      // Frame and arch.
+      g.rect(-18, -20, 36, 40).fill(frame);
+      g.rect(-12, -28, 24, 8).fill(frame);
+      g.rect(-6, -34, 12, 6).fill(frame);
+      // Panes.
+      g.rect(-14, -18, 28, 12).fill(DB32.cornflower);
+      g.rect(-14, -6, 28, 12).fill(DB32.clairvoyant);
+      g.rect(-14, 6, 28, 12).fill(DB32.eltGreen);
+      g.rect(-8, -28, 16, 10).fill(DB32.royalBlue);
+      // Lead.
+      g.rect(-1, -28, 2, 46).fill(ink);
+      g.rect(-14, -6, 28, 1).fill(ink);
+      g.rect(-14, 6, 28, 1).fill(ink);
+      // Spiral in gold leaf over the centre.
+      g.rect(-8, -4, 16, 2).fill(gold);
+      g.rect(-8, -4, 2, 9).fill(gold);
+      g.rect(6, -4, 2, 9).fill(gold);
+      g.rect(-8, 4, 16, 2).fill(gold);
+      g.rect(-3, 0, 6, 2).fill(gold);
+    },
+  },
+
+  // Great Kettle — on the lower floor (col 29), at the end of the stretch
+  // the pumpkin hops along, under the passage floor.
+  {
+    id: 'great-kettle',
+    x: 29 * TILE_SIZE + 8,
+    y: LOWER_FLOOR_Y,
+    name: 'Great Kettle',
+    description:
+      'An iron kettle big enough to bathe in, cold for longer than anyone can say. Something has dried in a ring ' +
+      'around the inside — soup, or dye, or ink. The ladle still hangs on the rim, as if the cook only stepped out.',
+    drawBody(g, discovered) {
+      const ink = inkFor(discovered);
+      const iron = discovered ? DB32.opal : DB32.verdigris;
+      const ironHi = discovered ? DB32.dimGray : DB32.topaz;
+      const wood = discovered ? DB32.dimGray : DB32.rope;
+
+      // Three stubby legs.
+      g.rect(-6, -2, 2, 2).fill(iron);
+      g.rect(-1, -2, 2, 2).fill(iron);
+      g.rect(4, -2, 2, 2).fill(iron);
+      // Pot body — 14 wide, rounded by trimming the corners.
+      g.rect(-7, -10, 14, 8).fill(iron);
+      g.rect(-6, -11, 12, 1).fill(iron);
+      g.rect(-6, -2, 12, 1).fill(ink);
+      g.rect(-7, -10, 1, 7).fill(ink);
+      g.rect(6, -10, 1, 7).fill(ink);
+      g.rect(-5, -9, 3, 1).fill(ironHi);
+      // Rim.
+      g.rect(-8, -12, 16, 2).fill(ironHi);
+      g.rect(-8, -12, 16, 1).fill(ink);
+      // Ladle hooked over the rim, handle up and out.
+      g.rect(5, -17, 1, 6).fill(wood);
+      g.rect(6, -18, 1, 2).fill(wood);
+    },
+    drawSketch(g) {
+      const iron = DB32.verdigris;
+      const ironHi = DB32.topaz;
+      const ink = DB32.valhalla;
+      // Legs.
+      g.rect(-18, 14, 5, 8).fill(iron);
+      g.rect(-2, 14, 5, 8).fill(iron);
+      g.rect(13, 14, 5, 8).fill(iron);
+      // Body.
+      g.rect(-22, -8, 44, 24).fill(iron);
+      g.rect(-18, -12, 36, 4).fill(iron);
+      g.rect(-18, 14, 36, 2).fill(ink);
+      g.rect(-16, -4, 8, 2).fill(ironHi);
+      // Rim, with the dried ring just under it.
+      g.rect(-24, -16, 48, 5).fill(ironHi);
+      g.rect(-24, -16, 48, 1).fill(ink);
+      g.rect(-20, -10, 40, 1).fill(DB32.oiledCedar);
+      // Ladle.
+      g.rect(14, -34, 3, 20).fill(DB32.rope);
+      g.rect(16, -38, 3, 5).fill(DB32.rope);
     },
   },
 ];
@@ -355,6 +557,7 @@ export const oldKeepLevel: LevelSpec = {
   parallax: 'keep',
   backdrop: 'indoor-dark',
   rockBgStartRow: 0,
+  openSky: false,
   createEntities(): readonly Entity[] {
     return [
       // Return door — LOWER floor left side, back to the meadow.
@@ -382,7 +585,9 @@ export const oldKeepLevel: LevelSpec = {
       // clock so they don't all flicker in sync.
       new TallCandle(9 * TILE_SIZE + 8, LOWER_FLOOR_Y),
       new TallCandle(21 * TILE_SIZE + 8, LOWER_FLOOR_Y),
-      new TallCandle(36 * TILE_SIZE + 8, LOWER_FLOOR_Y),
+      // Col 34, beside the hole rather than over it — at col 36 it stood
+      // on thin air.
+      new TallCandle(34 * TILE_SIZE + 8, LOWER_FLOOR_Y),
       new TallCandle(11 * TILE_SIZE + 8, UPPER_FLOOR_Y),
       new TallCandle(26 * TILE_SIZE + 8, UPPER_FLOOR_Y),
       new TallCandle(14 * TILE_SIZE + 8, BASEMENT_FLOOR_Y),

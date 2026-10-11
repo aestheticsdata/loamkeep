@@ -66,6 +66,9 @@ export interface LevelSpec {
   // row (so cave-gaps above ground reveal rock from above); for indoor
   // levels this is row 0 (the whole level wants the indoor backdrop).
   rockBgStartRow: number;
+  // True when sky lies above the top row, so the camera may follow a jump
+  // above it. False under a ceiling: the camera stops at row 0.
+  openSky: boolean;
 }
 
 // Materialised level: spec + built Tilemap. Mounting still happens in Game,

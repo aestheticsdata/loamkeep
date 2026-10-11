@@ -33,7 +33,7 @@ import type { Page } from "@playwright/test";
  *
  * IT WRITES TWO SKETCHBOOK PAGES, AND NOTHING ELSE LEAVES THE BROWSER. `loamkeep.sketchbook.v1`
  * in localStorage is the game's only persistence; Playwright's context is cold on every run, so
- * chapter one always opens on LANDMARKS 0/8 and the last chapter always finds exactly the
+ * chapter one always opens on LANDMARKS 0/13 and the last chapter always finds exactly the
  * pages this take wrote.
  */
 
@@ -90,15 +90,18 @@ const MEADOW = {
  * Three floors stacked, and the two doors are on different ones: the meadow's door lands the
  * player on the lower floor beside the one back out, and the one down to the crypt is a floor
  * below that. The only way between them is the hole in the lower floor at cols 36-37 — so the
- * chapter walks the length of the hall, drops through it, and walks back.
+ * chapter walks the length of the hall, drops through it onto the plinth beneath, and walks back.
  */
 const KEEP = {
   /** Where the meadow's door puts the player down: col 5, on the lower floor. */
   spawn: 5 * TILE + 2,
   /** The hole in the lower floor: cols 36-37. Far enough in to be over it. */
   floorHole: 36 * TILE + 4,
-  /** The basement floor, row 22 — the player's own y, standing on it. */
-  basementY: 22 * TILE - TILE,
+  /**
+   * The plinth under the hole, row 21 at cols 36-37 — the player's own y, standing on it. The fall
+   * through the hole lands here, and the walk left steps off it onto the basement floor.
+   */
+  plinthY: 21 * TILE - TILE,
   /**
    * The door down to the crypt: col 8, at the foot of the basement's left pillar. The pillar is
    * solid, so the walk left ends against it at x=144 — centre 150, fourteen pixels from the door's
@@ -114,15 +117,14 @@ const CRYPT = {
   /** The last tile before the floor's gap at cols 10-11 — where the jump starts. */
   gapEdge: 9 * TILE - 4,
   /**
-   * The inscription, across the gap: col 11. Its centre — and col 11 is the gap's second tile, so
-   * the slab hangs over the hole and cannot be stood under. The player reads it from the first
-   * solid tile past it, col 12: centre 198 against the slab's 184, fourteen pixels inside the
-   * sixteen the interact range allows.
+   * The inscription — the tomb's lid, slid aside onto the floor just past the gap, at cols 12-13.
+   * Its centre. The player reads it from the first solid tile past the gap, col 12: centre 198
+   * against the lid's 208, ten pixels inside the sixteen the interact range allows.
    */
-  inscription: 11 * TILE + 8,
+  inscription: 13 * TILE,
   /** The first solid tile past the gap — where the jump has to land, and where E is pressed. */
   landing: 12 * TILE,
-  /** The crypt floor is row 23; a jump that fell through the hole lands well below this. */
+  /** The crypt floor is row 23; a jump that fell into the grave lands on the bier below this. */
   floorY: 23 * TILE - TILE,
 } as const;
 
@@ -308,7 +310,7 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.chapter("The title");
   // The game boots on a painted dawn: seven sky bands, the sun coming up behind the keep, a rabbit
   // on the ground that is the same rabbit the meadow has. Nothing is pressed for a few seconds —
-  // the cursor blinks, the sun climbs, and the second entry reads LANDMARKS 0/8 because
+  // the cursor blinks, the sun climbs, and the second entry reads LANDMARKS 0/13 because
   // Playwright's browser is cold and the book is the one thing this game keeps. The zero is the
   // take's, not the game's: your own tab has whatever you have found.
   await demo.dwell(4200);
@@ -413,7 +415,7 @@ test("loamkeep, end to end", async ({ demo }) => {
   // end to end, because the only way down is the hole at the far end of it. The hall is also where
   // the pumpkin hops, so this walk is the one that may be interrupted to be introduced.
   await walkRightMeeting(KEEP.floorHole);
-  await whenLanded(page, 0, KEEP.basementY);
+  await whenLanded(page, 0, KEEP.plinthY);
   await demo.dwell(1200);
   // Back along the basement to the door under the hall, which stops the walk itself: the pillar
   // beside it is solid.
@@ -425,7 +427,7 @@ test("loamkeep, end to end", async ({ demo }) => {
   // ---------------------------------------------------------------------------------------------
   await demo.chapter("The crypt");
   // Near-black masonry with two neutral greys mixed outside the palette on purpose, lit by a
-  // chandelier and a candelabrum. The floor has a hole in it; the inscription is on the far side.
+  // chandelier and a candelabrum. The floor has an open grave in it; its lid is on the far side.
   await demo.dwell(2200);
   await demo.still("the-crypt");
   await walkRightTo(CRYPT.gapEdge);

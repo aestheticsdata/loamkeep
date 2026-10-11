@@ -17,7 +17,7 @@ import {
   WATER_GRAVITY,
   WATER_TERMINAL_VEL,
 } from '@constants';
-import { type Input, KEYS_DOWN, KEYS_JUMP, KEYS_LEFT, KEYS_RIGHT } from '@systems/input';
+import { KEYS_DOWN, KEYS_JUMP, KEYS_LEFT, KEYS_RIGHT, type KeyReader } from '@systems/input';
 import { type Body, stepPhysics } from '@systems/physics';
 import type { Vec2 } from '@types';
 import { Tile, type Tilemap } from '@world/tilemap';
@@ -46,14 +46,20 @@ const FOOTSTEP_DISTANCE = 20;
 export class Player implements Body {
   pos: Vec2;
   vel: Vec2 = { x: 0, y: 0 };
+  // Where the body was before the last physics step, and where it is drawn:
+  // between the two, by how far the display frame sits into the next step.
+  // Physics runs at a fixed 60 Hz; without this a 120 Hz display would show
+  // the figure moving on every other frame. The camera follows `renderPos`.
+  private readonly prevPos: Vec2;
+  readonly renderPos: Vec2;
   readonly size: Vec2 = { x: 12, y: 16 };
   onGround = false;
   readonly sprite: Graphics;
 
-  // One-shot event flags. Set true for a single frame when the corresponding
-  // event happens; the game loop reads them after update() to trigger SFX
-  // (or anything else that should pop on the transition). Cleared at the
-  // start of every update().
+  // One-shot event flags. Set true for a single physics step when the
+  // corresponding event happens; the game loop reads them after each update()
+  // to trigger SFX (or anything else that should pop on the transition).
+  // Cleared at the start of every update().
   didJumpThisFrame = false;
   didLandThisFrame = false;
   didFootstepThisFrame = false;
@@ -92,11 +98,42 @@ export class Player implements Body {
 
   constructor(x: number, y: number) {
     this.pos = { x, y };
+    this.prevPos = { x, y };
+    this.renderPos = { x, y };
     this.sprite = new Graphics();
     this.syncSprite();
+    this.interpolate(1);
   }
 
-  update(input: Input, dt: number, tilemap: Tilemap): void {
+  // Put the body somewhere outright — a spawn, a door, a respawn — at rest,
+  // with nothing to interpolate from.
+  placeAt(x: number, y: number): void {
+    this.pos.x = x;
+    this.pos.y = y;
+    this.prevPos.x = x;
+    this.prevPos.y = y;
+    this.vel.x = 0;
+    this.vel.y = 0;
+    this.interpolate(1);
+  }
+
+  // Draw the body `alpha` of the way from its previous step to its current
+  // one (0..1). Called once per display frame, after the steps have run.
+  // Position stays a float — the PixiJS Application has roundPixels enabled,
+  // which rounds renderables once at render time. Rounding here as well would
+  // compound with the camera/world container's own rounding and produce a
+  // 1-pixel horizontal jitter during smooth scrolling.
+  interpolate(alpha: number): void {
+    this.renderPos.x = this.prevPos.x + (this.pos.x - this.prevPos.x) * alpha;
+    this.renderPos.y = this.prevPos.y + (this.pos.y - this.prevPos.y) * alpha;
+    this.sprite.x = this.renderPos.x + this.size.x / 2;
+    this.sprite.y = this.renderPos.y + this.size.y;
+  }
+
+  // One fixed physics step (dt is always PHYSICS_STEP — see Game).
+  update(input: KeyReader, dt: number, tilemap: Tilemap): void {
+    this.prevPos.x = this.pos.x;
+    this.prevPos.y = this.pos.y;
     this.elapsedTime += dt;
     const wasGrounded = this.onGround;
     const wasInWater = this.inWater;
@@ -283,10 +320,7 @@ export class Player implements Body {
     });
   }
 
-  // Position is kept as floats here — the PixiJS Application has roundPixels
-  // enabled, which rounds renderables once at render time. Rounding here as
-  // well would compound with the camera/world container's own rounding and
-  // produce a 1-pixel horizontal jitter during smooth scrolling.
+  // Pose, facing and tint. Position is interpolate()'s job.
   //
   // scale.x = ±1 mirrors the figure in place around its vertical axis (the
   // character is drawn symmetrically around x=0, so the mirror reads as
@@ -294,8 +328,6 @@ export class Player implements Body {
   // pixel-art rendering.
   private syncSprite(): void {
     this.paintFigure();
-    this.sprite.x = this.pos.x + this.size.x / 2;
-    this.sprite.y = this.pos.y + this.size.y;
     this.sprite.scale.set(this.facing, 1);
     // Binary water cast: any tile of the body in water → whole figure
     // tinted blue; otherwise normal colors. PixiJS multiplies the tint

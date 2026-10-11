@@ -5,10 +5,11 @@ import type { Container } from 'pixi.js';
 
 // A simple 2D follow-camera. Tracks a target world point with exponential
 // smoothing on both axes and clamps horizontally + at the world floor so we
-// never reveal underground out-of-bounds space. The top is intentionally
+// never reveal underground out-of-bounds space. Under an open sky the top is
 // unclamped: the player can jump above the world's top row from high
 // platforms, and the Pixi stage background (cornflower) matches the sky, so
-// revealing extra space above the level just looks like more sky.
+// revealing extra space above the level just looks like more sky. Indoors it
+// is clamped at row 0 — above a ceiling, that cornflower is a blue band.
 //
 // The world bounds are mutable — `setBounds()` reconfigures the clamp when
 // the active level changes (meadow → keep, etc.). One Camera instance per
@@ -22,30 +23,34 @@ export class Camera {
 
   private worldWidth: number;
   private worldHeight: number;
+  private openSky: boolean;
 
-  constructor(tilemap: Tilemap) {
+  constructor(tilemap: Tilemap, openSky: boolean) {
     this.worldWidth = tilemap.width * TILE_SIZE;
     this.worldHeight = tilemap.height * TILE_SIZE;
+    this.openSky = openSky;
   }
 
   // Reconfigure the clamp bounds for a new level. Pos isn't snapped here —
   // call snap() after the new follow target is set if you want an instant
   // jump (which Game does on level transitions).
-  setBounds(tilemap: Tilemap): void {
+  setBounds(tilemap: Tilemap, openSky: boolean): void {
     this.worldWidth = tilemap.width * TILE_SIZE;
     this.worldHeight = tilemap.height * TILE_SIZE;
+    this.openSky = openSky;
   }
 
   // Aim the camera so that the world point (cx, cy) sits at the screen center.
   // Clamped horizontally and at the bottom so we never show beyond the level
-  // edges or underneath the world floor; the top edge is uncapped so the
-  // camera can follow the player above row 0 when they jump from high
-  // platforms.
+  // edges or underneath the world floor; under an open sky the top edge is
+  // uncapped so the camera can follow the player above row 0 when they jump
+  // from high platforms.
   follow(cx: number, cy: number): void {
     const maxX = Math.max(0, this.worldWidth - SCREEN_WIDTH);
     const maxY = Math.max(0, this.worldHeight - SCREEN_HEIGHT);
     this.target.x = clamp(cx - SCREEN_WIDTH / 2, 0, maxX);
-    this.target.y = Math.min(cy - SCREEN_HEIGHT / 2, maxY);
+    const y = Math.min(cy - SCREEN_HEIGHT / 2, maxY);
+    this.target.y = this.openSky ? y : Math.max(0, y);
   }
 
   // Snap to target immediately. Useful on the first frame so the camera

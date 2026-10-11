@@ -62,11 +62,70 @@ export class Input {
     return false;
   }
 
+  // This frame's edges, for StepInput to carry over to the physics step.
+  pressedCodes(): ReadonlySet<string> {
+    return this.pressed;
+  }
+
+  releasedCodes(): ReadonlySet<string> {
+    return this.released;
+  }
+
   // Call at the end of every game tick so "pressed"/"released" only fire on the
   // frame of the corresponding key event.
   endFrame(): void {
     this.pressed.clear();
     this.released.clear();
+  }
+}
+
+// What the player reads from the keyboard. Input answers it per frame;
+// StepInput answers it per physics step.
+export interface KeyReader {
+  isAnyDown(codes: readonly string[]): boolean;
+  isAnyPressed(codes: readonly string[]): boolean;
+  isAnyReleased(codes: readonly string[]): boolean;
+}
+
+// The keyboard as the fixed physics step sees it. Frames and steps don't line
+// up: on a 120 Hz display half the frames run no step, and a jump pressed on
+// one of those would be cleared by endFrame() before any step read it. So the
+// frame's edges are latched here and held until a step consumes them; on a
+// frame that runs two steps, only the first sees the press, as at 60 fps.
+export class StepInput implements KeyReader {
+  private readonly input: Input;
+  private pressed = new Set<string>();
+  private released = new Set<string>();
+
+  constructor(input: Input) {
+    this.input = input;
+  }
+
+  // Once per frame, before the steps run.
+  latch(): void {
+    for (const c of this.input.pressedCodes()) this.pressed.add(c);
+    for (const c of this.input.releasedCodes()) this.released.add(c);
+  }
+
+  // After each step — and whenever the world is paused, so a press made just
+  // before a popup opened doesn't fire when it closes.
+  consume(): void {
+    this.pressed.clear();
+    this.released.clear();
+  }
+
+  isAnyDown(codes: readonly string[]): boolean {
+    return this.input.isAnyDown(codes);
+  }
+
+  isAnyPressed(codes: readonly string[]): boolean {
+    for (const c of codes) if (this.pressed.has(c)) return true;
+    return false;
+  }
+
+  isAnyReleased(codes: readonly string[]): boolean {
+    for (const c of codes) if (this.released.has(c)) return true;
+    return false;
   }
 }
 

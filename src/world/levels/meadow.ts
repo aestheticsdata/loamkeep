@@ -17,8 +17,10 @@ import type { Graphics } from 'pixi.js';
 //   - Surface (rows 0-8): asymmetric platform layout (LEFT/MIDDLE/RIGHT), see
 //     the column-by-column breakdown below.
 //   - Upper cave (rows 13-17): wide cavern with a central lake.
-//   - Lower cave (rows 19-31): dark stone maze + a deep water column on the
-//     right, ending at the bottom-of-world floor.
+//   - Lower cave (rows 19-31): a deep water column on the right, and a dark
+//     stone maze off its west side (rows 22-26). Swim up out of the lake at
+//     col 33 into a one-tile tunnel and work west; the Spiral Fossil is in
+//     the far pocket (col 13). Every step in it is one tile, with headroom.
 //
 // The castle door sits at the bottom of the right-side cliff-fall: the
 // player leaps off the surface gap at col 47-55, falls through the open
@@ -53,7 +55,7 @@ const MEADOW_ROWS = [
   'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKWWWWWWWWKKKKKKKKK', // 21
   'KKKKKKKKKKKKKKKKKKKKKKKKKK..KKKKKKKKKKKKKKKWWWWWWKKKKKKKKKKK', // 22
   'KKKKKKKKKKKKKKKKKKKKKKKKKK...KKKKKKKKKKKKKKWWWWWWKKKKKKKKKKK', // 23
-  'KKKKKKKKKKKK....KKKKKKKKK.........K...KKKKWWWWWWWWWKKKKKKKKK', // 24
+  'KKKKKKKKKKKK....KKKKK.............K...KKKKWWWWWWWWWKKKKKKKKK', // 24
   'KKKKKKKKKK.......KKKK......KKKKKKWWWWWWWWWWWWWWWKKKKKKKKKKKK', // 25
   'KKKKKKKKKK..KKK........KKKKKKKKKKKKKKKKKKWWWWWWWWKKKKKKKKKKK', // 26
   'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKWWWWWWWWWWKKKKKKKKKK', // 27
@@ -70,8 +72,9 @@ const MEADOW_GRASS_ROW = 8;
 const inkFor = (discovered: boolean): number => (discovered ? DB32.opal : DB32.valhalla);
 
 // ---------------------------------------------------------------------------
-// Landmarks. Six total: five on the surface (spread across the asymmetric
-// platform layout) plus one underground in the lake.
+// Landmarks. Seven total: five on the surface (spread across the asymmetric
+// platform layout), one underground in the lake, one at the end of the
+// lower maze.
 // ---------------------------------------------------------------------------
 
 const MEADOW_LANDMARKS: LandmarkSpec[] = [
@@ -342,6 +345,72 @@ const MEADOW_LANDMARKS: LandmarkSpec[] = [
       }
     },
   },
+
+  // 7) Spiral Fossil — at the far west end of the lower maze (row 25,
+  //    col 13), reached by swimming up out of the deep lake at col 33 and
+  //    working west through the tunnels. The pocket is two tiles high, so
+  //    the drawing stays under 28 px.
+  {
+    id: 'spiral-fossil',
+    x: 13 * 16 + 8,
+    y: 26 * 16,
+    name: 'Spiral Fossil',
+    description:
+      'A shell turned to stone, coiled tight inside the rock. It is the spiral — the one on the Marker, ' +
+      'the Throne, the tomb — pressed here long before anyone was alive to carve it.',
+    drawBody(g, discovered) {
+      const ink = inkFor(discovered);
+      const rock = discovered ? DB32.opal : DB32.topaz;
+      const rockHi = discovered ? DB32.dimGray : DB32.heather;
+      const shell = discovered ? DB32.dimGray : DB32.twine;
+      const shellHi = discovered ? DB32.heather : DB32.pancho;
+
+      // The slab of rock it sits in.
+      g.rect(-9, -20, 18, 20).fill(rock);
+      g.rect(-9, -20, 18, 1).fill(rockHi);
+      g.rect(-9, -20, 1, 20).fill(ink);
+      g.rect(8, -20, 1, 20).fill(ink);
+      // The shell: a square coil, outside in.
+      g.rect(-6, -17, 12, 12).fill(shell);
+      g.rect(-6, -17, 12, 1).fill(shellHi);
+      g.rect(-6, -17, 1, 12).fill(ink);
+      g.rect(5, -17, 1, 12).fill(ink);
+      g.rect(-6, -6, 12, 1).fill(ink);
+      g.rect(-4, -15, 8, 1).fill(ink);
+      g.rect(-4, -15, 1, 7).fill(ink);
+      g.rect(-4, -9, 7, 1).fill(ink);
+      g.rect(2, -13, 1, 5).fill(ink);
+      g.rect(-2, -13, 4, 1).fill(ink);
+      g.rect(-2, -13, 1, 3).fill(ink);
+    },
+    drawSketch(g) {
+      const rock = DB32.topaz;
+      const shell = DB32.twine;
+      const shellHi = DB32.pancho;
+      const ink = DB32.valhalla;
+      // Rock.
+      g.rect(-26, -26, 52, 46).fill(rock);
+      g.rect(-26, -26, 52, 2).fill(DB32.heather);
+      // Shell, coiled square — each ring 2 px of ink inside the last.
+      g.rect(-18, -20, 36, 36).fill(shell);
+      g.rect(-18, -20, 36, 2).fill(shellHi);
+      g.rect(-18, -20, 2, 36).fill(ink);
+      g.rect(16, -20, 2, 36).fill(ink);
+      g.rect(-18, 14, 36, 2).fill(ink);
+      g.rect(-12, -14, 26, 2).fill(ink);
+      g.rect(-12, -14, 2, 24).fill(ink);
+      g.rect(-12, 8, 22, 2).fill(ink);
+      g.rect(8, -8, 2, 18).fill(ink);
+      g.rect(-6, -8, 16, 2).fill(ink);
+      g.rect(-6, -8, 2, 12).fill(ink);
+      g.rect(-6, 2, 9, 2).fill(ink);
+      g.rect(1, -2, 2, 6).fill(ink);
+      // Ribs across the outer whorl.
+      for (let i = 0; i < 5; i++) {
+        g.rect(-15 + i * 7, -18, 1, 3).fill(ink);
+      }
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -425,6 +494,11 @@ const MEADOW_DECORATIONS: DecorationSpec[] = [
   plantInCavern(35, 17, 'mushroom'),
   inCavern(40, 17, drawPebbles),
   plantInCavern(45, 17, 'mushroom'),
+
+  // Lower maze — a few mushrooms marking the way west to the fossil
+  plantInCavern(30, 25, 'mushroom'),
+  plantInCavern(24, 26, 'mushroom'),
+  plantInCavern(18, 27, 'mushroom'),
 ];
 
 // ---------------------------------------------------------------------------
@@ -478,6 +552,7 @@ export const meadowLevel: LevelSpec = {
   // The rock backdrop starts at the grass row so cave openings in the main
   // floor reveal rock from above, not cornflower sky.
   rockBgStartRow: MEADOW_GRASS_ROW,
+  openSky: true,
   // ctx is unused for now — Door's `interact` receives it at runtime from
   // Game. Phase 2 entities (Lever, Switch) will likely want it here so they
   // can read WorldState flags at construction time to draw in the right

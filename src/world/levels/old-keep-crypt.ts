@@ -11,25 +11,30 @@ import type { Graphics } from 'pixi.js';
 // The Crypt — small, dark, cosy. Deeply buried.
 //
 // 22 wide × 28 tall. The visible chamber is small (one screen wide,
-// 8 rows of interior) but it sits buried under many layers of stone,
+// 5 rows of interior) but it sits buried under many layers of stone,
 // so when the player jumps in the crypt they NEVER see sky above the
 // ceiling — only more brick. The visible interior:
 //
 //   Rows 0-13   solid CryptBrick — 14 rows of overhead stone. Camera
 //               can only ever reveal brick at the top of the viewport.
-//   Rows 14-15  ceiling (the bricks the player can JUST see above their
+//   Rows 14-17  ceiling (the bricks the player can JUST see above their
 //               head if they jump from the floor)
-//   Rows 16-22  interior (7 rows of headroom)
-//   Row 23      polished crypt floor
-//   Rows 24-27  foundation (4 rows of stone below the floor)
+//   Rows 18-22  interior (5 rows of headroom)
+//   Row 23      polished crypt floor, open at cols 10-11: the grave, its
+//               lid slid aside onto the floor beside it
+//   Rows 24-26  the ossuary under the floor (cols 5-16). A stone bier
+//               (row 26, cols 10-11) sits right under the grave: the drop
+//               lands on it, and from it a straight jump up (3 tiles)
+//               climbs back out through the opening.
+//   Row 27      ossuary floor
 //
 // Walls are CryptBrick (true neutral near-black with white "reflets"
 // highlights) and floor is CryptFloor (one notch lighter). Backdrop is
 // 'crypt-black' (pure black) so every gap between objects reads as
 // "the candlelight can't reach back there."
 //
-// Furniture: two red-velvet armchairs flanking the tomb inscription,
-// each by a candle. A cosy hideout buried under the keep — a place
+// Furniture: two red-velvet armchairs flanking the open tomb, each by a
+// candle, and one more candle down in the ossuary. A cosy hideout buried under the keep — a place
 // you'd want to sit down in, not just pass through.
 //
 // Legend (see CHAR_TO_TILE in tilemap.ts):
@@ -58,16 +63,19 @@ const OLD_KEEP_CRYPT_ROWS = [
   'cc..................cc', // 20
   'cc..................cc', // 21
   'cc..................cc', // 22
-  'ccvvvvvvvv..vvvvvvvvcc', // 23  polished crypt floor
-  'ccccccc.....cccccccccc', // 24  foundation
-  'ccccccc..ccccccccccccc', // 25
-  'ccccccc........ccccccc', // 26
-  'cccccccccccccccccccccc', // 27
+  'ccvvvvvvvv..vvvvvvvvcc', // 23  polished crypt floor — the open grave at cols 10-11
+  'ccccc............ccccc', // 24  ossuary (rows 24-26, cols 5-16)
+  'ccccc............ccccc', // 25
+  'ccccc.....cc.....ccccc', // 26  bier under the grave (cols 10-11)
+  'cccccccccccccccccccccc', // 27  ossuary floor
 ] as const;
 
 const FLOOR_ROW = 23;
 const STAND_Y = FLOOR_ROW * TILE_SIZE;
 const STAND_SPAWN_Y = STAND_Y - TILE_SIZE;
+
+// The ossuary's floor, under the crypt floor (row 27).
+const OSSUARY_FLOOR_Y = 27 * TILE_SIZE;
 
 // Return door — back up to the keep's basement. Sits at the left wall.
 const RETURN_DOOR_COL = 3;
@@ -80,19 +88,22 @@ const OLD_KEEP_CRYPT_SPAWNS: SpawnPoint[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Landmark — the engraved tomb slab on the crypt floor.
+// Landmarks — the engraved tomb lid on the crypt floor, and the ossuary
+// under it.
 // ---------------------------------------------------------------------------
 
 const inkFor = (discovered: boolean): number => (discovered ? DB32.opal : DB32.valhalla);
 
 const OLD_KEEP_CRYPT_LANDMARKS: LandmarkSpec[] = [
   {
+    // The lid lies on solid floor (cols 12-13) right beside the grave it
+    // was slid off — the opening at cols 10-11 is the way down.
     id: 'crypt-inscription',
-    x: 11 * TILE_SIZE + 8,
+    x: 13 * TILE_SIZE,
     y: STAND_Y,
     name: 'Crypt Inscription',
     description:
-      'A flat stone tomb, set into the floor. The lid is engraved in a language you do not know, but ' +
+      'A flat stone tomb lid, slid aside from an opening in the floor. It is engraved in a language you do not know, but ' +
       'the script spirals — the same spiral as the Stone Marker, as the Throne. ' +
       'Three names are picked out in faint gold leaf. The dates have worn away.',
     drawBody(g, discovered) {
@@ -153,6 +164,84 @@ const OLD_KEEP_CRYPT_LANDMARKS: LandmarkSpec[] = [
       g.rect(-16, 0, 4, 1).fill(gold);
       g.rect(-16, 2, 3, 1).fill(gold);
       g.rect(13, 0, 4, 1).fill(gold);
+    },
+  },
+
+  // Ossuary — against the east wall of the chamber under the floor
+  // (col 15). Stone chests rather than bones: the room is meant to read as
+  // kept with care, not as something to be afraid of. Under 32 px tall —
+  // the chamber is three tiles high.
+  {
+    id: 'ossuary',
+    x: 15 * TILE_SIZE + 8,
+    y: OSSUARY_FLOOR_Y,
+    name: 'Ossuary',
+    description:
+      'A low room under the tomb, lined with small stone chests stacked high against the walls — kept tidy by someone ' +
+      'long gone. Three of the chests sit apart, each with a fleck of gold leaf on its lid. ' +
+      'The three names from the tomb, at rest.',
+    drawBody(g, discovered) {
+      const ink = inkFor(discovered);
+      const stone = discovered ? DB32.dimGray : DB32.heather;
+      const stoneHi = discovered ? DB32.dimGray : DB32.lightSteel;
+      const gold = discovered ? DB32.dimGray : DB32.goldenFizz;
+
+      // One small chest: 6 wide × 4 tall, lid line on top.
+      const chest = (x: number, y: number): void => {
+        g.rect(x, y, 6, 4).fill(stone);
+        g.rect(x, y, 6, 1).fill(stoneHi);
+        g.rect(x, y, 1, 4).fill(ink);
+        g.rect(x + 5, y, 1, 4).fill(ink);
+        g.rect(x, y + 3, 6, 1).fill(ink);
+      };
+      // The stack against the wall: five rows of chests, narrowing upward.
+      for (const [x, y] of [
+        [-1, -4],
+        [5, -4],
+        [-1, -8],
+        [5, -8],
+        [-1, -12],
+        [5, -12],
+        [2, -16],
+        [2, -20],
+      ] as const) {
+        chest(x, y);
+      }
+      // The three set apart on the floor, each with its fleck of gold.
+      for (const x of [-12, -8, -4]) {
+        g.rect(x, -3, 3, 3).fill(stone);
+        g.rect(x, -3, 3, 1).fill(stoneHi);
+        g.rect(x + 1, -2, 1, 1).fill(gold);
+      }
+    },
+    drawSketch(g) {
+      const stone = DB32.heather;
+      const stoneHi = DB32.lightSteel;
+      const ink = DB32.valhalla;
+      const gold = DB32.goldenFizz;
+      const chest = (x: number, y: number): void => {
+        g.rect(x, y, 16, 10).fill(stone);
+        g.rect(x, y, 16, 2).fill(stoneHi);
+        g.rect(x, y + 9, 16, 1).fill(ink);
+        g.rect(x + 15, y, 1, 10).fill(ink);
+      };
+      // The stack.
+      for (const [x, y] of [
+        [0, 10],
+        [16, 10],
+        [0, 0],
+        [16, 0],
+        [8, -10],
+        [8, -20],
+      ] as const) {
+        chest(x, y);
+      }
+      // The three apart, gold on each lid.
+      for (const x of [-26, -16, -6]) {
+        g.rect(x, 12, 8, 8).fill(stone);
+        g.rect(x, 12, 8, 2).fill(stoneHi);
+        g.rect(x + 3, 15, 2, 2).fill(gold);
+      }
     },
   },
 ];
@@ -218,7 +307,8 @@ const onCryptFloor = (col: number, draw: (g: Graphics) => void): DecorationSpec 
 });
 
 const OLD_KEEP_CRYPT_DECORATIONS: DecorationSpec[] = [
-  // Two armchairs flanking the tomb inscription (which sits at col 11).
+  // Two armchairs flanking the open tomb (the grave at cols 10-11, its lid
+  // beside it at cols 12-13).
   // Left chair faces right (toward the inscription), right chair faces
   // left. Together with the candles either side, the chamber reads as
   // a private reading nook around the tomb.
@@ -242,6 +332,7 @@ export const oldKeepCryptLevel: LevelSpec = {
   // any warm colour at all.
   backdrop: 'crypt-black',
   rockBgStartRow: 0,
+  openSky: false,
   createEntities(): readonly Entity[] {
     return [
       // Return door — back up to the keep's basement. Player exited from
@@ -258,6 +349,8 @@ export const oldKeepCryptLevel: LevelSpec = {
       // Two candles, one beside each armchair.
       new TallCandle(5 * TILE_SIZE + 8, STAND_Y),
       new TallCandle(17 * TILE_SIZE + 8, STAND_Y),
+      // One down in the ossuary, at the west end, away from the chests.
+      new TallCandle(6 * TILE_SIZE + 8, OSSUARY_FLOOR_Y),
       // Iron chandelier hanging from the ceiling underside above the
       // tomb inscription (centre of the room). Anchored at its top
       // (chain attachment point) at the world Y of the ceiling
