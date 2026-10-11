@@ -4,7 +4,6 @@ import { ART_KIND, draws, registerArt } from '@hd/art-mode';
 import { ArtText } from '@hd/art-text';
 import { bake, FineSprite } from '@hd/bake';
 import { menuTextHd } from '@hd/book-font';
-import { record } from '@hd/classic-recorder';
 import { type CritterLayers, flatten } from '@hd/critter-hd';
 import { FINE, FineCanvas } from '@hd/fine-canvas';
 import type { Audio } from '@systems/audio';
@@ -40,7 +39,16 @@ import {
   WORDMARK_Y,
   wandererFrame,
 } from '@systems/title-art';
-import { sceneryHd, titleBackdropHd, wandererHd, wordmarkHd } from '@systems/title-hd';
+import {
+  cursorHd,
+  plateHd,
+  sceneryHd,
+  titleBackdropHd,
+  wandererHd,
+  wordmarkHd,
+  wordmarkRuleHd,
+} from '@systems/title-hd';
+import { TitleSkyHd } from '@systems/title-sky-hd';
 import { Container, Graphics, type TextStyleOptions } from 'pixi.js';
 
 // What the menu asked for. Game turns `go` into a fade + level load, `open`
@@ -143,6 +151,8 @@ export class TitleScreen {
   private t = 0;
 
   private readonly clouds = new Graphics();
+  // The clouds, mist and twinkles in HD, slid in fine steps.
+  private readonly skyHd: TitleSkyHd;
   private readonly twinkle = new Graphics();
   private readonly birds: ArtBody[] = [];
   private readonly birdWings: (0 | 1)[] = [];
@@ -164,7 +174,9 @@ export class TitleScreen {
   // Menu, drawn in the bitmap font. Rebuilt whenever the book counts change;
   // the cursor is its own Graphics so blinking never touches it.
   private readonly menuLayer = new Container();
-  private readonly cursor = new Graphics();
+  private readonly cursor = new Container();
+  private readonly cursorMark = new Graphics();
+  private readonly cursorHd = new FineSprite();
   private entries: MenuEntry[] = [];
   private cursorRow = 0;
   private cursorClock = 0;
@@ -181,7 +193,11 @@ export class TitleScreen {
       (g) => drawBackdrop(g, mood),
       () => titleBackdropHd(mood),
     );
-    this.container.addChild(backdrop, this.clouds, this.twinkle);
+    this.skyHd = new TitleSkyHd(mood);
+    registerArt({ classic: this.clouds, hd: this.skyHd.clouds });
+    registerArt({ classic: this.twinkle, hd: this.skyHd.twinkle });
+    registerArt({ classic: this.mist, hd: this.skyHd.mist });
+    this.container.addChild(backdrop, this.clouds, this.skyHd.clouds, this.twinkle, this.skyHd.twinkle);
 
     for (let i = 0; i < BIRD_COUNT; i++) {
       const bird = new ArtBody('bird');
@@ -195,7 +211,7 @@ export class TitleScreen {
 
     const scenery = new ArtBody('title-scenery');
     scenery.draw((g) => drawScenery(g, mood), sceneryHd);
-    this.container.addChild(scenery, this.keepLights, this.mist, this.tufts, this.cryptCandle);
+    this.container.addChild(scenery, this.keepLights, this.mist, this.skyHd.mist, this.tufts, this.cryptCandle);
 
     this.rabbit.position.set(RABBIT_X, groundTop(RABBIT_X));
     this.rabbit.draw((g) => drawTitleRabbit(g, false));
@@ -266,8 +282,12 @@ export class TitleScreen {
     const t = this.t;
     const mood = this.mood;
 
-    paintClouds(this.clouds, mood, t);
-    paintTwinkle(this.twinkle, mood, t);
+    if (draws(ART_KIND.classic)) {
+      paintClouds(this.clouds, mood, t);
+      paintTwinkle(this.twinkle, mood, t);
+      paintMist(this.mist, mood, t);
+    }
+    if (draws(ART_KIND.hd)) this.skyHd.tick(t);
     for (let i = 0; i < this.birds.length; i++) {
       const frame = birdFrame(i, t);
       const bird = this.birds[i];
@@ -279,7 +299,6 @@ export class TitleScreen {
     }
 
     paintKeepLights(this.keepLights, mood, t);
-    paintMist(this.mist, mood, t);
     paintTufts(this.tufts, mood, t);
     paintCryptCandle(this.cryptCandle, t);
 
@@ -366,30 +385,35 @@ export class TitleScreen {
     const U = this.mood.ui;
 
     const wordmark = new ArtBody('wordmark');
-    wordmark.draw((g) => {
-      drawWordmark(g, U.shadow, 2, 2);
-      drawWordmark(g, U.title);
-      drawWordmark(g, U.titleHi, 0, 0, { x: 0, y: WORDMARK_Y, w: SCREEN_WIDTH, h: 10 });
-      drawWordmarkRule(g, this.mood);
-    }, wordmarkHd);
-    this.sweepHd.show(bake(flatten(wordmarkHd(record((g) => drawWordmark(g, U.shine))))));
+    wordmark.draw(
+      (g) => {
+        drawWordmark(g, U.shadow, 2, 2);
+        drawWordmark(g, U.title);
+        drawWordmark(g, U.titleHi, 0, 0, { x: 0, y: WORDMARK_Y, w: SCREEN_WIDTH, h: 10 });
+      },
+      () => wordmarkHd({ face: U.title, top: U.titleHi, shadow: U.shadow }),
+    );
+    const rule = new ArtBody('wordmark-rule');
+    rule.draw((g) => drawWordmarkRule(g, this.mood), wordmarkRuleHd);
+    this.sweepHd.show(bake(flatten(wordmarkHd({ face: U.shine, top: null, shadow: null }))));
     this.sweepHd.mask = this.sweepMask;
     registerArt({ classic: this.sweep, hd: this.sweepHd });
-    ui.addChild(wordmark, this.sweep, this.sweepHd, this.sweepMask);
+    ui.addChild(wordmark, rule, this.sweep, this.sweepHd, this.sweepMask);
 
     // Tagline, left-aligned on the menu column on purpose: centred, it
     // collides with the flagpole. No drop shadow on the mono lines: the
     // plate carries the contrast, and a shadow offset by a whole logical
     // pixel under a thin antialiased glyph reads as a second copy.
-    const tagline = makeText(TAGLINE, { ...SMALL_TEXT, fill: U.tagline });
-    ui.addChild(plateAround(tagline, 20, 58, TAGLINE_PAD), tagline);
+    const tagline = makeText(TAGLINE, { ...SMALL_TEXT, fill: U.tagline }, TAGLINE_COLUMNS);
+    ui.addChild(plateAround(tagline, { x: 20, y: 58 }, TAGLINE_PAD), tagline);
 
+    this.cursorHd.show(bake(cursorHd(this.mood.ui.active)));
+    registerArt({ classic: this.cursorMark, hd: this.cursorHd });
+    this.cursor.addChild(this.cursorMark, this.cursorHd);
     ui.addChild(this.menuLayer, this.cursor);
 
     const keyLine = makeText(KEY_LINE, { ...SMALL_TEXT, fill: U.hint });
-    const keyPlateW = Math.ceil(keyLine.classic.width) + KEYS_PAD.x * 2;
-    const keyPlateX = Math.round(SCREEN_WIDTH / 2 - keyPlateW / 2);
-    ui.addChild(plateAround(keyLine, keyPlateX, 203, KEYS_PAD), keyLine);
+    ui.addChild(plateAround(keyLine, { x: null, y: 203 }, KEYS_PAD), keyLine);
 
     return ui;
   }
@@ -401,10 +425,19 @@ export class TitleScreen {
     for (const child of this.menuLayer.removeChildren()) child.destroy();
 
     const maxW = Math.max(...this.entries.map((entry) => measurePixelText(entry.label)));
-    // The plate is a scrim, translucent in both arts (see the HD spec): it
-    // keeps the menu legible over a moving scene, and is not pixel art.
+    // The plate keeps the menu legible over a moving scene: translucent in
+    // classic, dithered black in HD.
+    const plateBox = {
+      x: MENU_PLATE_X,
+      y: MENU_PLATE_Y,
+      w: maxW + MENU_PAD_X * 2,
+      h: menuPlateHeight(this.entries.length),
+    };
     const plate = new Graphics();
-    drawPlate(plate, MENU_PLATE_X, MENU_PLATE_Y, maxW + MENU_PAD_X * 2, menuPlateHeight(this.entries.length));
+    drawPlate(plate, plateBox.x, plateBox.y, plateBox.w, plateBox.h);
+    const plateHdSprite = new FineSprite();
+    plateHdSprite.show(bake(plateHd(plateBox)));
+    registerArt({ classic: plate, hd: plateHdSprite });
     const menu = new ArtBody('title-menu');
     menu.draw(
       (g) => {
@@ -417,7 +450,7 @@ export class TitleScreen {
       },
       () => this.menuHd(),
     );
-    this.menuLayer.addChild(plate, menu);
+    this.menuLayer.addChild(plate, plateHdSprite, menu);
   }
 
   // The menu on the fine grid: each row in the menu font's HD recipe, its
@@ -450,26 +483,55 @@ export class TitleScreen {
   private paintCursor(): void {
     const y = MENU_FIRST_Y + this.cursorRow * MENU_ROW_H + 1;
     const color = this.mood.ui.active;
-    this.cursor.clear();
-    this.cursor.rect(CURSOR_X, y, 1, 5).fill(color);
-    this.cursor.rect(CURSOR_X + 1, y + 1, 1, 3).fill(color);
-    this.cursor.rect(CURSOR_X + 2, y + 2, 1, 1).fill(color);
+    this.cursorMark.clear();
+    this.cursorMark.rect(CURSOR_X, y, 1, 5).fill(color);
+    this.cursorMark.rect(CURSOR_X + 1, y + 1, 1, 3).fill(color);
+    this.cursorMark.rect(CURSOR_X + 2, y + 2, 1, 1).fill(color);
+    this.cursorHd.position.set(CURSOR_X, y);
   }
 }
 
-function makeText(text: string, style: TextStyleOptions): ArtText {
-  return new ArtText({ text, style });
+// The title's small lines are set in HD at 3 fine a dot — classic's own
+// pixel — rather than the book's 2: on the title they stand alone over a
+// moving scene, at the size classic shows them.
+const TITLE_TEXT_DOT = 3;
+
+// The tagline at that size runs into the keep, so in HD it is two lines.
+const TAGLINE_COLUMNS = 24;
+
+function makeText(text: string, style: TextStyleOptions, columns?: number): ArtText {
+  return new ArtText({ text, style, dot: TITLE_TEXT_DOT, columns });
+}
+
+// Where a plate goes: its left edge (null to centre it on the screen) and
+// its top, logical px.
+interface PlateAt {
+  x: number | null;
+  y: number;
 }
 
 // A plate fitted around a text's measured box with `pad` on every side, the
 // text placed at the padding offset. Measured, not hard-coded: the box
 // height depends on which monospace font the browser picked, and a line
-// that sits 1 px low on a 14-px plate shows.
-function plateAround(text: ArtText, x: number, y: number, pad: { x: number; y: number }): Graphics {
+// that sits 1 px low on a 14-px plate shows. Each art gets its own plate,
+// fitted to its own text — classic's translucent, HD's dithered.
+function plateAround(text: ArtText, at: PlateAt, pad: { x: number; y: number }): Container {
+  const left = (w: number) => at.x ?? Math.round(SCREEN_WIDTH / 2 - w / 2);
   const w = Math.ceil(text.classic.width) + pad.x * 2;
   const h = Math.ceil(text.classic.height) + pad.y * 2;
+  const x = left(w);
   const plate = new Graphics();
-  drawPlate(plate, x, y, w, h);
-  text.position.set(x + pad.x, y + pad.y);
-  return plate;
+  drawPlate(plate, x, at.y, w, h);
+  text.position.set(x + pad.x, at.y + pad.y);
+
+  const hdW = Math.ceil(text.hdWidth) + pad.x * 2;
+  const hdH = Math.ceil(text.hdHeight) + pad.y * 2;
+  const hdX = left(hdW);
+  const plateHdSprite = new FineSprite();
+  plateHdSprite.show(bake(plateHd({ x: hdX, y: at.y, w: hdW, h: hdH })));
+  text.alignHd(hdX - x);
+  registerArt({ classic: plate, hd: plateHdSprite });
+  const both = new Container();
+  both.addChild(plate, plateHdSprite);
+  return both;
 }

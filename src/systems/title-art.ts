@@ -401,6 +401,25 @@ const CLOUD_STREAKS = [
   [102, 0.6, 58],
 ] as const;
 
+// A cloud streak at rest — its row, length and colour — and where it has
+// drifted to at time t: what the HD clouds (title-hd.ts) draw and move.
+export interface CloudStreak {
+  y: number;
+  width: number;
+  color: number;
+}
+
+export const CLOUD_COUNT = CLOUD_STREAKS.length;
+
+export function cloudStreak(i: number, mood: TitleMood): CloudStreak {
+  const [y, , width] = CLOUD_STREAKS[i];
+  return { y, width, color: mood.cloud[i % 2] };
+}
+
+export function cloudX(i: number, t: number): number {
+  return ((t * CLOUD_STREAKS[i][1] + i * 137) % 420) - 60;
+}
+
 export function paintClouds(g: Graphics, mood: TitleMood, t: number): void {
   g.clear();
   for (let i = 0; i < CLOUD_STREAKS.length; i++) {
@@ -416,6 +435,22 @@ export function paintClouds(g: Graphics, mood: TitleMood, t: number): void {
 // The first seven stars brighten to white on the crest of their sine and
 // vanish into the sky at its trough; in between the static star shows.
 const TWINKLE_COUNT = 7;
+
+// A twinkling star at time t: where it is and the colour it shows, or null
+// while it shows as the static star under it.
+export interface Twinkle {
+  x: number;
+  y: number;
+  color: number | null;
+}
+
+export function twinkles(mood: TitleMood, t: number): Twinkle[] {
+  return Array.from({ length: TWINKLE_COUNT }, (_, i) => {
+    const { x, y } = starAt(i, Math.min(64, mood.stars.maxY));
+    const f = Math.sin(t * 2.1 + i * 1.7);
+    return { x, y, color: f > 0.55 ? DB32.white : f < -0.85 ? bandColorAt(mood, y) : null };
+  });
+}
 
 export function paintTwinkle(g: Graphics, mood: TitleMood, t: number): void {
   g.clear();
@@ -495,6 +530,21 @@ export function paintKeepLights(g: Graphics, mood: TitleMood, t: number): void {
 }
 
 // Three rows of dashes drifting at different speeds along the foot of the hills.
+// The mist: three rows of dashes, each drifting at its own speed and
+// fainter than the one above.
+export const MIST_ROWS = 3;
+
+export interface MistRow {
+  y: number;
+  density: number;
+  // Logical px a second.
+  speed: number;
+}
+
+export function mistRow(i: number): MistRow {
+  return { y: 156 + i * 3, density: 0.16 - i * 0.04, speed: 3 + i };
+}
+
 export function paintMist(g: Graphics, mood: TitleMood, t: number): void {
   g.clear();
   for (let i = 0; i < 3; i++) {
@@ -620,6 +670,22 @@ export interface PixelClip {
   y: number;
   w: number;
   h: number;
+}
+
+// Each glyph of the wordmark where it stands: its left edge in logical px and
+// its rows of dots, each dot drawn WORDMARK_SCALE px square. The HD wordmark
+// (title-hd.ts) draws from this rather than from the blocks.
+export interface WordmarkGlyph {
+  x: number;
+  rows: readonly string[];
+}
+
+export const WORDMARK_DOT = WORDMARK_SCALE;
+
+export function wordmarkGlyphs(): WordmarkGlyph[] {
+  const { x0 } = wordmarkLayout();
+  const advance = GLYPH_ADVANCE * WORDMARK_SCALE + WORDMARK_TRACKING;
+  return [...WORDMARK].map((ch, i) => ({ x: x0 + i * advance, rows: GLYPHS[ch] }));
 }
 
 // Paint every ink pixel of the wordmark as a 3×3 block in `color`, offset by

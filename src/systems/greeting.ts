@@ -100,10 +100,7 @@ export class Greeting {
     subject.scale.set(spec.subjectScale, spec.subjectScale);
     subject.position.set(SUBJECT_CENTER_X, SUBJECT_BOTTOM_Y);
     // In HD the subject is drawn at the size it is seen, not enlarged.
-    const subjectHd = shownLarge((g) => spec.drawSubject(g), {
-      scale: spec.subjectScale,
-      chamfer: Math.max(1, Math.floor(spec.subjectScale / 2)),
-    });
+    const subjectHd = shownLarge((g) => spec.drawSubject(g), spec.subjectScale);
     subjectHd.position.set(SUBJECT_CENTER_X, SUBJECT_BOTTOM_Y);
     registerArt({ classic: subject, hd: subjectHd });
     this.content.addChild(subject, subjectHd);

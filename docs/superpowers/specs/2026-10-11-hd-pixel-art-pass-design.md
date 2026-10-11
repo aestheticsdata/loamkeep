@@ -113,18 +113,19 @@ With `fineMotion` off, every HD frame is a classic frame redrawn.
 
 - **Type.** Every in-game `Text` is an `ArtText`: the classic Text unchanged, and in HD the same words in the book font (`src/hd/book-font.ts`). Its capitals are the game's own 5×7 glyphs, and the bundle's alphabet is extended with — ; " ← → ↑ ↓. A test scans every string the game writes and refuses a character without a glyph. Body text is set at 2 fine a dot, titles (12 px and up in classic) at 3. The sketchbook pages by the book's metrics (lines 10 px apart, wrapped by character count) only in pure HD; classic and split keep classic's page breaks, which the book font always fits.
 - **Title.**
-  - The sky's seams are three dithered steps.
+  - Each sky seam is a stepped Bayer gradient: 25 / 50 / 75 %, centred on the seam, each step up to 9 fine, depending on how much room the bands leave.
   - The sun's rings are round and feathered.
-  - The stars are 2×2.
+  - The stars are 2×2, and the twinkling ones are drawn as 2×2 too.
+  - The clouds and the mist are baked once at fine resolution (their translucent rows become dithered rows that taper at the ends) and slide a fine pixel at a time (`title-sky-hd.ts`).
   - The scenery's silhouettes are smoothed by elbow passes.
-  - The wordmark is chamfered.
-  - The sweep is the HD wordmark in the shine colour, seen through a moving mask, so it is never baked per frame.
-  - The menu is in the menu font's HD recipe.
-  - The layers that move every frame (clouds, mist, twinkles) stay classic.
-  - The dark plates behind text stay translucent in both arts: they are scrims that keep text legible over a moving scene, not pixel art. This is the one place alpha remains.
+  - The wordmark is drawn from its glyph table, not from classic's blocks. Each letter's dots go through `smoothScale` at ×9, giving 45° diagonals and a round O, and the drop shadow is the same outline offset 2 logical px. A first version that chamfered the blocks cut notches into the letters and was rejected on sight.
+  - The menu font keeps classic's black shadow, a logical pixel down and right. The cursor is the classic triangle smoothed to 45°.
+  - The tagline and the key line are set at 3 fine a dot. At the book's 2 they read thin and dirty on the title. In HD the tagline is wrapped onto two lines, so it clears the keep.
+  - The plates behind text are a 50 % checkerboard of black fine pixels, with no alpha. Each art's plate is fitted to its own text.
+  - The grass tufts, the keep's lights and the crypt candle stay classic. They are 1-px marks.
 - **Behind a book or a greeting** there is no veil in HD. `rampDownFilter` (`src/hd/ramp-filter.ts`) snaps every pixel of the world and its sky to its nearest DB32 tone and paints the tone two steps down its ramp; tones without a ramp borrow the nearest ramped tone's. WebGL 1 can index a uniform array only by the loop counter, so the shader carries the answer out of its search loop.
 - **Parchment** (`src/systems/parchment-hd.ts`): the prototype's page 5, ported — vignette, 6-fine border with its bevel, dog-ear, faded rule.
-- **Large drawings** (a greeting's subject at ×4–×8, a page's sketch) are recorded at their displayed size and chamfered in proportion to it (`portraitHd`), never a small sprite enlarged.
+- **Large drawings** (a greeting's subject at ×3–×8, a page's sketch) are never a small sprite enlarged. `smoothScale` (`src/hd/smooth-scale.ts`) is EPX generalised to any whole factor: each source pixel becomes an f×f block, and each corner where the two neighbours agree with each other and not with the pixel is cut along the diagonal to their colour. Outer corners round off, inner ones fill, staircases become 45° edges, and no tone is added. Selout follows: the shadow side is as thick as half the scale, and the lit side is 1 fine. A lit rim as thick as the shadow read as a pale line drawn round the subject. Chamfering the enlarged blocks, the first version, left the subjects blocky.
 
 ## HD by default (LOA-42, 2026-10-11)
 

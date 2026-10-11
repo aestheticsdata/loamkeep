@@ -1,6 +1,6 @@
 import { textResolution } from '@constants';
 import { ART_KIND, draws, registerArt } from '@hd/art-mode';
-import { BakeCache, FineSprite } from '@hd/bake';
+import { BakeCache, type BakedFine, FineSprite } from '@hd/bake';
 import { bookWidth, bookWrap, drawBook } from '@hd/book-font';
 import { FINE, FineCanvas } from '@hd/fine-canvas';
 import { Container, Text, type TextStyleOptions } from 'pixi.js';
@@ -17,6 +17,12 @@ const bakes = new BakeCache();
 export interface ArtTextSpec {
   text: string;
   style: TextStyleOptions;
+  // The HD dot, fine px, where the size rule above is not the one wanted:
+  // the title's small lines are set at 3, the size of classic's pixel.
+  dot?: number;
+  // Where the HD lines wrap, in characters, where classic's line does not
+  // fit at that dot: the title's tagline is two lines in HD.
+  columns?: number;
 }
 
 // Text in both arts: the classic Pixi Text exactly as it was, and in HD the
@@ -33,12 +39,31 @@ export class ArtText extends Container {
     this.classic.resolution = textResolution();
     this.addChild(this.classic, this.hd);
     registerArt({ classic: this.classic, hd: this.hd });
-    if (draws(ART_KIND.hd)) this.hd.show(bakes.get(key(spec), () => bookCanvas(spec)));
+    this.box = bakes.get(key(spec), () => bookCanvas(spec));
+    if (draws(ART_KIND.hd)) this.hd.show(this.box);
+  }
+
+  private readonly box: BakedFine;
+
+  // The HD lines' size in logical px, for whatever is fitted around them.
+  get hdWidth(): number {
+    return this.box.texture.width / FINE;
+  }
+
+  get hdHeight(): number {
+    return this.box.texture.height / FINE;
+  }
+
+  // Moves the HD lines `dx` logical px from the classic Text's left edge,
+  // for a line centred on something: the two arts are not the same width.
+  alignHd(dx: number): void {
+    this.hd.x = dx;
   }
 }
 
-function dotOf(style: TextStyleOptions): number {
-  return (typeof style.fontSize === 'number' ? style.fontSize : 8) >= TITLE_SIZE ? 3 : 2;
+function dotOf(spec: ArtTextSpec): number {
+  if (spec.dot !== undefined) return spec.dot;
+  return (typeof spec.style.fontSize === 'number' ? spec.style.fontSize : 8) >= TITLE_SIZE ? 3 : 2;
 }
 
 function colorOf(style: TextStyleOptions): number {
@@ -47,19 +72,22 @@ function colorOf(style: TextStyleOptions): number {
 
 function key(spec: ArtTextSpec): string {
   const { style } = spec;
-  return `${dotOf(style)}|${colorOf(style)}|${style.wordWrap ? style.wordWrapWidth : 0}|${spec.text}`;
+  return `${dotOf(spec)}|${colorOf(style)}|${style.wordWrap ? style.wordWrapWidth : 0}|${spec.columns ?? 0}|${spec.text}`;
 }
 
 // The lines, wrapped by character count when the classic Text wraps, set
 // in the book font.
 function bookCanvas(spec: ArtTextSpec): FineCanvas {
   const { style } = spec;
-  const dot = dotOf(style);
+  const dot = dotOf(spec);
   const pitch = dot === 3 ? TITLE_PITCH : BODY_PITCH;
-  const columns = style.wordWrap && style.wordWrapWidth ? Math.floor((style.wordWrapWidth * FINE) / (6 * dot)) : 0;
+  const wraps = style.wordWrap && style.wordWrapWidth ? Math.floor((style.wordWrapWidth * FINE) / (6 * dot)) : 0;
+  const columns = spec.columns ?? wraps;
   const lines = columns > 0 ? bookWrap(spec.text, columns) : spec.text.split('\n');
   const width = Math.max(1, ...lines.map((line) => bookWidth(line, dot)));
-  const canvas = new FineCanvas({ x: 0, y: 0, w: width, h: Math.max(1, lines.length * pitch) });
+  // The last line is as tall as its glyphs (9 rows, descenders in), not a
+  // whole pitch: what is fitted around the text ends where the ink does.
+  const canvas = new FineCanvas({ x: 0, y: 0, w: width, h: Math.max(1, (lines.length - 1) * pitch + 9 * dot) });
   lines.forEach((text, i) => {
     drawBook(canvas, { text, x: 0, y: i * pitch, color: colorOf(style), dot });
   });

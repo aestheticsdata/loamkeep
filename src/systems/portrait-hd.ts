@@ -11,28 +11,21 @@ const bakes = new BakeCache();
 // The tones that give light in a portrait, left lit by selout.
 const LIGHTS = [DB32.goldenFizz, DB32.white, DB32.viking, DB32.tahitiGold];
 
-// How a drawing is shown large: the scale classic enlarges it by (1 for a
-// sketch already drawn at page size), and how many chamfer passes its blocks
-// take at that size.
-export interface LargeDrawing {
-  scale: number;
-  chamfer: number;
-}
-
-// A drawing shown large, in HD: recorded at its displayed scale and drawn as
-// a portrait that size (portraitHd). Positioned like the classic Graphics it
-// stands in for, which is scaled where this is not.
-export function shownLarge(draw: (g: Graphics) => void, large: LargeDrawing): FineSprite {
-  const { scale, chamfer } = large;
-  const recorded = record((g) => {
-    if (scale !== 1) g.setTransform(scale, 0, 0, scale, 0, 0);
+// A drawing shown large, in HD: drawn as a portrait the size it is shown
+// (portraitHd), `scale` times its own size (1 for a sketch already drawn at
+// page size). Positioned like the classic Graphics it stands in for, which is
+// scaled where this is not.
+export function shownLarge(draw: (g: Graphics) => void, scale: number): FineSprite {
+  const native = record(draw);
+  const scaled = record((g) => {
+    g.setTransform(scale, 0, 0, scale, 0, 0);
     draw(g);
-    if (scale !== 1) g.resetTransform();
+    g.resetTransform();
   });
-  const rects = recorded.rects.map((r) => [r.x, r.y, r.w, r.h, r.color, r.alpha].join(','));
-  const glows = recorded.glows.map((g) => [g.x, g.y, g.radius, g.color].join(','));
-  const key = [scale, chamfer, ...rects, '|', ...glows].join(';');
+  const rects = native.rects.map((r) => [r.x, r.y, r.w, r.h, r.color, r.alpha].join(','));
+  const glows = native.glows.map((g) => [g.x, g.y, g.radius, g.color].join(','));
+  const key = [scale, ...rects, '|', ...glows].join(';');
   const sprite = new FineSprite();
-  sprite.show(bakes.get(key, () => flatten(portraitHd(recorded, chamfer, { emissive: LIGHTS }))));
+  sprite.show(bakes.get(key, () => flatten(portraitHd({ native, scaled, scale }, { emissive: LIGHTS }))));
   return sprite;
 }

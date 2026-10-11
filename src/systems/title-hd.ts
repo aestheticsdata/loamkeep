@@ -1,23 +1,37 @@
 import { DB32, SCREEN_WIDTH } from '@constants';
 import { drawFigureHd, figureHdPose } from '@entities/figure-hd';
+import type { LogicalRect } from '@hd/chunk-layer';
 import { type ClassicRecorder, up } from '@hd/classic-recorder';
 import { type CritterLayers, haloFromClassic } from '@hd/critter-hd';
 import { FINE, FineCanvas } from '@hd/fine-canvas';
 import { bayer } from '@hd/palette';
-import { hash, type TitleMood, type WandererFrame } from '@systems/title-art';
+import { smoothScale } from '@hd/smooth-scale';
+import {
+  type CloudStreak,
+  hash,
+  type TitleMood,
+  type WandererFrame,
+  WORDMARK_DOT,
+  WORDMARK_Y,
+  type WordmarkGlyph,
+  wordmarkGlyphs,
+} from '@systems/title-art';
 
-// The title scene in HD, by the bundle's laws (it is not in the bundle). Only
-// what reads at a glance is redrawn: the sky, the stars and the sun; the
-// scenery's silhouettes; the wordmark. The layers that move every frame —
-// clouds, mist, twinkles — stay classic in both arts.
+// The title scene in HD, by the bundle's laws (it is not in the bundle): the
+// sky, the stars and the sun; the clouds, the mist and the twinkling stars,
+// which move in fine steps; the scenery's silhouettes; the wordmark.
 
 // Where the sky stops: the horizon of title-art.ts.
 const HORIZON_Y = 150;
 
-// The sky, stars and sun. Each band seam is three 2-fine steps of the lower
-// band dithered up into the one above (25 / 50 / 75 %), where classic bleeds
-// one pixel in two and one in four; the stars are 2×2 points; the sun's rings
-// are round and feathered 2 fine into the ring outside them.
+// The tallest step of a sky seam's gradient, fine px.
+const MAX_SEAM_STEP = 9;
+
+// The sky, stars and sun. Each band seam is a stepped Bayer gradient (L5):
+// three steps of 25 / 50 / 75 % of the lower band, centred on the seam and
+// as tall as the narrower band allows, where classic bleeds one pixel in two
+// and one in four; the stars are 2×2 points; the sun's rings are round and
+// feathered 2 fine into the ring outside them.
 export function titleBackdropHd(mood: TitleMood): CritterLayers {
   const s = new FineCanvas({ x: 0, y: 0, w: SCREEN_WIDTH * FINE, h: HORIZON_Y * FINE });
   const w = SCREEN_WIDTH * FINE;
@@ -27,9 +41,14 @@ export function titleBackdropHd(mood: TitleMood): CritterLayers {
   });
   mood.bands.forEach(([y0, color], i) => {
     if (i === 0) return;
-    [0.25, 0.5, 0.75].forEach((t, k) => {
-      s.dither({ x: 0, y: y0 * FINE - 6 + k * 2, w, h: 2 }, { under: null, over: color, t });
-    });
+    const above = y0 - mood.bands[i - 1][0];
+    const below = (i + 1 < mood.bands.length ? mood.bands[i + 1][0] : HORIZON_Y) - y0;
+    const step = Math.max(2, Math.min(MAX_SEAM_STEP, Math.floor((Math.min(above, below) * FINE) / 4)));
+    const upper = mood.bands[i - 1][1];
+    const seam = y0 * FINE;
+    s.dither({ x: 0, y: seam - 2 * step, w, h: step }, { under: null, over: color, t: 0.25 });
+    s.dither({ x: 0, y: seam - step, w, h: step }, { under: null, over: color, t: 0.5 });
+    s.dither({ x: 0, y: seam, w, h: step }, { under: null, over: upper, t: 0.25 });
   });
   const { count, maxY } = mood.stars;
   for (let i = 0; i < count; i++) {
@@ -63,13 +82,63 @@ export function sceneryHd(classic: ClassicRecorder): CritterLayers {
   return { body: s, halo: haloFromClassic(classic) };
 }
 
-// The wordmark: its 3×3 blocks chamfered. Round twice to cut the outer
-// corners, bridge the elbows three times to fill the inner ones, so a
-// diagonal stroke reads as a diagonal rather than a stair of squares.
-export function wordmarkHd(classic: ClassicRecorder): CritterLayers {
-  const s = up(classic);
-  s.round().round().elbows().elbows().elbows();
-  return { body: s, halo: haloFromClassic(classic) };
+// The wordmark's inks: the face, the lit band across its top rows (null for
+// none), and the drop shadow behind it (null for none).
+export interface WordmarkInk {
+  face: number;
+  top: number | null;
+  shadow: number | null;
+}
+
+// How far the shadow sits behind the face, and how deep the lit band runs
+// from the top of the wordmark: classic's 2 and 10 logical px.
+const SHADOW_OFFSET = 2 * FINE;
+const LIT_ROWS = 10 * FINE;
+
+// The wordmark drawn from its glyph table, not from classic's blocks: each
+// letter's dots enlarged to their 9-fine size by smoothScale, so a diagonal
+// stroke (K, M, A) is a straight 45° edge and the O is round, with the same
+// outline laid behind as the shadow. Nothing is chamfered after the fact.
+export function wordmarkHd(ink: WordmarkInk): CritterLayers {
+  const top = WORDMARK_Y * FINE;
+  const glyphs = wordmarkGlyphs();
+  const left = glyphs[0].x * FINE;
+  const last = glyphs[glyphs.length - 1];
+  const scale = WORDMARK_DOT * FINE;
+  const s = new FineCanvas({
+    x: left,
+    y: top,
+    w: (last.x - glyphs[0].x) * FINE + 5 * scale + SHADOW_OFFSET,
+    h: 8 * scale + SHADOW_OFFSET,
+  });
+  const shapes = glyphs.map((glyph) => ({ at: glyph.x * FINE, shape: smoothScale(dots(glyph), scale) }));
+  if (ink.shadow !== null) {
+    const shadow = ink.shadow;
+    for (const { at, shape } of shapes) {
+      shape.forInk((x, y) => s.set(at + x + SHADOW_OFFSET, top + y + SHADOW_OFFSET, shadow));
+    }
+  }
+  for (const { at, shape } of shapes) {
+    shape.forInk((x, y) => s.set(at + x, top + y, ink.top !== null && y < LIT_ROWS ? ink.top : ink.face));
+  }
+  return { body: s, halo: null };
+}
+
+// A glyph's dots, one pixel each.
+function dots(glyph: WordmarkGlyph): FineCanvas {
+  const s = new FineCanvas({ x: 0, y: 0, w: glyph.rows[0].length, h: glyph.rows.length });
+  glyph.rows.forEach((row, y) => {
+    [...row].forEach((c, x) => {
+      if (c === 'X') s.set(x, y, 1);
+    });
+  });
+  return s;
+}
+
+// The rule under the wordmark: its line as drawn, its fading dots as opaque
+// dithered pixels.
+export function wordmarkRuleHd(classic: ClassicRecorder): CritterLayers {
+  return { body: up(classic), halo: haloFromClassic(classic) };
 }
 
 // The wanderer on the title: the HD figure, breathing, and the hem lifting
@@ -79,4 +148,62 @@ export function wandererHd(frame: WandererFrame): CritterLayers {
   const s = drawFigureHd(figureHdPose(pose));
   if (frame.hem) s.rect({ x: -17, y: -18 + frame.bodyBob * FINE, w: 2, h: 9 }, DB32.valhalla);
   return { body: s, halo: null };
+}
+
+// The dark plate behind a line of text, without alpha: classic's black at
+// 34 % as a checkerboard of black fine pixels, the plainest dither there is,
+// which a fine pixel's size turns back into a shade.
+export function plateHd(at: LogicalRect): FineCanvas {
+  const x = at.x * FINE;
+  const y = at.y * FINE;
+  const w = at.w * FINE;
+  const h = at.h * FINE;
+  const s = new FineCanvas({ x, y, w, h });
+  s.dither({ x, y, w, h }, { under: null, over: DB32.black, t: 0.5 });
+  return s;
+}
+
+// One cloud streak (title-art.ts CLOUD_STREAKS), drawn once with its left end
+// at x = 0 and moved as a whole: classic's three translucent rows as rows of
+// opaque pixels at their densities, each tapering over its last 9 fine so the
+// streak thins out instead of stopping.
+const CLOUD_ROWS: readonly (readonly [number, number, number, number])[] = [
+  // dy, inset left, inset width, density — classic's px() calls.
+  [0, 0, 0, 0.75],
+  [1, 5, 12, 0.5],
+  [-1, 12, 26, 0.35],
+];
+
+export function cloudHd(streak: CloudStreak): FineCanvas {
+  const s = new FineCanvas({ x: 0, y: (streak.y - 1) * FINE, w: streak.width * FINE, h: 3 * FINE });
+  for (const [dy, inset, shrink, t] of CLOUD_ROWS) {
+    const x0 = inset * FINE;
+    const x1 = (streak.width - shrink + inset) * FINE;
+    const y = (streak.y + dy) * FINE;
+    s.dither(
+      { x: x0, y, w: x1 - x0, h: FINE },
+      { under: null, over: streak.color, t: (px) => t * Math.min(1, (px - x0 + 1) / 9, (x1 - px) / 9) },
+    );
+  }
+  return s;
+}
+
+// One row of the mist: dashes 5 px long every 8, at the row's density,
+// across the screen and one period beyond, so it can slide by a fine pixel
+// at a time and wrap every 24.
+export function mistRowHd(y: number, color: number, t: number): FineCanvas {
+  const period = 8 * FINE;
+  const s = new FineCanvas({ x: -period, y: y * FINE, w: SCREEN_WIDTH * FINE + 2 * period, h: FINE });
+  for (let x = -period; x < SCREEN_WIDTH * FINE + period; x += period) {
+    s.dither({ x, y: y * FINE, w: 5 * FINE, h: FINE }, { under: null, over: color, t });
+  }
+  return s;
+}
+
+// The menu cursor: classic's three-step triangle (5, 3 and 1 px tall),
+// smoothed up so its two slanted edges are 45° lines. Top-left at (0, 0).
+export function cursorHd(color: number): FineCanvas {
+  const dots = new FineCanvas({ x: 0, y: 0, w: 3, h: 5 });
+  dots.rect({ x: 0, y: 0, w: 1, h: 5 }, color).rect({ x: 1, y: 1, w: 1, h: 3 }, color).set(2, 2, color);
+  return smoothScale(dots, FINE);
 }

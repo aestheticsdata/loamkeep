@@ -1,5 +1,5 @@
+import { DB32 } from '@constants';
 import { FineCanvas } from '@hd/fine-canvas';
-import { loOf } from '@hd/palette';
 import { PIXEL_GLYPHS } from '@systems/pixel-font';
 
 // "Loam Book" (RECIPES §8): the in-game text face in HD, in place of the
@@ -124,8 +124,8 @@ export function bookWrap(text: string, columns: number): string[] {
 }
 
 // The menu font on the fine grid (RECIPES §8, `menuHD`): each dot 3×3; where
-// two dots touch only at a corner, one fine pixel bridges each elbow; a
-// 1-fine drop shadow one step down the ramp. Drawn with its top-left at
+// two dots touch only at a corner, one fine pixel bridges each elbow; the
+// drop shadow classic draws, black a logical pixel down. Top-left at
 // (0, 0).
 export function menuTextHd(text: string, color: number): FineCanvas {
   const on = new Set<string>();
@@ -149,10 +149,11 @@ export function menuTextHd(text: string, color: number): FineCanvas {
       }
     }
   }
-  const out = new FineCanvas({ x: 0, y: 0, w: ink.w, h: ink.h });
-  const shade = loOf(color);
+  // The shadow is classic's: black, a whole logical pixel down and right.
+  // A 1-fine shadow a step down the ramp read as a smear on the dark plate.
+  const out = new FineCanvas({ x: 0, y: 0, w: ink.w + 3, h: ink.h + 3 });
   ink.forInk((x, y) => {
-    if (!ink.ink(x + 1, y + 1)) out.set(x + 1, y + 1, shade);
+    out.set(x + 3, y + 3, DB32.black);
   });
   return out.blit(ink);
 }

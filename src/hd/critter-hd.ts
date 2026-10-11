@@ -2,6 +2,7 @@ import { DB32 } from '@constants';
 import { type ClassicRecorder, up } from '@hd/classic-recorder';
 import { FINE, FineCanvas } from '@hd/fine-canvas';
 import { bayer, loOf, RAMP } from '@hd/palette';
+import { smoothScale, toLogical } from '@hd/smooth-scale';
 import type { Vec2 } from '@types';
 
 // A creature's HD drawing as two layers: the body, which the footprint law
@@ -196,15 +197,51 @@ export function plantHd(classic: ClassicRecorder): CritterLayers {
   return { body: s, halo: haloFromClassic(classic) };
 }
 
-// A drawing shown large — a greeting's subject at ×4 to ×8, a book's sketch
+// A drawing shown large — a greeting's subject at ×3 to ×8, a book's sketch
 // at page size — drawn at the size it is seen, never a small sprite blown up
-// (RECIPES §7). The classic drawing, recorded at its displayed scale, is
-// lifted, its corners chamfered by `passes` passes — more the wider its
-// blocks — and selout laid along the outline.
-export function portraitHd(classic: ClassicRecorder, passes: number, options: CritterHdOptions = {}): CritterLayers {
-  const s = up(classic);
-  for (let i = 0; i < passes; i++) s.round();
-  for (let i = 0; i <= passes; i++) s.elbows();
-  s.edges(options.emissive ?? [], options.ramp ?? RAMP);
-  return { body: s, halo: haloFromClassic(classic) };
+// (RECIPES §7). `native` is the classic drawing at its own size and `scaled`
+// the same drawing at the size it is shown (for its glows). The body is the
+// native drawing smoothed up to the displayed size (smoothScale), then given
+// selout as thick as the size calls for, so the rim reads like the in-world
+// sprite's does at ×3.
+interface LargeRecording {
+  native: ClassicRecorder;
+  scaled: ClassicRecorder;
+  scale: number;
+}
+
+export function portraitHd(large: LargeRecording, options: CritterHdOptions = {}): CritterLayers {
+  const body = smoothScale(toLogical(up(large.native), FINE), FINE * large.scale);
+  thickEdges(body, { thickness: Math.max(1, Math.round(large.scale / 2)), ...options });
+  return { body, halo: haloFromClassic(large.scaled) };
+}
+
+interface ThickEdges extends CritterHdOptions {
+  thickness: number;
+}
+
+// Selout (L3, light from the upper left): a pixel within `thickness` fine
+// px of the outline below or to the right takes its tone's shadow; one right
+// on the outline above or to the left takes its lit neighbour. A lit rim as
+// thick as the shadow read as a pale line drawn round the subject.
+function thickEdges(s: FineCanvas, spec: ThickEdges): void {
+  const skip = spec.emissive ?? [];
+  const ramp = spec.ramp ?? RAMP;
+  const changes: [number, number, number][] = [];
+  s.forInk((x, y, c) => {
+    if (skip.includes(c)) return;
+    const steps = ramp.get(c);
+    if (!steps) return;
+    for (let k = 1; k <= spec.thickness; k++) {
+      if (!s.ink(x, y + k) || !s.ink(x + k, y)) {
+        changes.push([x, y, steps[1]]);
+        return;
+      }
+      if (k === 1 && (!s.ink(x, y - 1) || !s.ink(x - 1, y))) {
+        changes.push([x, y, steps[0]]);
+        return;
+      }
+    }
+  });
+  for (const [x, y, c] of changes) s.set(x, y, c);
 }

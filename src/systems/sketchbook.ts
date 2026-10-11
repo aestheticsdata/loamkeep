@@ -59,10 +59,6 @@ const TEXT_Y = FRAME_Y + 46;
 const TEXT_WRAP_W = 130;
 const TEXT_LINE_H = 13;
 
-// The chamfer passes a page's sketch takes in HD: drawn at page size, its
-// shapes are several logical pixels wide.
-const SKETCH_CHAMFER = 2;
-
 // The footer hint's own line, which the description has to stop clear of.
 const HINT_Y = FRAME_Y + FRAME_H - 16;
 
@@ -250,7 +246,7 @@ export class Sketchbook {
     sketch.position.set(FRAME_X + 50, FRAME_Y + 110);
     // In HD the sketch is drawn at page size, chamfered as a drawing that
     // size, never a small sprite enlarged.
-    const sketchHd = shownLarge((g) => page.drawSketch(g), { scale: 1, chamfer: SKETCH_CHAMFER });
+    const sketchHd = shownLarge((g) => page.drawSketch(g), 1);
     sketchHd.position.set(FRAME_X + 50, FRAME_Y + 110);
     registerArt({ classic: sketch, hd: sketchHd });
     this.content.addChild(sketch, sketchHd);
