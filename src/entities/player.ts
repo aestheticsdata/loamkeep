@@ -66,6 +66,7 @@ export class Player implements Body {
   // to trigger SFX (or anything else that should pop on the transition).
   // Cleared at the start of every update().
   didJumpThisFrame = false;
+  didBounceThisFrame = false;
   didLandThisFrame = false;
   didFootstepThisFrame = false;
   didEnterWaterThisFrame = false;
@@ -152,6 +153,7 @@ export class Player implements Body {
     // Clear last-frame event flags. They'll be set again below if the
     // matching event fires this frame.
     this.didJumpThisFrame = false;
+    this.didBounceThisFrame = false;
     this.didLandThisFrame = false;
     this.didFootstepThisFrame = false;
     this.didEnterWaterThisFrame = false;
@@ -291,7 +293,7 @@ export class Player implements Body {
         this.vel.y = -PUFFBALL_VELOCITY;
         this.coyoteTimer = 0;
         this.jumpBufferTimer = 0;
-        this.didJumpThisFrame = true;
+        this.didBounceThisFrame = true;
       }
 
       if (this.coyoteTimer > 0 && this.jumpBufferTimer > 0) {

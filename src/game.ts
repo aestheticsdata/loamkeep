@@ -890,6 +890,7 @@ export class Game {
   // SFX driven by the player's one-shot event flags, set during update().
   private playPlayerSounds(): void {
     if (this.player.didJumpThisFrame) this.audio.jump();
+    if (this.player.didBounceThisFrame) this.audio.bounce();
     if (this.player.didLandThisFrame) this.audio.land();
     if (this.player.didFootstepThisFrame) {
       if (this.player.inWater) this.audio.wadeStep();

@@ -115,6 +115,42 @@ export class Audio {
     this.blip({ freq: 220, freqEnd: 660, duration: 0.15, volume: 0.2 });
   }
 
+  // Puffball bounce: a springy "boing", deliberately unlike jump(). A
+  // triangle sweeps up two octaves over a third of a second — slower and
+  // lower than the jump chirp, so it reads as being thrown rather than
+  // leaping — while an LFO wobbles its pitch, the wobble dying away like a
+  // spring settling. A soft low thump under it is the cap squashing.
+  bounce(): void {
+    const ctx = this.ensureContext();
+    const start = ctx.currentTime;
+    const duration = 0.38;
+    const end = start + duration;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(140, start);
+    osc.frequency.exponentialRampToValueAtTime(560, end);
+
+    const wobble = ctx.createOscillator();
+    wobble.frequency.setValueAtTime(18, start);
+    const depth = ctx.createGain();
+    depth.gain.setValueAtTime(60, start);
+    depth.gain.exponentialRampToValueAtTime(1, end);
+    wobble.connect(depth).connect(osc.frequency);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.28, start);
+    gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    osc.connect(gain).connect(this.masterNode);
+    osc.start(start);
+    wobble.start(start);
+    osc.stop(end);
+    wobble.stop(end);
+
+    this.blip({ freq: 110, freqEnd: 55, duration: 0.07, volume: 0.2, type: 'sine' });
+  }
+
   // Low triangle thud + tiny noise tick. Triangle (not square) keeps it
   // mellow; the noise adds an impact crunch without making it loud.
   land(): void {
