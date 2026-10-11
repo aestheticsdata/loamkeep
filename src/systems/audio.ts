@@ -1,3 +1,5 @@
+import { GRAVITY, PUFFBALL_VELOCITY } from '@constants';
+
 // Procedural 8-bit-style SFX. Everything is synthesized at play-time from
 // oscillators and a single noise buffer — same primitives a NES sound chip
 // has (square/triangle/noise channels), no samples, no external assets.
@@ -115,14 +117,37 @@ export class Audio {
     this.blip({ freq: 220, freqEnd: 660, duration: 0.15, volume: 0.2 });
   }
 
-  // Puffball bounce: a pinball-bumper "pwing", deliberately unlike jump().
-  // It starts where the jump chirp ends, already high, and climbs two
-  // octaves fast — a fifth of a second — so it reads as a spring firing
-  // rather than a leap. A triangle an octave above, a touch shorter, adds
-  // the metallic ring.
+  // Puffball bounce: a pinball-bumper "pwiiing" that rides the whole climb.
+  // It starts where the jump chirp ends, already high, and glides up an
+  // octave for exactly as long as the player rises — the bounce's time to
+  // apex — holding its volume and only fading over the last stretch, so the
+  // pitch peaks with the player. A triangle an octave above adds the
+  // metallic ring.
   bounce(): void {
-    this.blip({ freq: 660, freqEnd: 2640, duration: 0.2, volume: 0.15 });
-    this.blip({ freq: 1320, freqEnd: 3520, duration: 0.16, volume: 0.08, type: 'triangle' });
+    const ctx = this.ensureContext();
+    const start = ctx.currentTime;
+    const end = start + PUFFBALL_VELOCITY / GRAVITY;
+    const fadeFrom = end - 0.15;
+
+    const layers = [
+      { type: 'square', freq: 660, volume: 0.12 },
+      { type: 'triangle', freq: 1320, volume: 0.06 },
+    ] as const;
+    for (const layer of layers) {
+      const osc = ctx.createOscillator();
+      osc.type = layer.type;
+      osc.frequency.setValueAtTime(layer.freq, start);
+      osc.frequency.exponentialRampToValueAtTime(layer.freq * 2, end);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(layer.volume, start);
+      gain.gain.setValueAtTime(layer.volume, fadeFrom);
+      gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+      osc.connect(gain).connect(this.masterNode);
+      osc.start(start);
+      osc.stop(end);
+    }
   }
 
   // Low triangle thud + tiny noise tick. Triangle (not square) keeps it
