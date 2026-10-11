@@ -130,8 +130,8 @@ export class Audio {
     const fadeFrom = end - 0.15;
 
     const layers = [
-      { type: 'square', freq: 660, volume: 0.08 },
-      { type: 'triangle', freq: 1320, volume: 0.04 },
+      { type: 'square', freq: 660, volume: 0.04 },
+      { type: 'triangle', freq: 1320, volume: 0.02 },
     ] as const;
     for (const layer of layers) {
       const osc = ctx.createOscillator();
