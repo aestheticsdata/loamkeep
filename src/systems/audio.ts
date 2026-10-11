@@ -115,40 +115,14 @@ export class Audio {
     this.blip({ freq: 220, freqEnd: 660, duration: 0.15, volume: 0.2 });
   }
 
-  // Puffball bounce: a springy "boing", deliberately unlike jump(). A
-  // triangle sweeps up two octaves over a third of a second — slower and
-  // lower than the jump chirp, so it reads as being thrown rather than
-  // leaping — while an LFO wobbles its pitch, the wobble dying away like a
-  // spring settling. A soft low thump under it is the cap squashing.
+  // Puffball bounce: a pinball-bumper "pwing", deliberately unlike jump().
+  // It starts where the jump chirp ends, already high, and climbs two
+  // octaves fast — a fifth of a second — so it reads as a spring firing
+  // rather than a leap. A triangle an octave above, a touch shorter, adds
+  // the metallic ring.
   bounce(): void {
-    const ctx = this.ensureContext();
-    const start = ctx.currentTime;
-    const duration = 0.38;
-    const end = start + duration;
-
-    const osc = ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(140, start);
-    osc.frequency.exponentialRampToValueAtTime(560, end);
-
-    const wobble = ctx.createOscillator();
-    wobble.frequency.setValueAtTime(18, start);
-    const depth = ctx.createGain();
-    depth.gain.setValueAtTime(60, start);
-    depth.gain.exponentialRampToValueAtTime(1, end);
-    wobble.connect(depth).connect(osc.frequency);
-
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.28, start);
-    gain.gain.exponentialRampToValueAtTime(0.0001, end);
-
-    osc.connect(gain).connect(this.masterNode);
-    osc.start(start);
-    wobble.start(start);
-    osc.stop(end);
-    wobble.stop(end);
-
-    this.blip({ freq: 110, freqEnd: 55, duration: 0.07, volume: 0.2, type: 'sine' });
+    this.blip({ freq: 660, freqEnd: 2640, duration: 0.2, volume: 0.15 });
+    this.blip({ freq: 1320, freqEnd: 3520, duration: 0.16, volume: 0.08, type: 'triangle' });
   }
 
   // Low triangle thud + tiny noise tick. Triangle (not square) keeps it
