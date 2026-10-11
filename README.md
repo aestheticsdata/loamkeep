@@ -6,10 +6,11 @@ mood, atmosphere, and discovery rather than challenge. You play a hooded
 wanderer exploring a small world; landmarks log into a sketchbook as you
 find them.
 
-> Status: playable vertical slice. Three connected levels (meadow → old keep →
-> crypt) with doorway transitions, wildlife (rabbits, fish, birds, a hopping
-> pumpkin), water you can wade and swim through, and a procedural Amiga-500
-> art direction. Everything ships as TypeScript — there are still no PNGs or
+> Status: playable vertical slice. Five connected levels (meadow → old keep,
+> then up the keep's belfry to its roof at night, or down through the crypt
+> to a flooded cistern) with doorway transitions, wildlife (rabbits, fish,
+> birds, a hopping pumpkin, owls, glowfish), water you can wade and swim
+> through, and a procedural Amiga-500 art direction. Everything ships as TypeScript — there are still no PNGs or
 > audio samples.
 
 ## Design constraints
@@ -78,6 +79,8 @@ src/
     tall-candle.ts  # Candelabrum floor-light
     rabbit.ts       # Pacing wildlife — bob animation, AABB greet hitbox
     fish.ts         # Swimming wildlife — colour-aware, lives in water bodies
+    glowfish.ts     # The cistern's fish — carries its own pulsing light
+    owl.ts          # Perched belfry wildlife — blinks, turns its head
     bird.ts         # Flying wildlife — silhouette + 2-frame flap
     pumpkin.ts      # Hopping pumpkin — gravity-driven arc with cooldown
   systems/
@@ -86,7 +89,7 @@ src/
     input.ts        # Keyboard state (down / pressed / released)
     audio.ts        # Web Audio synth + 8-bit SFX
     sketchbook.ts   # Discovery modal (one sketchbook page)
-    greeting.ts     # First-encounter "you met X" popup (rabbit/fish/bird)
+    greeting.ts     # First-encounter "you met X" popup, one per species
     world-state.ts  # Cross-level boolean-flag store
     sketchbook-store.ts  # localStorage persistence for the pages found, per book
     sketchbooks.ts  # Registry of the books the title menu lists, in menu order
@@ -103,6 +106,8 @@ src/
       meadow.ts          # Outdoor starting area
       old-keep.ts        # Indoor castle interior
       old-keep-crypt.ts  # Underground crypt
+      old-keep-belfry.ts # The bell tower, climbed to the roof at night
+      flooded-cistern.ts # The swimming level under the crypt
     parallax.ts     # Procedural parallax background (per-flavor)
 ```
 
@@ -135,7 +140,7 @@ src/
   contents. `landmarks` derives its own by walking the level registry, so
   adding a landmark anywhere updates its count and gallery order for free;
   `creatures` is authored in `world/creatures.ts`, one page per species —
-  rabbit, fish, bird, pumpkin — because a species is not registered on a level
+  rabbit, fish, bird, pumpkin, owl, glowfish — because a species is not registered on a level
   the way a landmark is. Registering a book is the whole of adding one; the
   title screen has no per-book code. Four books is the comfortable ceiling
   before the menu plate reaches the key line.
@@ -151,18 +156,21 @@ src/
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
   under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old
   name so no save is orphaned; a v1 blob migrates into the `landmarks` book on
-  read). A book's entry reads `LANDMARKS 3/13` and opens a gallery of them,
+  read). A book's entry reads `LANDMARKS 3/15` and opens a gallery of them,
   ending on a count of the pages still blank — never their names. The count is
-  there from the start: a book nothing has been found in reads `LANDMARKS 0/13`,
+  there from the start: a book nothing has been found in reads `LANDMARKS 0/15`,
   dimmed and skipped by the cursor, because the denominator is what tells a new
   player how much there is to find.
 - **Per-level visual flavor**: each level picks its own parallax flavor
-  (`meadow` rolling hills, `keep` indoor backdrop) and backdrop kind (`cave`
+  (`meadow` rolling hills, `keep` indoor backdrop, `night` stars, a moon and
+  dark hills that slide on both axes, behind the belfry's open chamber and
+  roof) and backdrop kind (`cave`
   rock texture, `indoor-dark` flat near-black, `crypt-black` pure black for
   candle-lit underground).
 - **Expanded tile palette**: grass / dirt / stone / dark stone (outdoor),
   castle brick / castle floor / gold pillar (castle interior), crypt brick /
-  crypt floor (deep underground), plus water. Authored in ASCII — each
+  crypt floor (deep underground), timber beams and plank floors (the belfry),
+  plus water. Authored in ASCII — each
   character maps to one tile type.
 - **Water mechanics**: wade on submerged ground at reduced speed, swim freely
   off-ground, hold jump to rise, hold down to dive. Exit-pop boost when
@@ -170,12 +178,15 @@ src/
   Submerged pixels get a blue tint applied at render time, and the surface
   ripples ±1 px only on the body the player is currently inside.
 - **Wildlife**: rabbits pacing platforms, fish swimming in water bodies, birds
-  silhouetted across the sky, a hopping pumpkin with its own gravity. None
-  collide with the player; they just inhabit the world.
-- **First-encounter greetings**: the first time you bump into a rabbit, fish,
-  or bird, a parchment popup pauses gameplay with a small line of speech
-  ("Got a carrot for me, buddy?"). One-shot per session, tracked in
-  `WorldState`. Closes on any movement-key press.
+  silhouetted across the sky, a hopping pumpkin with its own gravity, owls
+  perched in the belfry, glowfish lighting the cistern. None collide with the
+  player; they just inhabit the world.
+- **First-encounter greetings**: the first time you bump into any creature, a
+  parchment popup pauses gameplay with a small line of speech ("Got a carrot
+  for me, buddy?"). One-shot for good, not per session: the creature's page,
+  written at the same moment, keeps it from opening again after a reload
+  (`WorldState` covers the session when storage is blocked). Closes on any
+  movement-key press.
 - **Per-tile procedural detail**: a stable hash per `(tx, ty)` seeds grass
   tufts and sparse red wildflowers, dirt speckles, dark-stone speckles, brick
   mortar joints — consistent under camera scroll, no per-frame randomness.
@@ -196,7 +207,7 @@ src/
 - **Level data is plain ASCII**: each level is an array of strings where each
   character is a tile type (`.` sky, `G` grass, `D` dirt, `S` stone,
   `K` dark stone, `W` water, `B`/`F`/`P` castle bricks/floor/pillar,
-  `c`/`v` crypt bricks/floor). Easy to hand-edit and read.
+  `c`/`v` crypt bricks/floor, `T` timber). Easy to hand-edit and read.
 - **Logical resolution is 320×224.** The PixiJS stage upscales it ×3 to a
   fixed 960×672 canvas — the same size in every window, centred on the page's
   near-black ground, so a logical pixel is always exactly three of them.

@@ -23,6 +23,9 @@ const CRYPT_LO = 0x000000; // pure black mortar
 //              VERY dark palette — almost-black masonry that catches just
 //              enough candlelight to read. The crypt is meant to feel
 //              like a cosy hideout deep underground.
+//   - Timber:  the belfry's beams and plank floors. Warm brown against
+//              the tower's grey brick, so a ledge reads as "something to
+//              stand on" before the eye has found its edge.
 // Water is shared (lakes happen in both biomes).
 export const Tile = {
   Empty: 0,
@@ -36,6 +39,7 @@ export const Tile = {
   GoldPillar: 8,
   CryptBrick: 9,
   CryptFloor: 10,
+  Timber: 11,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -53,6 +57,7 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   P: Tile.GoldPillar,
   c: Tile.CryptBrick,
   v: Tile.CryptFloor,
+  T: Tile.Timber,
 };
 
 const TILE_COLORS: Record<Tile, number> = {
@@ -87,6 +92,8 @@ const TILE_COLORS: Record<Tile, number> = {
   // CryptFloor — one notch lighter than the wall (still neutral grey)
   // so the floor catches just enough candlelight to walk by.
   [Tile.CryptFloor]: CRYPT_FLOOR,
+  // Timber — oiled cedar, the same wood as the keep's door and bookshelf.
+  [Tile.Timber]: DB32.oiledCedar,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -108,6 +115,7 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.GoldPillar]: false,
   [Tile.CryptBrick]: true,
   [Tile.CryptFloor]: true,
+  [Tile.Timber]: true,
 };
 
 export class Tilemap {
@@ -400,6 +408,9 @@ function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: nu
     case Tile.CryptFloor:
       drawCryptFloor(g, x, y, ty);
       break;
+    case Tile.Timber:
+      drawTimber(g, x, y, tx, ty);
+      break;
   }
 }
 
@@ -634,6 +645,27 @@ function drawCryptBrick(g: Graphics, x: number, y: number, tx: number, ty: numbe
 // pattern, same bright white highlights.
 function drawCryptFloor(g: Graphics, x: number, y: number, ty: number): void {
   drawBrickPattern(g, x, y, ty, TILE_COLORS[Tile.CryptFloor], CRYPT_HI, CRYPT_LO);
+}
+
+// Timber beam / plank. A lit top edge (the surface the player stands on),
+// a dark underside, and two grain lines whose length varies per tile so a
+// run of planks doesn't read as one printed strip. A peg every few tiles
+// says "nailed down" without any extra geometry.
+function drawTimber(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  g.rect(x, y, TILE_SIZE, 2).fill(DB32.rope);
+  g.rect(x, y, TILE_SIZE, 1).fill(DB32.twine);
+  g.rect(x, y + TILE_SIZE - 2, TILE_SIZE, 2).fill(DB32.valhalla);
+  const a = 2 + Math.floor(tileHash(tx, ty, 160) * 6);
+  const b = 1 + Math.floor(tileHash(tx, ty, 161) * 6);
+  g.rect(x + a, y + 5, TILE_SIZE - a - 2, 1).fill(DB32.loulou);
+  g.rect(x + b, y + 9, TILE_SIZE - b - 4, 1).fill(DB32.loulou);
+  // Plank joint on the left edge of roughly every other tile.
+  if (tileHash(tx, ty, 162) < 0.5) {
+    g.rect(x, y + 2, 1, TILE_SIZE - 4).fill(DB32.valhalla);
+  }
+  if (tileHash(tx, ty, 163) < 0.25) {
+    g.rect(x + 7, y + 3, 2, 2).fill(DB32.twine);
+  }
 }
 
 // Golden classical column. Vertical "round column" shading per tile: a

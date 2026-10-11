@@ -16,7 +16,9 @@ export interface SpawnPoint {
 // Which parallax flavor sits behind this level. The meadow's distant-hill
 // silhouettes don't fit an indoor castle; the keep wants either nothing or
 // a dim interior backdrop. Add more flavors here as new biomes arrive.
-export type ParallaxFlavor = 'meadow' | 'keep';
+// 'night' is the belfry's sky: stars, a moon and dark hills, behind
+// whatever part of a level its backdrop leaves uncovered.
+export type ParallaxFlavor = 'meadow' | 'keep' | 'night';
 
 // What kind of solid backdrop sits at the back of the world container,
 // behind the tilemap.

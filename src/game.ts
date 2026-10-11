@@ -3,7 +3,9 @@ import { Bird, drawBird } from '@entities/bird';
 import { Decoration } from '@entities/decoration';
 import type { Entity, InteractContext } from '@entities/entity';
 import { drawFishLarge, Fish } from '@entities/fish';
+import { drawGlowfishLarge, Glowfish } from '@entities/glowfish';
 import { Landmark } from '@entities/landmark';
+import { drawOwl, Owl } from '@entities/owl';
 import { Player } from '@entities/player';
 import { drawPumpkin, Pumpkin } from '@entities/pumpkin';
 import { drawRabbit, Rabbit } from '@entities/rabbit';
@@ -381,6 +383,8 @@ export class Game {
       this.checkFishEncounter();
       this.checkBirdEncounter();
       this.checkPumpkinEncounter();
+      this.checkOwlEncounter();
+      this.checkGlowfishEncounter();
       this.noticeNearbyPlants();
 
       this.runInteractionLoop();
@@ -724,6 +728,47 @@ export class Game {
           // 7x8 native, so x4 gives it the rabbit's presence in the frame.
           subjectScale: 4,
           speech: 'Hop hop hop! Fancy a race?',
+        });
+        return;
+      }
+    }
+  }
+
+  // The belfry's owls. Grounded only, as with the bird: an owl perches at
+  // the end of a ledge, and a jump that grazes it on the way past must not
+  // freeze the player in mid-air under a popup.
+  private checkOwlEncounter(): void {
+    if (this.metCreature('owl', 'owl-greeted')) return;
+    if (!this.player.onGround) return;
+    for (const entity of this.currentEntities) {
+      if (!(entity instanceof Owl)) continue;
+      if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
+        this.worldState.set('owl-greeted', true);
+        this.sketchbookStore.add(CREATURES_BOOK_ID, 'owl');
+        this.greeting.show({
+          drawSubject: (g) => drawOwl(g, { blink: false, look: 0 }),
+          // 8x11 native, x4 to sit in the frame like the rabbit.
+          subjectScale: 4,
+          speech: "Hoo... hoo's climbing my tower at this hour?",
+        });
+        return;
+      }
+    }
+  }
+
+  // The cistern's glowfish. No grounded guard: everyone meets it swimming,
+  // and a swimmer paused under a popup just hangs in the water.
+  private checkGlowfishEncounter(): void {
+    if (this.metCreature('glowfish', 'glowfish-greeted')) return;
+    for (const entity of this.currentEntities) {
+      if (!(entity instanceof Glowfish)) continue;
+      if (entity.isPlayerInRange(this.player.pos, this.player.size)) {
+        this.worldState.set('glowfish-greeted', true);
+        this.sketchbookStore.add(CREATURES_BOOK_ID, 'glowfish');
+        this.greeting.show({
+          drawSubject: drawGlowfishLarge,
+          subjectScale: 3,
+          speech: "Shh. You're swimming in my light.",
         });
         return;
       }

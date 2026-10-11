@@ -25,7 +25,8 @@ import type { Graphics } from 'pixi.js';
 //   Rows 24-26  the ossuary under the floor (cols 5-16). A stone bier
 //               (row 26, cols 10-11) sits right under the grave: the drop
 //               lands on it, and from it a straight jump up (3 tiles)
-//               climbs back out through the opening.
+//               climbs back out through the opening. A stair at col 8
+//               goes down again, to the flooded cistern.
 //   Row 27      ossuary floor
 //
 // Walls are CryptBrick (true neutral near-black with white "reflets"
@@ -81,10 +82,16 @@ const OSSUARY_FLOOR_Y = 27 * TILE_SIZE;
 const RETURN_DOOR_COL = 3;
 const RETURN_DOOR_X = RETURN_DOOR_COL * TILE_SIZE + 8;
 
+// Cistern stair — in the ossuary, between the candle and the bier, down to
+// the flooded cistern.
+const CISTERN_DOOR_X = 8 * TILE_SIZE + 8;
+
 const OLD_KEEP_CRYPT_SPAWNS: SpawnPoint[] = [
   // 'from-keep' — player descended from the keep's basement. Two tiles
   // right of the return door, clear of its interaction zone.
   { id: 'from-keep', x: 6 * TILE_SIZE + 2, y: STAND_SPAWN_Y },
+  // 'from-cistern' — back up the cistern stair, in the ossuary, west of it.
+  { id: 'from-cistern', x: 5 * TILE_SIZE + 2, y: OSSUARY_FLOOR_Y - TILE_SIZE },
 ];
 
 // ---------------------------------------------------------------------------
@@ -300,6 +307,26 @@ function drawArmchair(g: Graphics): void {
   g.rect(-1, -8, 2, 1).fill(trim);
 }
 
+// The cistern stair: a stone arch, 14 wide × 22 tall, over three steps
+// going down into black, and a line of water-blue at the foot. Drawn around
+// (0, 0) with its base on the y = 0 line, as every door is.
+function drawCisternStair(g: Graphics): void {
+  const stone = DB32.dimGray;
+  const stoneHi = DB32.heather;
+  g.rect(-7, -20, 14, 20).fill(stone);
+  g.rect(-5, -22, 10, 2).fill(stone);
+  g.rect(-5, -22, 10, 1).fill(stoneHi);
+  g.rect(-7, -20, 2, 1).fill(stoneHi);
+  g.rect(5, -20, 2, 1).fill(stoneHi);
+  g.rect(-5, -19, 10, 19).fill(DB32.black);
+  g.rect(-3, -21, 6, 2).fill(DB32.black);
+  // Steps, each a little darker and narrower than the one above it.
+  g.rect(-5, -9, 10, 1).fill(stoneHi);
+  g.rect(-4, -6, 8, 1).fill(stone);
+  g.rect(-3, -3, 6, 1).fill(DB32.opal);
+  g.rect(-2, -1, 4, 1).fill(DB32.venice);
+}
+
 const onCryptFloor = (col: number, draw: (g: Graphics) => void): DecorationSpec => ({
   x: col * TILE_SIZE + 8,
   y: STAND_Y,
@@ -351,6 +378,17 @@ export const oldKeepCryptLevel: LevelSpec = {
       new TallCandle(17 * TILE_SIZE + 8, STAND_Y),
       // One down in the ossuary, at the west end, away from the chests.
       new TallCandle(6 * TILE_SIZE + 8, OSSUARY_FLOOR_Y),
+      // The stair down to the cistern — a low arch over steps going into the
+      // dark, with the water's glint at the bottom.
+      new Door({
+        id: 'crypt-cistern-door',
+        x: CISTERN_DOOR_X,
+        y: OSSUARY_FLOOR_Y,
+        targetLevelId: 'flooded-cistern',
+        targetSpawnId: 'from-crypt',
+        promptLabel: 'descend',
+        drawBody: drawCisternStair,
+      }),
       // Iron chandelier hanging from the ceiling underside above the
       // tomb inscription (centre of the room). Anchored at its top
       // (chain attachment point) at the world Y of the ceiling

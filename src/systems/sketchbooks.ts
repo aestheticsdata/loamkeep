@@ -35,7 +35,7 @@ export const SKETCHBOOKS: readonly SketchbookBook[] = [
   {
     id: LANDMARKS_BOOK_ID,
     label: 'LANDMARKS',
-    // In level-registry order (meadow → keep → crypt, then authoring order
+    // In level-registry order (meadow → keep → belfry → crypt → cistern, then authoring order
     // inside each level), so adding a landmark to any level updates this
     // book's count and its gallery order for free.
     pages: () =>

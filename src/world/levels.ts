@@ -1,19 +1,23 @@
 import type { LandmarkSpec } from '@entities/landmark';
 import { Level, type LevelSpec } from '@world/level';
+import { floodedCisternLevel } from '@world/levels/flooded-cistern';
 import { meadowLevel } from '@world/levels/meadow';
 import { oldKeepLevel } from '@world/levels/old-keep';
+import { oldKeepBelfryLevel } from '@world/levels/old-keep-belfry';
 import { oldKeepCryptLevel } from '@world/levels/old-keep-crypt';
 
 // Registry of every authored level in the game. Keys are the string ids used
 // by Door entities and (eventually) save data. Adding a new level is a
 // two-line change: drop a `<name>.ts` in `world/levels/` exporting a
 // LevelSpec, then import + register it here.
-export type LevelId = 'meadow' | 'old-keep' | 'old-keep-crypt';
+export type LevelId = 'meadow' | 'old-keep' | 'old-keep-belfry' | 'old-keep-crypt' | 'flooded-cistern';
 
 export const LEVEL_SPECS: Record<LevelId, LevelSpec> = {
   meadow: meadowLevel,
   'old-keep': oldKeepLevel,
+  'old-keep-belfry': oldKeepBelfryLevel,
   'old-keep-crypt': oldKeepCryptLevel,
+  'flooded-cistern': floodedCisternLevel,
 };
 
 // Default level loaded at game start. Currently the meadow — the player
@@ -31,8 +35,8 @@ export function loadLevel(id: string): Level {
   return new Level(LEVEL_SPECS[id as LevelId]);
 }
 
-// Every landmark in the game, in registry order (meadow → keep → crypt, then
-// authoring order inside each level). This is the sketchbook's table of
+// Every landmark in the game, in registry order (meadow → keep → belfry →
+// crypt → cistern, then authoring order inside each level). This is the sketchbook's table of
 // contents: the title screen's page count and the gallery's page order both
 // come from here, so adding a landmark to any level updates both for free.
 export interface LandmarkPage {

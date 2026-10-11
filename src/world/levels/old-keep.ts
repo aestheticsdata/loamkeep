@@ -16,6 +16,7 @@ import type { Graphics } from 'pixi.js';
 //
 //   Upper floor (row 8, cols 2-29, with a one-tile-lower lip at row 9 out to
 //   col 35) — the "balcony"
+//     - Belfry door at col 4, up to the bell tower
 //     - Stone Throne (col 14) + Bookshelf (col 20) + columns + candles
 //     - The gold columns are not solid; the player walks through them
 //
@@ -108,16 +109,24 @@ const RETURN_DOOR_X = RETURN_DOOR_COL * TILE_SIZE + 8;
 const DESCEND_DOOR_COL = 8;
 const DESCEND_DOOR_X = DESCEND_DOOR_COL * TILE_SIZE + 8;
 
+// Belfry door — UPPER floor, west end, past the throne: the tower is the
+// next climb after this one.
+const BELFRY_DOOR_X = 4 * TILE_SIZE + 8;
+const UPPER_SPAWN_Y = UPPER_FLOOR_Y - TILE_SIZE;
+
 // Spawns:
 //   'from-meadow' - LOWER floor, near the return door (cool down on entry).
 //   'from-crypt'  - BASEMENT floor, near the descend door (where the
 //                   player exited the crypt).
+//   'from-belfry' - UPPER floor, two tiles right of the belfry door.
 const SPAWN_FROM_MEADOW_X = 5 * TILE_SIZE + 2;
 const SPAWN_FROM_CRYPT_X = 11 * TILE_SIZE + 2;
+const SPAWN_FROM_BELFRY_X = 6 * TILE_SIZE + 2;
 
 const OLD_KEEP_SPAWNS: SpawnPoint[] = [
   { id: 'from-meadow', x: SPAWN_FROM_MEADOW_X, y: LOWER_SPAWN_Y },
   { id: 'from-crypt', x: SPAWN_FROM_CRYPT_X, y: BASEMENT_SPAWN_Y },
+  { id: 'from-belfry', x: SPAWN_FROM_BELFRY_X, y: UPPER_SPAWN_Y },
 ];
 
 // ---------------------------------------------------------------------------
@@ -578,6 +587,15 @@ export const oldKeepLevel: LevelSpec = {
         targetLevelId: 'old-keep-crypt',
         targetSpawnId: 'from-keep',
         promptLabel: 'descend',
+      }),
+      // Belfry door — UPPER floor west end, up into the bell tower.
+      new Door({
+        id: 'keep-belfry-door',
+        x: BELFRY_DOOR_X,
+        y: UPPER_FLOOR_Y,
+        targetLevelId: 'old-keep-belfry',
+        targetSpawnId: 'from-keep',
+        promptLabel: 'climb',
       }),
       // Candles — three on the lower floor, two on the upper floor (near
       // the throne and the bookshelf), two in the basement (one on each
