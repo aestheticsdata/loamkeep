@@ -36,7 +36,11 @@ export type ParallaxFlavor = 'meadow' | 'keep' | 'night' | 'autumn' | 'zenith';
 //   'grotto'      - deep blue-black rock with a fine grain, wavering strata
 //                   and the odd cyan glint: a cave you can see the back of
 //                   by the light of what grows in it, never a flat void.
-export type BackdropKind = 'cave' | 'indoor-dark' | 'crypt-black' | 'grotto';
+//   'library'     - the library's back wall: shelf on shelf of books in deep
+//                   shadow, behind the stacks you can stand on.
+//   'masonry'     - the cistern's back wall: big dark blocks, damp streaks
+//                   running down them, moss low where the water has been.
+export type BackdropKind = 'cave' | 'indoor-dark' | 'crypt-black' | 'grotto' | 'library' | 'masonry';
 
 // A rectangle of the level in tiles: top-left (col, row) and its size.
 export interface TileRect {

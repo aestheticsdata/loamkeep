@@ -32,7 +32,8 @@ export type FloraId =
   | 'squash'
   | 'bean-trellis'
   | 'sunflower'
-  | 'heather';
+  | 'heather'
+  | 'apple-tree';
 
 function drawSmallTree(g: Graphics): void {
   const trunk = DB32.oiledCedar;
@@ -308,6 +309,32 @@ function drawHeather(g: Graphics): void {
   g.rect(1, -1, 1, 1).fill(DB32.rope);
 }
 
+// Apple tree — the orchard's: a short crooked trunk, a round crown going
+// yellow at the edges, and the last red apples in it. 20 wide × 28 tall.
+export function drawAppleTree(g: Graphics): void {
+  const trunk = DB32.oiledCedar;
+  g.rect(-2, -12, 4, 12).fill(trunk);
+  g.rect(-1, -12, 1, 12).fill(DB32.rope);
+  g.rect(2, -16, 2, 4).fill(trunk);
+  g.rect(-4, -15, 2, 3).fill(trunk);
+  g.rect(-9, -24, 18, 10).fill(DB32.dell);
+  g.rect(-7, -27, 14, 3).fill(DB32.dell);
+  g.rect(-10, -21, 20, 5).fill(DB32.dell);
+  g.rect(-6, -26, 8, 2).fill(DB32.christi);
+  g.rect(-9, -18, 3, 2).fill(DB32.rainforest);
+  g.rect(6, -22, 3, 3).fill(DB32.rainforest);
+  for (const [x, y] of [
+    [-6, -20],
+    [3, -24],
+    [6, -17],
+    [-2, -16],
+    [0, -21],
+  ] as const) {
+    g.rect(x, y, 2, 2).fill(DB32.clairvoyant);
+    g.rect(x, y, 1, 1).fill(DB32.brown);
+  }
+}
+
 // Every species by id, so a plant is placed by name and can never be handed
 // the wrong drawing — and so the book and the world are guaranteed to show
 // the same thing.
@@ -334,4 +361,5 @@ export const PLANTS: Record<FloraId, PlantDrawing> = {
   'bean-trellis': { draw: drawBeanTrellis, height: 19 },
   sunflower: { draw: drawSunflower, height: 24 },
   heather: { draw: drawHeather, height: 6 },
+  'apple-tree': { draw: drawAppleTree, height: 27 },
 };

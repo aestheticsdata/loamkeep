@@ -28,6 +28,10 @@ const GRANITE_HI = 0x58627a;
 const GRANITE_CRACK = 0x232836;
 const LICHEN = 0x7d8a6a;
 const PUFFBALL = 0xd9c6de;
+// Autumn turf: grass gone the colour of straw in the low sun.
+const TURF = 0x9a8a3e;
+const TURF_LIGHT = 0xd2c26a;
+const TURF_DARK = 0x6c5e2a;
 const PUFFBALL_SHADE = 0xa98fb4;
 
 // Tile type. Uses a const object (not enum) so it plays nicely with
@@ -51,6 +55,8 @@ const PUFFBALL_SHADE = 0xa98fb4;
 //              in night colours rather than tinted, and not the meadow's
 //              grass, earth and brick: frost on the heath, roots in the
 //              peat, granite in irregular blocks with lichen on it.
+//   - Turf:    AutumnTurf, the kitchen garden's ground: grass gone gold, with
+//              fallen leaves on it — not the meadow's green.
 //   - Puffball: a giant mushroom cap on the hill. Solid, and it bounces
 //              whoever lands on it (see Player).
 //   - Timber:  the belfry's beams and plank floors. Warm brown against
@@ -77,6 +83,7 @@ export const Tile = {
   Peat: 16,
   Granite: 17,
   Puffball: 18,
+  AutumnTurf: 19,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -102,6 +109,7 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   p: Tile.Peat,
   g: Tile.Granite,
   U: Tile.Puffball,
+  a: Tile.AutumnTurf,
 };
 
 const TILE_COLORS: Record<Tile, number> = {
@@ -151,6 +159,7 @@ const TILE_COLORS: Record<Tile, number> = {
   [Tile.Peat]: PEAT,
   [Tile.Granite]: GRANITE,
   [Tile.Puffball]: PUFFBALL,
+  [Tile.AutumnTurf]: TURF,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -180,6 +189,7 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.Peat]: true,
   [Tile.Granite]: true,
   [Tile.Puffball]: true,
+  [Tile.AutumnTurf]: true,
 };
 
 export class Tilemap {
@@ -500,6 +510,9 @@ function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: nu
       break;
     case Tile.Granite:
       drawGranite(g, x, y, tx, ty);
+      break;
+    case Tile.AutumnTurf:
+      drawAutumnTurf(g, x, y, tx, ty);
       break;
   }
 }
@@ -892,6 +905,29 @@ function drawPuffball(g: Graphics, x: number, y: number, tx: number): void {
   g.rect(x + 10 - (tx % 2) * 4, y + 5, 2, 1).fill(PUFFBALL_SHADE);
 }
 
+// Autumn turf: a lit top edge, straw-coloured blades standing up out of it,
+// a band of soil underneath, and fallen leaves lying on it — two or three a
+// tile, in the garden's reds and golds, placed by hash.
+function drawAutumnTurf(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  g.rect(x, y, TILE_SIZE, 1).fill(TURF_LIGHT);
+  g.rect(x, y + TILE_SIZE - 6, TILE_SIZE, 6).fill(DB32.oiledCedar);
+  for (let i = 0; i < TILE_SIZE; i += 3) {
+    g.rect(x + i + (ty & 1), y + TILE_SIZE - 7, 1, 1).fill(DB32.oiledCedar);
+  }
+  for (let i = 0; i < 3; i++) {
+    const bx = Math.floor(tileHash(tx, ty, 260 + i) * TILE_SIZE);
+    g.rect(x + bx, y - 1, 1, 2).fill(TURF_DARK);
+  }
+  const leaves = [DB32.tahitiGold, DB32.clairvoyant, DB32.rope];
+  for (let i = 0; i < 3; i++) {
+    if (tileHash(tx, ty, 270 + i) < 0.55) {
+      const lx = 1 + Math.floor(tileHash(tx, ty, 273 + i) * (TILE_SIZE - 3));
+      const ly = 2 + Math.floor(tileHash(tx, ty, 276 + i) * 5);
+      g.rect(x + lx, y + ly, 2, 1).fill(leaves[i]);
+    }
+  }
+}
+
 // Golden classical column. Vertical "round column" shading per tile: a
 // bright fluting line on the left (catching the light), a deep shadow band
 // on the right (the column receding into the room), and a centre seam to
@@ -985,6 +1021,63 @@ export function renderGrottoBackdrop(width: number, startY: number, endY: number
       } else if (h < 0.2) {
         g.rect(x, y, h < 0.08 ? 2 : 1, 1).fill(GROTTO_BACK_GRAIN);
       }
+    }
+  }
+  return g;
+}
+
+// Library backdrop — the wall behind the stacks: dark wood, a shelf every
+// 24 px, and on each shelf a row of spines in colours muted almost to the
+// wood's, so the room reads as books all the way up without the back wall
+// ever competing with the stacks in front of it. Sampled per spine, not per
+// pixel, so a hall this size is a few thousand rects.
+const LIBRARY_BACK = 0x1c1418;
+const LIBRARY_SHELF = 0x2e2018;
+const LIBRARY_SPINES = [0x3a2228, 0x2a2a3a, 0x24342a, 0x3a3020, 0x302430] as const;
+
+export function renderLibraryBackdrop(width: number, startY: number, endY: number): Graphics {
+  const g = new Graphics();
+  g.rect(0, startY, width, endY - startY).fill(LIBRARY_BACK);
+  for (let y = startY + 20; y < endY; y += 24) {
+    g.rect(0, y, width, 2).fill(LIBRARY_SHELF);
+    let x = 0;
+    let i = 0;
+    while (x < width) {
+      const n = (x * 374761393 + y * 668265263 + i) | 0;
+      const h = (((n ^ (n >>> 13)) * 1274126177) >>> 0) / 0xffffffff;
+      const w = 2 + Math.floor(h * 3);
+      const tall = 12 + Math.floor(h * 7);
+      if (h > 0.08) g.rect(x, y - tall, w, tall).fill(LIBRARY_SPINES[Math.floor(h * 97) % LIBRARY_SPINES.length]);
+      x += w + (h < 0.15 ? 3 : 1);
+      i += 1;
+    }
+  }
+  // Pilasters every 160 px break the wall into bays.
+  for (let x = 72; x < width; x += 160) g.rect(x, startY, 10, endY - startY).fill(LIBRARY_SHELF);
+  return g;
+}
+
+// Masonry backdrop — the cistern's back wall: blocks 32 × 16 in running bond,
+// darker than the crypt brick in front, damp streaks running down from some
+// joints, and the odd patch of moss. Sampled per block.
+const MASONRY_BACK = 0x14171c;
+const MASONRY_JOINT = 0x0a0c10;
+const MASONRY_LIGHT = 0x1c2128;
+const MASONRY_DAMP = 0x101820;
+
+export function renderMasonryBackdrop(width: number, startY: number, endY: number): Graphics {
+  const g = new Graphics();
+  g.rect(0, startY, width, endY - startY).fill(MASONRY_BACK);
+  for (let y = startY; y < endY; y += 16) {
+    g.rect(0, y, width, 1).fill(MASONRY_JOINT);
+    const offset = ((y - startY) / 16) % 2 === 0 ? 0 : 16;
+    for (let x = -offset; x < width; x += 32) {
+      g.rect(x, y, 1, 16).fill(MASONRY_JOINT);
+      const n = (x * 374761393 + y * 668265263) | 0;
+      const h = (((n ^ (n >>> 13)) * 1274126177) >>> 0) / 0xffffffff;
+      if (h < 0.3) g.rect(x + 2, y + 2, 26, 1).fill(MASONRY_LIGHT);
+      if (h > 0.85) g.rect(x + 6 + Math.floor(h * 16), y + 1, 2, 30).fill(MASONRY_DAMP);
+      if (h > 0.6 && h < 0.63) g.rect(x + 4, y + 11, 8, 4).fill(0x1e2a1e);
     }
   }
   return g;

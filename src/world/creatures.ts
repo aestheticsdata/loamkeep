@@ -1,18 +1,27 @@
 import { DB32 } from '@constants';
 import { drawBatLarge } from '@entities/bat';
+import { drawBeeLarge } from '@entities/bees';
 import { drawBird } from '@entities/bird';
+import { drawBookworm } from '@entities/bookworm';
+import { drawCat } from '@entities/cat';
+import { drawCrab } from '@entities/crab';
+import { drawEel } from '@entities/eel';
 import { drawFirefliesLarge } from '@entities/fireflies';
 import { drawFishLarge } from '@entities/fish';
 import { drawFrog } from '@entities/frog';
 import { drawGlowfishLarge } from '@entities/glowfish';
 import { drawHare } from '@entities/hare';
 import { drawHedgehog } from '@entities/hedgehog';
+import { drawHen } from '@entities/hen';
 import { drawMothLarge } from '@entities/moth';
+import { drawMouse } from '@entities/mouse';
 import { drawNewt } from '@entities/newt';
 import { drawOwl } from '@entities/owl';
+import { drawPigeon } from '@entities/pigeon';
 import { drawPumpkin } from '@entities/pumpkin';
 import { drawRabbit } from '@entities/rabbit';
 import { drawSnail } from '@entities/snail';
+import { drawSpider } from '@entities/spider';
 import { type SketchbookPage, scaledSketch } from '@systems/sketchbook';
 
 // The creatures sketchbook's table of contents: one page per species, in the
@@ -41,7 +50,16 @@ export type CreatureId =
   | 'snail'
   | 'frog'
   | 'fireflies'
-  | 'newt';
+  | 'newt'
+  | 'hen'
+  | 'mouse'
+  | 'bees'
+  | 'cat'
+  | 'bookworm'
+  | 'crab'
+  | 'eel'
+  | 'pigeon'
+  | 'spider';
 
 export interface CreaturePage {
   id: CreatureId;
@@ -196,6 +214,96 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
         'Orange as a coal, with black spots, on the wet rock by the underground lake. It goes in little dashes ' +
         'and stops dead in between, as if it had just remembered something, every single time.',
       drawSketch: scaledSketch((g) => drawNewt(g, 0), 5, -4, 0),
+    },
+  },
+  {
+    id: 'hen',
+    page: {
+      name: 'Hen',
+      description:
+        'Brown, round and very sure of itself. It strolls the kitchen garden as if it owned it, stops dead to ' +
+        'peck at the turf, finds nothing, and strolls on, delighted all the same.',
+      drawSketch: scaledSketch((g) => drawHen(g, false), 4, -11, 0),
+    },
+  },
+  {
+    id: 'mouse',
+    page: {
+      name: 'Cellar Mouse',
+      description:
+        'Grey, all whiskers, and either perfectly still or already somewhere else. It lives among the jars in ' +
+        'the root cellar and has nibbled the corner off every seed packet but one.',
+      drawSketch: scaledSketch((g) => drawMouse(g, 0), 6, -6, 0),
+    },
+  },
+  {
+    id: 'bees',
+    page: {
+      name: 'Bees',
+      description:
+        'A knot of bees over each hive, flying small fast loops and never colliding. It is late in the year ' +
+        'for them, and they seem to know it: nobody stops.',
+      drawSketch: scaledSketch(drawBeeLarge, 5, -8, 0),
+    },
+  },
+  {
+    id: 'cat',
+    page: {
+      name: 'Library Cat',
+      description:
+        'Ginger, round and asleep, always on the one warm board in the building. It has been here longer than ' +
+        'some of the books, and it opens one eye when you pass as if to check you are not one of them.',
+      drawSketch: scaledSketch((g) => drawCat(g, { stretching: false, flick: 0 }), 4, -8, 0),
+    },
+  },
+  {
+    id: 'bookworm',
+    page: {
+      name: 'Bookworm',
+      description:
+        'A small green worm in spectacles, inching along the tops of the stacks. Every book it has passed has ' +
+        'a neat round hole through the middle of the longest word.',
+      drawSketch: scaledSketch((g) => drawBookworm(g, 1), 6, -4, 0),
+    },
+  },
+  {
+    id: 'crab',
+    page: {
+      name: 'Cistern Crab',
+      description:
+        'A small red crab on the ledges of the cistern, going sideways with great purpose. It never once turns ' +
+        'round; when it wants to go back, it simply goes the other way, still facing you.',
+      drawSketch: scaledSketch((g) => drawCrab(g, 1), 5, -7, 0),
+    },
+  },
+  {
+    id: 'eel',
+    page: {
+      name: 'Eel',
+      description:
+        'Long, olive and unhurried, winding between the columns under the water. It gives every swimmer a wide ' +
+        'berth and a hurt look, as if it had heard what people say about eels.',
+      drawSketch: scaledSketch((g) => drawEel(g, 0), 4, -3, 1),
+    },
+  },
+  {
+    id: 'pigeon',
+    page: {
+      name: 'Pigeon',
+      description:
+        'Grey, with a sheen of green and purple at the neck, strutting the ledges of the belfry as if it owned ' +
+        'the place. It bobs its head with every step, and looks at you as if you owed it something.',
+      drawSketch: scaledSketch((g) => drawPigeon(g, 0), 4, -9, 0),
+    },
+  },
+  {
+    id: 'spider',
+    page: {
+      name: 'Spider',
+      description:
+        'Small and round, on a thread from the clock room ceiling, letting itself down and winding itself back ' +
+        'up again all night, in time with the clock, as near as anyone can tell.',
+      drawSketch: scaledSketch((g) => drawSpider(g, 0), 5, -10, 0),
     },
   },
 ];

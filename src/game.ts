@@ -49,6 +49,8 @@ import {
   renderCryptBackdrop,
   renderGrottoBackdrop,
   renderIndoorBackdrop,
+  renderLibraryBackdrop,
+  renderMasonryBackdrop,
   renderRockBackground,
   renderTilemap,
   renderWaterBody,
@@ -554,6 +556,10 @@ export class Game {
         backdrop = renderCryptBackdrop(width, top, bottom);
       } else if (level.spec.backdrop === 'grotto') {
         backdrop = renderGrottoBackdrop(width, top, bottom);
+      } else if (level.spec.backdrop === 'library') {
+        backdrop = renderLibraryBackdrop(width, top, bottom);
+      } else if (level.spec.backdrop === 'masonry') {
+        backdrop = renderMasonryBackdrop(width, top, bottom);
       } else {
         backdrop = renderIndoorBackdrop(width, top, bottom);
       }

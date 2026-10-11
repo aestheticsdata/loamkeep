@@ -90,6 +90,10 @@ src/
     spores.ts / kelp.ts  # Moving scenery: rising spores, swaying lake kelp
     moth.ts         # Grotto wildlife — circles a glowcap
     falling-leaf.ts # The kitchen garden's leaves, drifting down
+    hen.ts / mouse.ts / bees.ts  # The kitchen garden's crowd
+    cat.ts / bookworm.ts  # The library's: a cat on the stacks, a bookworm in the shelves
+    crab.ts / eel.ts  # The cistern's: a crab on the stones, an eel that greets you swimming
+    pigeon.ts / spider.ts  # The belfry's: pigeons on the ledges, spiders on their threads
     glow.ts         # Soft round light behind glowing things
     plants.ts       # Every flora species, drawn once for world and book
     bird.ts         # Flying wildlife — silhouette + 2-frame flap
@@ -119,11 +123,11 @@ src/
       meadow.ts          # Outdoor starting area
       old-keep.ts        # Indoor castle interior
       old-keep-crypt.ts  # Underground crypt
-      old-keep-belfry.ts # The bell tower, climbed to the roof at night
-      flooded-cistern.ts # The swimming level under the crypt
+      old-keep-belfry.ts # 90×120 bell tower at night: floors and ladders inside, ledges up both faces, the spire
+      flooded-cistern.ts # 150×80 under the crypt: flooded hall, aqueduct bridge, pump room, drain, dry shrine
       glow-grotto.ts     # 160×90 underground: mushroom forest, warrens, lake, echo chamber
-      kitchen-garden.ts  # The walled autumn garden, the pumpkin's home
-      old-keep-library.ts  # Behind the bookshelf: stacks and ladders
+      kitchen-garden.ts  # 170×72 walled autumn garden: greenhouse, orchard, pond, well and cellar, dovecote
+      old-keep-library.ts  # 120×100 behind the bookshelf: four galleries, two staircases, the dome, the archives
       cairn-observatory.ts # 192×100 hill at night: moor and warren, face, puffballs, bridge, tor, caves
     parallax.ts     # Procedural parallax background (per-flavor)
 ```
@@ -174,27 +178,29 @@ src/
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
   under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old
   name so no save is orphaned; a v1 blob migrates into the `landmarks` book on
-  read). A book's entry reads `LANDMARKS 3/23` and opens a gallery of them,
+  read). A book's entry reads `LANDMARKS 3/31` and opens a gallery of them,
   ending on a count of the pages still blank — never their names. The count is
-  there from the start: a book nothing has been found in reads `LANDMARKS 0/23`,
+  there from the start: a book nothing has been found in reads `LANDMARKS 0/31`,
   dimmed and skipped by the cursor, because the denominator is what tells a new
   player how much there is to find.
 - **Per-level visual flavor**: each level picks its own parallax flavor
   (`meadow` rolling hills, `keep` indoor backdrop, `night` stars, a moon and
-  dark hills that slide on both axes, behind the belfry's open chamber and
-  roof, `autumn` a low sun in banded evening sky over the kitchen garden,
+  dark hills that slide on both axes, behind the belfry's faces and
+  spire, `autumn` a low sun in banded evening sky over the kitchen garden,
   `zenith` the observatory's dense stars with the spiral picked out in them)
   and backdrop kind (`cave`
   rock texture, `indoor-dark` flat near-black, `crypt-black` pure black for
   candle-lit underground, `grotto` deep blue rock with grain, strata and cyan
-  glints, so the glow grotto's halls have a back wall to see). The backdrop is normally one band from a given row
+  glints, so the glow grotto's halls have a back wall to see, `library` shelved
+  walls, `masonry` dressed stone for the cistern and the inside of the belfry). The backdrop is normally one band from a given row
   down; a level can instead name `backdropRegions`, so the observatory's caves
   are black inside a hill with open sky either side of it.
 - **Expanded tile palette**: grass / dirt / stone / dark stone (outdoor),
   castle brick / castle floor / gold pillar (castle interior), crypt brick /
   crypt floor (deep underground), timber beams and plank floors (the belfry),
   grotto rock, bookcases and ladders (the library), heath, peat and granite
-  (the observatory hill, drawn in night colours), plus water. Authored in ASCII — each
+  (the observatory hill, drawn in night colours), autumn turf (the kitchen
+  garden), puffballs, plus water. Authored in ASCII — each
   character maps to one tile type.
 - **Water mechanics**: wade on submerged ground at reduced speed, swim freely
   off-ground, hold jump to rise, hold down to dive. Exit-pop boost when
@@ -206,7 +212,8 @@ src/
   drifts to the middle of the ladder's column, and leaving the top with
   upward speed gets the same pop as leaving water, enough to step onto the
   ledge the ladder leans against.
-- **Puffballs**: giant mushroom caps on the observatory hill. Landing on one
+- **Puffballs**: giant mushroom caps on the observatory hill, and in the
+  garden and the cistern's pump room. Landing on one
   throws the player up about eight tiles; hold ↓ to land without the bounce.
 - **A map of the world**: MAP OF THE WORLD on the title opens a parchment sheet
   with every place on it, the paths between them, and — for the one in hand —
@@ -220,7 +227,9 @@ src/
 - **Wildlife**: rabbits pacing platforms, fish swimming in water bodies, birds
   silhouetted across the sky, a hopping pumpkin with its own gravity, owls
   perched in the belfry, glowfish lighting the cistern, moths circling the
-  grotto's glowcaps. None collide with the
+  grotto's glowcaps, hens and bees in the garden, a cat and a bookworm in the
+  library, crabs and an eel in the cistern, pigeons and spiders in the belfry.
+  None collide with the
   player; they just inhabit the world.
 - **First-encounter greetings**: the first time you bump into any creature, a
   parchment popup pauses gameplay with a small line of speech ("Got a carrot

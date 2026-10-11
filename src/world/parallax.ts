@@ -20,27 +20,30 @@ interface ParallaxLayer {
 
 // The night sky behind the belfry. Unlike the meadow's, its layers are drawn
 // in SCREEN space and slide by a fraction of the camera on both axes, so the
-// stars barely move while the player climbs forty rows past them.
+// stars barely move while the player climbs a hundred rows past them.
 //
-// NIGHT_HORIZON_Y is where the far hills' foot sits on screen with the camera
-// at y = 0, tuned to the belfry: from the bell chamber (camera ≈ 180) the hills
-// show just above its floor, and from the roof's peak (camera ≈ -60) they sink
-// to the bottom of the screen.
+// The hills' horizon is worked out from the level's height (nightHorizonY):
+// with the camera at the bottom of the level — the belfry's roof walk — the
+// far hills' foot sits low on the screen, and as the player climbs the tower
+// they sink out of view, until from the spire there is only sky.
+const NIGHT_HILLS_BOTTOM_Y = 176;
+// Where the horizon glow starts, with the camera as low as it goes.
+const NIGHT_GLOW_TOP_Y = 168;
 const NIGHT_SKY = DB32.valhalla;
 const NIGHT_GLOW = DB32.deepKoamaru;
 const NIGHT_HILLS_FAR = 0x18162a;
 const NIGHT_HILLS_NEAR = 0x0e0d16;
-const NIGHT_HORIZON_Y = 204;
-const NIGHT_HILLS_FY = 0.3;
+const NIGHT_HILLS_FY = 0.08;
 const NIGHT_STARS_FY = 0.06;
 const NIGHT_MOON_FY = 0.03;
 
 // The kitchen garden's evening. Its layers track the camera 1:1 vertically
-// like the meadow's, so the horizon stays glued to the garden's soil row
-// (row 14), which is what AUTUMN_HORIZON_Y is. The sky is bands of warm to
+// like the meadow's, so the horizon stays glued to the garden's ground,
+// which is what AUTUMN_HORIZON_Y is. The sky is bands of warm to
 // cool from the horizon up, dithered at each seam: the copper bars the meadow
-// gave up for a flat blue, which an evening needs.
-const AUTUMN_HORIZON_Y = 14 * 16;
+// gave up for a flat blue, which an evening needs. The garden's ground is row
+// 56; its dovecote's roof is forty rows above it.
+const AUTUMN_HORIZON_Y = 56 * 16;
 
 // The observatory's sky. Screen-space like the night's, but deeper and far
 // fuller, with a band of faint dust across it and the spiral constellation
@@ -97,7 +100,7 @@ export class ParallaxBackground {
     } else if (flavor === 'autumn') {
       this.buildAutumnLayers(levelWidthPx);
     } else if (flavor === 'night') {
-      this.buildNightLayers(levelWidthPx);
+      this.buildNightLayers(levelSize);
     } else if (flavor === 'keep') {
       // Indoor flavor: no sky, no hills. The rock backdrop in the world
       // container handles every visible "behind the walls" pixel. If we
@@ -121,28 +124,39 @@ export class ParallaxBackground {
     }
   }
 
-  private buildNightLayers(levelWidthPx: number): void {
+  private buildNightLayers(levelSize: Vec2): void {
+    const levelWidthPx = levelSize.x;
+    // Where the hills' foot must sit (with no camera offset) for it to land at
+    // NIGHT_HILLS_BOTTOM_Y when the camera is as low as this level lets it go.
+    const nightHorizonY = NIGHT_HILLS_BOTTOM_Y + Math.max(0, levelSize.y - SCREEN_HEIGHT) * NIGHT_HILLS_FY;
+    const fieldHeight = SCREEN_HEIGHT + levelSize.y * NIGHT_STARS_FY;
     const width = levelWidthPx + SCREEN_WIDTH;
 
-    // Sky: one flat night blue glued to the viewport, with a lighter band
-    // low down where the horizon glows. 1-px dither on the seam, the
-    // copper-bar treatment the meadow's sky dropped and the night keeps.
+    // Sky: one flat night blue glued to the viewport.
     const sky = new Graphics();
     sky.rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT).fill(NIGHT_SKY);
-    sky.rect(0, 168, SCREEN_WIDTH, SCREEN_HEIGHT - 168).fill(NIGHT_GLOW);
-    for (let x = 0; x < SCREEN_WIDTH; x += 2) {
-      sky.rect(x + ((x >> 1) & 1), 167, 1, 1).fill(NIGHT_GLOW);
-    }
     this.addLayer(sky, { x: 0, y: 0 });
 
-    this.addLayer(makeStarField(width, 0x5eed), { x: NIGHT_STARS_FY, y: NIGHT_STARS_FY });
+    // A lighter band low down where the horizon glows, just above the far
+    // hills and scrolling with them, so a tall level's camera never sees it
+    // hanging in the sky with the hills gone below. 1-px dither on the seam,
+    // the copper-bar treatment the meadow's sky dropped and the night keeps.
+    const glowTop = nightHorizonY - (NIGHT_HILLS_BOTTOM_Y - NIGHT_GLOW_TOP_Y);
+    const glow = new Graphics();
+    glow.rect(0, glowTop, SCREEN_WIDTH, 400).fill(NIGHT_GLOW);
+    for (let x = 0; x < SCREEN_WIDTH; x += 2) {
+      glow.rect(x + ((x >> 1) & 1), glowTop - 1, 1, 1).fill(NIGHT_GLOW);
+    }
+    this.addLayer(glow, { x: 0, y: NIGHT_HILLS_FY });
+
+    this.addLayer(makeStarField(width, 0x5eed, fieldHeight), { x: NIGHT_STARS_FY, y: NIGHT_STARS_FY });
     this.addLayer(makeMoon(), { x: NIGHT_MOON_FY, y: NIGHT_MOON_FY });
 
     this.addLayer(
       makeHillSilhouette({
         width,
-        horizonY: NIGHT_HORIZON_Y,
-        baseY: NIGHT_HORIZON_Y + 400,
+        horizonY: nightHorizonY,
+        baseY: nightHorizonY + 400,
         maxHeight: 28,
         pointSpacing: 24,
         frequency: 0.5,
@@ -154,8 +168,8 @@ export class ParallaxBackground {
     this.addLayer(
       makeHillSilhouette({
         width,
-        horizonY: NIGHT_HORIZON_Y + 14,
-        baseY: NIGHT_HORIZON_Y + 400,
+        horizonY: nightHorizonY + 14,
+        baseY: nightHorizonY + 400,
         maxHeight: 20,
         pointSpacing: 12,
         frequency: 0.9,
@@ -438,7 +452,7 @@ function makeMoon(): Graphics {
 // far above any camera position, as the meadow's does.
 function makeAutumnSky(width: number): Graphics {
   const g = new Graphics();
-  const top = AUTUMN_HORIZON_Y - 420;
+  const top = AUTUMN_HORIZON_Y - 1400;
   for (let i = 0; i < AUTUMN_BANDS.length; i++) {
     const [start, color] = AUTUMN_BANDS[i];
     const end = i + 1 < AUTUMN_BANDS.length ? AUTUMN_BANDS[i + 1][0] : AUTUMN_HORIZON_Y - top;

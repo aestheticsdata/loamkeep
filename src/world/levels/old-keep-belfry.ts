@@ -1,121 +1,253 @@
 import { DB32, TILE_SIZE } from '@constants';
+import { Bat } from '@entities/bat';
 import type { DecorationSpec } from '@entities/decoration';
 import { Door } from '@entities/door';
 import type { Entity } from '@entities/entity';
 import type { LandmarkSpec } from '@entities/landmark';
 import { Owl } from '@entities/owl';
+import { Pigeon } from '@entities/pigeon';
+import { Spider } from '@entities/spider';
 import { TallCandle } from '@entities/tall-candle';
 import type { LevelSpec, SpawnPoint } from '@world/level';
 import type { Graphics } from 'pixi.js';
 
-// The Belfry — the keep's bell tower, climbed from the upper floor to the
-// roof, at night.
+// The Belfry — the keep's bell tower, climbed inside and out, at night.
 //
-// 24 wide × 41 tall (cols 0-1 and 22-23 are the tower walls). A full jump
-// peaks at ~67 px, so no climb asks for more than 3 tiles up, and every
-// storey has five rows of air: a jump from its floor can graze the boards
-// above (~3 px) but has already cleared the ledge it is going for.
+// 90 wide × 120 tall. The tower stands on the keep (its roof walk is row 100,
+// either side) with walls two tiles thick (cols 29-30, 59-60):
 //
-//   Roof (rows 4-10) — slate steps up to the peak, under an open sky. The
-//     hatch at cols 4-5 in the eaves (row 10) is the way out onto it.
+//   The ground floor (row 115) — the door back down into the keep; two
+//     ladders up to the first floor (row 100), whose windows open on the
+//     keep's roof walk both sides.
+//   Up inside — a zigzag of ledges from the first floor to the clock room
+//     (floor 85, the Tower Clock); a ladder to floor 70; a ladder to the bell
+//     chamber (floor 55, the Silent Bell on its beam); a ladder to the loft
+//     (floor 40), with a gap in its floor to drop onto the bell's beam.
+//   Up outside — from the west roof walk, ledges up the west face to a
+//     balcony and a window back in on floor 70; from the clock room's window,
+//     ledges up the east face past the bell chamber's and the loft's windows
+//     to the top of the wall, and from there up the stepped spire to the
+//     Weathervane. The outside is the only way to the top.
 //
-//   Bell chamber (rows 11-19, floor row 20) — open-sided: the backdrop
-//     stops at row 20, so the night sky shows through the arches in the
-//     walls and behind the bell. The bell hangs from its beam (row 14,
-//     cols 17-21) over the ringers' floor, right of the stairwell, where a
-//     player coming up it lands.
-//     Climb, west of the stairwell: brick step (rows 18-19, cols 11-13, two
-//     tiles up) → beam (row 16, cols 7-9, two up) → hatch ledge (row 13,
-//     cols 2-5, three up) → straight up through the hatch. Two-tile steps
-//     can sit diagonally off each other's corners; the one three-tile jump
-//     has a column of air before its ledge, because a 3-tile target that
-//     starts in the very next column catches the player's head under its
-//     corner before the feet are high enough.
-//
-//   The shaft (rows 21-37) — three storeys of plank floors, each with a
-//     stairwell hole on alternate sides (row 32 cols 15-16, row 26 cols 5-6,
-//     row 20 cols 15-16). Under every hole, three rows down, a ledge: hop
-//     onto it from the floor, then jump straight up through the hole. A fall
-//     back through a hole lands on that same ledge, so a slip costs one
-//     storey, never the whole tower.
-//
-//   Ground floor (row 38) — the door back down to the keep's upper floor.
+// Every jump is two rows up, or three with a column of air before the ledge
+// and nothing overhead. Checked with a port of the player's physics: every
+// place is reachable from the door, and the door from every place.
 //
 // Legend (see CHAR_TO_TILE in tilemap.ts):
-//   . empty   B CastleBrick   F CastleFloor   T Timber   K DarkStone (slate)
+//   . empty   B CastleBrick   F CastleFloor   T Timber   H ladder
 const OLD_KEEP_BELFRY_ROWS = [
-  '........................', //  0  night sky
-  '........................', //  1
-  '........................', //  2
-  '........................', //  3
-  '...........KK...........', //  4  roof peak (cols 11-12)
-  '..........KKKK..........', //  5
-  '.........KKKKKK.........', //  6
-  '........KKKKKKKK........', //  7
-  '.......KKKKKKKKKK.......', //  8
-  '......KKKKKKKKKKKK......', //  9
-  'BBKK..KKKKKKKKKKKKKKKKBB', // 10  eaves — the hatch at cols 4-5
-  'BB....................BB', // 11  arch lintels
-  '........................', // 12  open arches (rows 12-17)
-  '..TTTT..................', // 13  hatch ledge (cols 2-5)
-  '.................TTTTT..', // 14  bell beam (cols 17-21)
-  '........................', // 15
-  '.......TTT..............', // 16  beam (cols 7-9)
-  '........................', // 17
-  'BB.........BBB........BB', // 18  arch sills + brick step (cols 11-13)
-  'BB.........BBB........BB', // 19
-  'BBFFFFFFFFFFFFF..FFFFFBB', // 20  RINGERS' FLOOR — hole at cols 15-16
-  'BB....................BB', // 21  storey 3
-  'BB....................BB', // 22
-  'BB............TTTTT...BB', // 23  ledge under the row-20 hole (cols 14-18)
-  'BB....................BB', // 24
-  'BB....................BB', // 25
-  'BBTTT..TTTTTTTTTTTTTTTBB', // 26  floor — hole at cols 5-6
-  'BB....................BB', // 27  storey 2
-  'BB....................BB', // 28
-  'BB.TTTTTT.............BB', // 29  ledge under the row-26 hole (cols 3-8)
-  'BB....................BB', // 30
-  'BB....................BB', // 31
-  'BBTTTTTTTTTTTTT..TTTTTBB', // 32  floor — hole at cols 15-16
-  'BB....................BB', // 33  storey 1
-  'BB....................BB', // 34
-  'BB............TTTTT...BB', // 35  ledge under the row-32 hole (cols 14-18)
-  'BB....................BB', // 36
-  'BB....................BB', // 37
-  'BBFFFFFFFFFFFFFFFFFFFFBB', // 38  GROUND FLOOR
-  'BBBBBBBBBBBBBBBBBBBBBBBB', // 39  foundation
-  'BBBBBBBBBBBBBBBBBBBBBBBB', // 40
+  '..........................................................................................', //  0
+  '..........................................................................................', //  1
+  '..........................................................................................', //  2
+  '..........................................................................................', //  3
+  '..........................................................................................', //  4
+  '..........................................................................................', //  5
+  '............................................BB............................................', //  6  the spire's peak (cols 44-45) — the Weathervane
+  '...........................................BBBB...........................................', //  7
+  '..........................................BBBBBB..........................................', //  8
+  '.........................................BBBBBBBB.........................................', //  9
+  '........................................BBBBBBBBBB........................................', // 10
+  '.......................................BBBBBBBBBBBB.......................................', // 11
+  '......................................BBBBBBBBBBBBBB......................................', // 12
+  '.....................................BBBBBBBBBBBBBBBB.....................................', // 13
+  '....................................BBBBBBBBBBBBBBBBBB....................................', // 14
+  '...................................BBBBBBBBBBBBBBBBBBBB...................................', // 15
+  '..................................BBBBBBBBBBBBBBBBBBBBBB..................................', // 16
+  '.................................BBBBBBBBBBBBBBBBBBBBBBBB.................................', // 17
+  '................................BBBBBBBBBBBBBBBBBBBBBBBBBB................................', // 18
+  '...............................BBBBBBBBBBBBBBBBBBBBBBBBBBBB...............................', // 19  the spire, stepped, on the tower's roof base
+  '.............................BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.............................', // 20  the roof base, and the top of the tower wall (cols 59-60) at the east face's last ledge
+  '.............................BB............................BB.............................', // 21
+  '.............................BB............................BBBBB..........................', // 22
+  '.............................BB............................BB.............................', // 23
+  '.............................BB............................BB.............................', // 24
+  '.............................BB............................BB.....BBB.....................', // 25
+  '.............................BB............................BB.............................', // 26
+  '.............................BB............................BB.............................', // 27
+  '.............................BB............................BBBBB..........................', // 28
+  '.............................BB............................BB.............................', // 29
+  '.............................BB............................BB.............................', // 30
+  '.............................BB............................BB.....BBB.....................', // 31
+  '.............................BB............................BB.............................', // 32
+  '.............................BB............................BB.............................', // 33
+  '.............................BB............................BBBBB..........................', // 34
+  '.............................BB............................BB.............................', // 35
+  '.............................BB............................BB.............................', // 36
+  '.............................BB...................................BBB.....................', // 37  the loft's window onto the east face (rows 37-39)
+  '.............................BB...........................................................', // 38
+  '.............................BBT.T........................................................', // 39
+  '.............................BBTHTTTTTTTTTTTTTT..TTTTTTTTTTBBBBB..........................', // 40  THE LOFT FLOOR, its ladder hole at col 32 and a gap over the bell beam (cols 47-48)
+  '.............................BB.H..........................BB.............................', // 41
+  '.............................BB.H..........................BB.............................', // 42
+  '.............................BB.H..........................BB.....BBB.....................', // 43
+  '.............................BB.H.........TTTTTTTT.........BB.............................', // 44  the bell's beam (cols 42-49)
+  '.............................BB.H..........................BB.............................', // 45
+  '.............................BB.H..........................BBBBB..........................', // 46
+  '.............................BB.H..........................BB.............................', // 47
+  '.............................BB.H..........................BB.............................', // 48
+  '.............................BB.H..........................BB.....BBB.....................', // 49
+  '.............................BB.H..........................BB.............................', // 50
+  '.............................BB.H..........................BB.............................', // 51
+  '.............................BB.H............................BBB..........................', // 52  the bell chamber's window onto the east face (rows 52-54)
+  '.............................BB.H.........................................................', // 53
+  '.............................BB.H.T.T.....................................................', // 54
+  '.............................BBTTTTHTTTTTTTTTTTTTTTTTTTTTTTBB.....BBB.....................', // 55  THE BELL CHAMBER FLOOR, its ladder hole at col 35
+  '.............................BB....H.......................BB.............................', // 56
+  '.............................BB....H.......................BB.............................', // 57
+  '.............................BB....H.......................BBBBB..........................', // 58
+  '.............................BB....H.......................BB.............................', // 59
+  '.............................BB....H.......................BB.............................', // 60
+  '.............................BB....H.......................BB.....BBB.....................', // 61
+  '.............................BB....H.......................BB.............................', // 62
+  '.............................BB....H.......................BB.............................', // 63
+  '.............................BB....H.......................BBBBB..........................', // 64
+  '.............................BB....H.......................BB.............................', // 65
+  '.............................BB....H.......................BB.............................', // 66
+  '...................................H.......................BB.....BBB.....................', // 67  floor 70's west window onto the balcony (rows 67-69)
+  '...................................H.......................BB.............................', // 68
+  '...................................H...................T.T.BB.............................', // 69
+  '..........................BBBBBTTTTTTTTTTTTTTTTTTTTTTTTTHTTBBBBB..........................', // 70  FLOOR 70, its ladder hole at col 56; the west balcony (cols 26-28)
+  '.............................BB.........................H..BB.............................', // 71
+  '.............................BB.........................H..BB.............................', // 72
+  '......................BBB....BB.........................H..BB.....BBB.....................', // 73
+  '.............................BB.........................H..BB.............................', // 74
+  '.............................BB.........................H..BB.............................', // 75
+  '..........................BBBBB.........................H..BBBBB..........................', // 76
+  '.............................BB.........................H..BB.............................', // 77
+  '.............................BB.........................H..BB.............................', // 78
+  '......................BBB....BB.........................H..BB.....BBB.....................', // 79
+  '.............................BB.........................H..BB.............................', // 80
+  '.............................BB.........................H..BB.............................', // 81
+  '..........................BBBBB.........................H....BBB..........................', // 82  the clock room's window onto the east face (rows 82-84)
+  '.............................BB.........................H.................................', // 83
+  '.............................BB.........................H.................................', // 84
+  '......................BBB....BB..........TTTTTTTTTTTTTTTTTTBBBBBBBBBB.....................', // 85  THE CLOCK ROOM FLOOR (cols 41-58); the east sill (cols 61-68)
+  '.............................BB............................BB.............................', // 86
+  '.............................BB............................BB.............................', // 87
+  '..........................BBBBB......TTT...................BB.............................', // 88  the inside zigzag (cols 32-34 and 37-39), rows 88-97
+  '.............................BB............................BB.............................', // 89
+  '.............................BB............................BB.............................', // 90
+  '......................BBB....BB.TTT........................BB.............................', // 91
+  '.............................BB............................BB.............................', // 92
+  '.............................BB............................BB.............................', // 93
+  '..........................BBBBB......TTT...................BB.............................', // 94
+  '.............................BB............................BB.............................', // 95
+  '.............................BB............................BB.............................', // 96
+  '......................BBB.......TTT.......................................................', // 97  windows onto the keep's roof walk both sides (rows 97-99)
+  '..........................................................................................', // 98
+  '..BB....BB....BB.....................T.T.............T.T..................BB....BB....BB..', // 99
+  'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFBBTTTTTTTHTTTTTTTTTTTTTTTHTTTTBBFFFFFFFFFFFFFFFFFFFFFFFFFFFFF', // 100  THE FIRST FLOOR (inside) and the keep's roof walk (outside)
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 101
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 102
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 103
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 104
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 105
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 106
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 107
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 108
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 109
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 110
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 111
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 112
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 113
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB.......H...............H....BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 114
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBFFFFFFFFFFFFFFFFFFFFFFFFFFFFBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 115  THE GROUND FLOOR, two ladders up (cols 38, 54)
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 116
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 117
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 118
+  'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB', // 119
 ] as const;
 
-const GROUND_Y = 38 * TILE_SIZE;
-const RINGERS_FLOOR_Y = 20 * TILE_SIZE;
+const T = TILE_SIZE;
+const GROUND_Y = 115 * T;
+const FIRST_Y = 100 * T;
+const CLOCK_Y = 85 * T;
+const FLOOR70_Y = 70 * T;
+const CHAMBER_Y = 55 * T;
+const LOFT_Y = 40 * T;
 
-const RETURN_DOOR_X = 3 * TILE_SIZE + 8;
+const RETURN_DOOR_X = 33 * T + 8;
 
 const OLD_KEEP_BELFRY_SPAWNS: SpawnPoint[] = [
   // Two tiles right of the door, clear of its interaction zone.
-  { id: 'from-keep', x: 5 * TILE_SIZE + 2, y: GROUND_Y - TILE_SIZE },
+  { id: 'from-keep', x: 35 * T + 2, y: GROUND_Y - T },
 ];
 
 // ---------------------------------------------------------------------------
-// Landmark — the bell, on the ringers' floor under its beam.
+// Landmarks — the Tower Clock, the Silent Bell, the Weathervane.
 // ---------------------------------------------------------------------------
 
+// How far the underside of the bell's beam is above the chamber floor, and
+// how far the bell's headstock hangs below it, in pixels — low enough to be
+// seen from the floor.
+const BELL_HANG = 160;
+const BELL_DROP = 40;
+
+// The bell on two iron straps from its beam, drawn BELL_DROP lower than
+// drawBell expects, its rope reaching down toward the floor.
+function drawHungBell(g: Graphics): void {
+  g.rect(-7, -BELL_HANG, 2, BELL_HANG - 80 - BELL_DROP).fill(DB32.dimGray);
+  g.rect(5, -BELL_HANG, 2, BELL_HANG - 80 - BELL_DROP).fill(DB32.dimGray);
+  g.setTransform(1, 0, 0, 1, 0, -BELL_DROP);
+  drawBell(g);
+  g.resetTransform();
+}
+
 const OLD_KEEP_BELFRY_LANDMARKS: LandmarkSpec[] = [
-  // Anchored on the floor under the middle of its beam (cols 17-21) so the
-  // interaction zone is where the player stands; drawn hanging from the
-  // beam's underside, 80 px up.
+  {
+    id: 'tower-clock',
+    x: 50 * T,
+    y: CLOCK_Y,
+    name: 'Tower Clock',
+    description:
+      "The clockwork behind the tower's face: wheels within wheels, a pendulum as long as you are tall, all of " +
+      'it oiled and all of it stopped. The hands outside stand at a minute to midnight, and someone has wedged ' +
+      'the escapement with a carved wooden spiral, so that they will stay there.',
+    drawBody(g) {
+      const iron = DB32.verdigris;
+      const brass = DB32.rainforest;
+      g.rect(-14, -36, 28, 32).fill(DB32.oiledCedar);
+      g.rect(-14, -36, 28, 2).fill(DB32.rope);
+      for (const [x, y, r] of [
+        [-6, -26, 6],
+        [6, -20, 5],
+        [-4, -12, 4],
+      ] as const) {
+        for (let dy = -r; dy <= r; dy++) {
+          const half = Math.round(Math.sqrt(r * r - dy * dy));
+          g.rect(x - half, y + dy, half * 2 + 1, 1).fill(brass);
+        }
+        g.rect(x - 1, y - 1, 2, 2).fill(iron);
+      }
+      g.rect(-1, -4, 2, 4).fill(iron);
+      g.rect(-3, -2, 6, 2).fill(brass);
+      g.rect(2, -10, 3, 3).fill(DB32.twine);
+    },
+    drawSketch(g) {
+      for (let dy = -28; dy <= 28; dy++) {
+        const half = Math.round(Math.sqrt(784 - dy * dy));
+        g.rect(-half, dy, half * 2 + 1, 1).fill(DB32.pancho);
+      }
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        g.rect(Math.round(Math.cos(a) * 23) - 1, Math.round(Math.sin(a) * 23) - 1, 2, 2).fill(DB32.valhalla);
+      }
+      g.rect(-1, -20, 2, 20).fill(DB32.valhalla);
+      g.rect(-1, -16, 2, 16).fill(DB32.valhalla);
+      g.rect(-2, -2, 4, 4).fill(DB32.rainforest);
+    },
+  },
   {
     id: 'silent-bell',
-    x: 19 * TILE_SIZE + 8,
-    y: RINGERS_FLOOR_Y,
+    x: 45 * T + 8,
+    y: CHAMBER_Y,
     name: 'Silent Bell',
     description:
       'A bronze bell as tall as you are, hung where the whole valley could have heard it. Its clapper has been ' +
       'bound fast with rope — many turns, knotted with care — so that it can never ring. ' +
       'Cast into its waist, where a maker would put their name: the spiral.',
     drawBody(g) {
-      drawBell(g);
+      drawHungBell(g);
     },
     drawSketch(g) {
       const bronze = DB32.rainforest;
@@ -151,11 +283,42 @@ const OLD_KEEP_BELFRY_LANDMARKS: LandmarkSpec[] = [
       g.rect(-1, 26, 2, 10).fill(DB32.twine);
     },
   },
+  {
+    id: 'weathervane',
+    x: 44 * T + 8,
+    y: 6 * T,
+    name: 'Weathervane',
+    description:
+      'On the very tip of the spire, an iron cockerel on a spindle. It does not point into the wind. It turns, ' +
+      'slowly, all night, one full turn for every turn of the stars overhead — and its tail feathers are ' +
+      'wrought into a spiral.',
+    drawBody(g) {
+      const iron = DB32.dimGray;
+      g.rect(-1, -26, 2, 26).fill(iron);
+      g.rect(-6, -10, 12, 1).fill(iron);
+      g.rect(-7, -10, 1, 1).fill(DB32.heather);
+      g.rect(6, -10, 1, 1).fill(DB32.heather);
+      g.rect(-5, -24, 8, 5).fill(iron);
+      g.rect(3, -27, 3, 4).fill(iron);
+      g.rect(5, -26, 1, 1).fill(DB32.clairvoyant);
+      g.rect(-8, -26, 3, 3).fill(iron);
+      g.rect(-7, -25, 1, 1).fill(DB32.heather);
+      g.rect(-2, -19, 1, 1).fill(DB32.heather);
+    },
+    drawSketch(g) {
+      const iron = DB32.dimGray;
+      g.rect(-2, -10, 4, 40).fill(iron);
+      g.rect(-20, -16, 32, 16).fill(iron);
+      g.rect(10, -26, 10, 12).fill(iron);
+      g.rect(17, -22, 3, 3).fill(DB32.clairvoyant);
+      g.rect(-30, -24, 12, 2).fill(iron);
+      g.rect(-30, -24, 2, 10).fill(iron);
+      g.rect(-30, -16, 9, 2).fill(iron);
+      g.rect(-23, -20, 2, 6).fill(iron);
+    },
+  },
 ];
 
-// The bell, hanging from the underside of its beam 80 px above the floor,
-// with its clapper bound and the rope falling to a striped sally at hand
-// height. Drawn around the floor anchor (0, 0).
 function drawBell(g: Graphics): void {
   const wood = DB32.oiledCedar;
   const bronze = DB32.rainforest;
@@ -199,8 +362,7 @@ function drawBell(g: Graphics): void {
 }
 
 // ---------------------------------------------------------------------------
-// Decorations — slit windows in the shaft walls, the only hint of the night
-// outside until the chamber.
+// Decorations.
 // ---------------------------------------------------------------------------
 
 // A narrow arched slit, 6 wide × 20 tall, anchored at its sill. Night-blue
@@ -215,13 +377,67 @@ function drawSlitWindow(g: Graphics): void {
   g.rect(-3, -1, 6, 1).fill(DB32.lightSteel);
 }
 
-const slitWindow = (col: number, sillRow: number): DecorationSpec => ({
-  x: col * TILE_SIZE + 8,
-  y: sillRow * TILE_SIZE,
-  draw: drawSlitWindow,
+// A stone gargoyle crouched on a ledge, looking out, 12 wide × 12 tall.
+function drawGargoyle(g: Graphics): void {
+  const stone = DB32.dimGray;
+  g.rect(-5, -7, 9, 7).fill(stone);
+  g.rect(2, -11, 5, 5).fill(stone);
+  g.rect(-6, -9, 3, 3).fill(stone);
+  g.rect(5, -10, 1, 1).fill(DB32.goldenFizz);
+  g.rect(6, -8, 2, 1).fill(DB32.valhalla);
+  g.rect(-5, -7, 1, 7).fill(DB32.heather);
+}
+
+// The clock's face on the back wall of the clock room, 48 across.
+function drawClockFace(g: Graphics): void {
+  for (let dy = -24; dy <= 24; dy++) {
+    const half = Math.round(Math.sqrt(576 - dy * dy));
+    g.rect(-half, -60 + dy, half * 2 + 1, 1).fill(DB32.pancho);
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    g.rect(Math.round(Math.cos(a) * 20) - 1, -60 + Math.round(Math.sin(a) * 20) - 1, 2, 2).fill(DB32.valhalla);
+  }
+  g.rect(-1, -78, 2, 18).fill(DB32.valhalla);
+  g.rect(-1, -74, 2, 14).fill(DB32.valhalla);
+  g.rect(-2, -62, 4, 4).fill(DB32.rainforest);
+}
+
+// Two small bells on a bar, beside the great one.
+function drawSmallBells(g: Graphics): void {
+  g.rect(-14, -64, 28, 2).fill(DB32.oiledCedar);
+  for (const x of [-9, 7]) {
+    g.rect(x - 4, -60, 8, 7).fill(DB32.rainforest);
+    g.rect(x - 5, -54, 10, 2).fill(DB32.rainforest);
+    g.rect(x - 3, -59, 1, 5).fill(DB32.twine);
+    g.rect(x, -62, 1, 2).fill(DB32.oiledCedar);
+  }
+}
+
+const at = (col: number, surfaceRow: number, draw: (g: Graphics) => void): DecorationSpec => ({
+  x: col * T + 8,
+  y: surfaceRow * T,
+  draw,
 });
 
-const OLD_KEEP_BELFRY_DECORATIONS: DecorationSpec[] = [slitWindow(9, 37), slitWindow(19, 31), slitWindow(9, 25)];
+const OLD_KEEP_BELFRY_DECORATIONS: DecorationSpec[] = [
+  at(45, 115, drawSlitWindow),
+  at(33, 97, drawSlitWindow),
+  at(50, 97, drawSlitWindow),
+  at(44, 85, drawClockFace),
+  at(40, 67, drawSlitWindow),
+  at(52, 67, drawSlitWindow),
+  at(53, 55, drawSmallBells),
+  at(40, 37, drawSlitWindow),
+  at(55, 37, drawSlitWindow),
+  // Gargoyles on the outside ledges.
+  at(23, 91, drawGargoyle),
+  at(27, 82, drawGargoyle),
+  at(67, 73, drawGargoyle),
+  at(62, 58, drawGargoyle),
+  at(67, 43, drawGargoyle),
+  at(62, 28, drawGargoyle),
+];
 
 export const oldKeepBelfryLevel: LevelSpec = {
   id: 'old-keep-belfry',
@@ -232,9 +448,10 @@ export const oldKeepBelfryLevel: LevelSpec = {
   landmarks: OLD_KEEP_BELFRY_LANDMARKS,
   decorations: OLD_KEEP_BELFRY_DECORATIONS,
   parallax: 'night',
-  backdrop: 'indoor-dark',
-  // The shaft is indoors; the chamber and the roof above it are not.
-  rockBgStartRow: 20,
+  // Masonry inside the tower; outside, the night sky.
+  backdrop: 'masonry',
+  rockBgStartRow: OLD_KEEP_BELFRY_ROWS.length,
+  backdropRegions: [{ col: 31, row: 21, cols: 28, rows: 95 }],
   openSky: true,
   createEntities(): readonly Entity[] {
     return [
@@ -246,13 +463,30 @@ export const oldKeepBelfryLevel: LevelSpec = {
         targetSpawnId: 'from-belfry',
         promptLabel: 'go down',
       }),
-      new TallCandle(8 * TILE_SIZE + 8, GROUND_Y),
-      // Owls: at the end of the first ledge, at the take-off end of the
-      // chamber's beam, and on the roof's peak — one on the way up, one in
-      // the way, one waiting.
-      new Owl({ x: 18 * TILE_SIZE + 8, y: 35 * TILE_SIZE }),
-      new Owl({ x: 7 * TILE_SIZE + 6, y: 16 * TILE_SIZE }),
-      new Owl({ x: 12 * TILE_SIZE, y: 4 * TILE_SIZE }),
+      new TallCandle(40 * T + 8, GROUND_Y),
+      new TallCandle(57 * T + 8, FIRST_Y),
+      new TallCandle(42 * T + 8, CLOCK_Y),
+      new TallCandle(33 * T + 8, FLOOR70_Y),
+      new TallCandle(38 * T + 8, CHAMBER_Y),
+      new TallCandle(52 * T + 8, LOFT_Y),
+      // Owls: on the bell's beam, in the loft, on the west balcony, on the spire.
+      new Owl({ x: 43 * T + 8, y: 44 * T }),
+      new Owl({ x: 36 * T + 8, y: LOFT_Y }),
+      new Owl({ x: 27 * T + 8, y: FLOOR70_Y }),
+      new Owl({ x: 40 * T + 8, y: 11 * T }),
+      // Pigeons on the roof walks and the ledges.
+      new Pigeon({ x: 10 * T, y: FIRST_Y, minX: 3 * T, maxX: 20 * T }),
+      new Pigeon({ x: 78 * T, y: FIRST_Y, minX: 70 * T, maxX: 86 * T }),
+      new Pigeon({ x: 64 * T, y: 85 * T, minX: 62 * T, maxX: 68 * T }),
+      new Pigeon({ x: 67 * T, y: 49 * T, minX: 66 * T + 4, maxX: 69 * T - 4 }),
+      // Spiders on threads from the ceilings of the clock room and the loft.
+      new Spider({ x: 47 * T, y: 71 * T }),
+      new Spider({ x: 55 * T, y: 71 * T }),
+      new Spider({ x: 50 * T, y: 21 * T }),
+      // Bats under the loft's roof and the bell chamber's.
+      new Bat({ x: 40 * T, y: 21 * T }),
+      new Bat({ x: 54 * T, y: 21 * T }),
+      new Bat({ x: 50 * T, y: 41 * T }),
     ];
   },
 };

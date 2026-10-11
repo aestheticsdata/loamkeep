@@ -4,7 +4,8 @@ import type { Graphics } from 'pixi.js';
 
 // The flora sketchbook's table of contents: one page per species, largest
 // tree last, then the two things that grow under them, then the glow
-// grotto's three, the kitchen garden's, and the heather on the hill.
+// grotto's three, the kitchen garden's, the heather on the hill, and the
+// garden orchard's apple trees.
 //
 // Authored rather than derived, like the creatures book — a species is not
 // registered anywhere the way a landmark is registered on a level, and one
@@ -176,6 +177,16 @@ export const FLORA_PAGES: readonly FloraPage[] = [
         'at night as readily as by day. Frost sits on every spike. The whole ' +
         'hill smells faintly of honey.',
       drawSketch: plantSketch('heather', UNDERSTOREY_SCALE),
+    },
+  },
+  {
+    id: 'apple-tree',
+    page: {
+      name: 'Apple Tree',
+      description:
+        'Old, short and crooked, pruned for so long it has forgotten how to grow any other way. The last few ' +
+        'apples hang where nobody can reach them, which is presumably why they are the last few.',
+      drawSketch: plantSketch('apple-tree', TREE_SCALE),
     },
   },
 ];
