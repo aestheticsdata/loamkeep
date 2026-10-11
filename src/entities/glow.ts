@@ -20,6 +20,13 @@ const RINGS: readonly (readonly [number, number])[] = [
 ];
 
 export function drawGlow(g: Graphics, glow: GlowSpec): void {
+  // A recorder (the HD pass's, see @hd/classic-recorder) takes the glow as a
+  // light, and draws it as an opaque radial falloff instead of these rows.
+  const recorder = g as unknown as { recordGlow?: (glow: GlowSpec) => void };
+  if (recorder.recordGlow) {
+    recorder.recordGlow(glow);
+    return;
+  }
   for (const [scale, alpha] of RINGS) {
     const r = Math.max(1, Math.round(glow.radius * scale));
     for (let dy = -r; dy <= r; dy++) {

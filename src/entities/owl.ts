@@ -1,7 +1,8 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
+import { ArtBody } from '@hd/art-body';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Seconds between two blinks, and how long the eyes stay shut. Slow on
 // purpose: an owl that blinks like a person reads as nervous.
@@ -37,7 +38,7 @@ export class Owl implements Entity {
 
   private readonly posX: number;
   private readonly posY: number;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private elapsedTime: number;
   private pose: OwlPose = { blink: false, look: 0 };
 
@@ -53,9 +54,9 @@ export class Owl implements Entity {
     this.sprite = new Container();
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
-    this.body = new Graphics();
+    this.body = new ArtBody('owl');
     this.sprite.addChild(this.body);
-    drawOwl(this.body, this.pose);
+    this.body.draw((g) => drawOwl(g, this.pose));
   }
 
   update(dt: number): void {
@@ -66,8 +67,7 @@ export class Owl implements Entity {
     const look = sweep[Math.floor(this.elapsedTime / LOOK_INTERVAL) % sweep.length];
     if (blink === this.pose.blink && look === this.pose.look) return;
     this.pose = { blink, look };
-    this.body.clear();
-    drawOwl(this.body, this.pose);
+    this.body.draw((g) => drawOwl(g, this.pose));
   }
 
   isPlayerInRange(playerPos: Vec2, playerSize: Vec2): boolean {

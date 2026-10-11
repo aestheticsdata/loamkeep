@@ -10,7 +10,7 @@ export const PIXEL_FONT_HEIGHT = 7;
 // 5 columns of ink plus one blank, like Silkscreen at 8 px.
 const ADVANCE = 6;
 
-const GLYPHS: Record<string, readonly string[]> = {
+export const PIXEL_GLYPHS: Record<string, readonly string[]> = {
   A: ['.XXX.', 'X...X', 'X...X', 'XXXXX', 'X...X', 'X...X', 'X...X'],
   B: ['XXXX.', 'X...X', 'X...X', 'XXXX.', 'X...X', 'X...X', 'XXXX.'],
   C: ['.XXXX', 'X....', 'X....', 'X....', 'X....', 'X....', '.XXXX'],
@@ -63,7 +63,7 @@ export function measurePixelText(text: string): number {
 export function drawPixelText(g: Graphics, text: string, x: number, y: number, color: number): void {
   let gx = x;
   for (const ch of text) {
-    const rows = GLYPHS[ch];
+    const rows = PIXEL_GLYPHS[ch];
     if (rows === undefined) throw new Error(`No pixel glyph for '${ch}'`);
     for (let r = 0; r < PIXEL_FONT_HEIGHT; r++) {
       const row = rows[r];

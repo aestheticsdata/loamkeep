@@ -1,6 +1,10 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
-import { Container, Graphics } from 'pixi.js';
+import { ArtBody } from '@hd/art-body';
+import { Container, type Graphics } from 'pixi.js';
+
+// The flame's tones give light: selout leaves them lit.
+const FLAME = [DB32.white, DB32.goldenFizz, DB32.tahitiGold];
 
 // Frequency (Hz) at which the flame alternates between its two frames.
 // 6 Hz feels alive without being epileptic — slow enough to read as
@@ -26,8 +30,8 @@ const FLAME_FREQUENCY = 6;
 // frame — same total area, just redistributed, which reads as flicker.
 export class TallCandle implements Entity {
   readonly sprite: Container;
-  private readonly body: Graphics;
-  private readonly flame: Graphics;
+  private readonly body = new ArtBody('candle');
+  private readonly flame = new ArtBody('candle-flame', { emissive: FLAME });
   private elapsedTime = 0;
   private currentFlameFrame = -1; // forces an initial draw
 
@@ -36,11 +40,9 @@ export class TallCandle implements Entity {
     this.sprite.x = x;
     this.sprite.y = y;
 
-    this.body = new Graphics();
-    drawCandleBody(this.body);
+    this.body.draw(drawCandleBody);
     this.sprite.addChild(this.body);
 
-    this.flame = new Graphics();
     this.sprite.addChild(this.flame);
     this.updateFlame(0);
     this.currentFlameFrame = 0;
@@ -56,8 +58,7 @@ export class TallCandle implements Entity {
   }
 
   private updateFlame(frame: number): void {
-    this.flame.clear();
-    drawFlame(this.flame, frame);
+    this.flame.draw((g) => drawFlame(g, frame));
   }
 }
 

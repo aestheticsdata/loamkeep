@@ -1,7 +1,9 @@
 import { DB32 } from '@constants';
+import { glowfishHd } from '@entities/critters-hd';
 import type { Entity } from '@entities/entity';
+import { ArtBody } from '@hd/art-body';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Tail wiggle (Hz), glow pulse (rad/s) and the slow vertical drift (rad/s,
 // px). The pulse is slower than the tail so the light reads as breathing,
@@ -45,7 +47,7 @@ export class Glowfish implements Entity {
   private facing: 1 | -1;
   private readonly minX: number;
   private readonly maxX: number;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private elapsedTime: number;
   private drawn: GlowfishFrame = { tail: -1, glow: -1 };
 
@@ -65,7 +67,7 @@ export class Glowfish implements Entity {
     // Phase from x, so a shoal does not pulse in step.
     this.elapsedTime = spec.x * 0.11;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('glowfish');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -89,8 +91,11 @@ export class Glowfish implements Entity {
     const glow = Math.round(pulse * GLOW_STEPS) / GLOW_STEPS;
     if (tail !== this.drawn.tail || glow !== this.drawn.glow) {
       this.drawn = { tail, glow };
-      this.body.clear();
-      drawGlowfish(this.body, this.drawn);
+      const frame = this.drawn;
+      this.body.draw(
+        (g) => drawGlowfish(g, frame),
+        () => glowfishHd(frame),
+      );
     }
 
     this.sprite.x = this.posX;

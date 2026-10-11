@@ -1,7 +1,8 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
+import { ArtBody } from '@hd/art-body';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Wing-flap frequency in Hz. 8 Hz reads as small fast-flapping bird at
 // this distance (the classic Amiga "two-pixel V flapping across the
@@ -44,7 +45,7 @@ export class Bird implements Entity {
   private readonly maxX: number;
   private readonly color: number;
 
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private elapsedTime = 0;
   private currentWingFrame = -1;
 
@@ -58,7 +59,7 @@ export class Bird implements Entity {
     this.color = spec.color ?? DB32.valhalla;
 
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('bird');
     this.sprite.addChild(this.body);
 
     this.redraw(0);
@@ -90,8 +91,7 @@ export class Bird implements Entity {
   }
 
   private redraw(wingFrame: number): void {
-    this.body.clear();
-    drawBird(this.body, wingFrame, this.color);
+    this.body.draw((g) => drawBird(g, wingFrame, this.color));
   }
 
   private syncSprite(): void {

@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, type PatrolSpec, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const TRUNDLE_SPEED = 9;
 // How near the player has to come for it to roll up, in pixels.
@@ -21,7 +22,7 @@ export class Hedgehog implements Critter {
   };
 
   private readonly spec: PatrolSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private elapsed = 0;
@@ -32,7 +33,7 @@ export class Hedgehog implements Critter {
     this.spec = spec;
     this.x = spec.x;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('hedgehog');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -57,8 +58,7 @@ export class Hedgehog implements Critter {
     const key = `${this.curled}${step}`;
     if (key !== this.drawn) {
       this.drawn = key;
-      this.body.clear();
-      drawHedgehog(this.body, { curled: this.curled, step });
+      this.body.draw((g) => drawHedgehog(g, { curled: this.curled, step }));
     }
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y;

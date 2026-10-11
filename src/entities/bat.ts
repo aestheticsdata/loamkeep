@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Seconds a bat hangs between two flutters, and how long a flutter lasts.
 const HANG_TIME = 3.4;
@@ -28,7 +29,7 @@ export class Bat implements Critter {
   };
 
   private readonly spec: BatSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private timer: number;
   private fluttering = false;
   private pos: Vec2;
@@ -38,7 +39,7 @@ export class Bat implements Critter {
     this.pos = { x: spec.x, y: spec.y };
     this.timer = (spec.x * 0.021) % HANG_TIME;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('bat');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -49,7 +50,6 @@ export class Bat implements Critter {
       this.fluttering = !this.fluttering;
       this.timer = this.fluttering ? FLUTTER_TIME : HANG_TIME;
     }
-    this.body.clear();
     if (this.fluttering) {
       const t = 1 - this.timer / FLUTTER_TIME;
       const a = t * Math.PI * 2;
@@ -57,10 +57,12 @@ export class Bat implements Critter {
         x: this.spec.x + Math.sin(a) * FLUTTER_RADIUS,
         y: this.spec.y + 8 + (1 - Math.cos(a)) * 5,
       };
-      drawBatFlying(this.body, Math.floor(t * 14) & 1);
+      const frame = Math.floor(t * 14) & 1;
+      this.body.draw((g) => drawBatFlying(g, frame));
     } else {
       this.pos = { x: this.spec.x, y: this.spec.y };
-      drawBatHanging(this.body, this.timer % 1.3 < 0.12);
+      const blink = this.timer % 1.3 < 0.12;
+      this.body.draw((g) => drawBatHanging(g, blink));
     }
     this.sprite.x = this.pos.x;
     this.sprite.y = this.pos.y;

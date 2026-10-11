@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, type PatrolSpec, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const SCUTTLE_SPEED = 26;
 // A newt goes in little dashes: scuttle, stop dead, look about, scuttle.
@@ -22,7 +23,7 @@ export class Newt implements Critter {
   };
 
   private readonly spec: PatrolSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private timer: number;
@@ -34,7 +35,7 @@ export class Newt implements Critter {
     this.x = spec.x;
     this.timer = (spec.x * 0.031) % STOP_TIME;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('newt');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -53,8 +54,7 @@ export class Newt implements Critter {
         this.facing = this.facing === 1 ? -1 : 1;
       }
     }
-    this.body.clear();
-    drawNewt(this.body, this.dashing ? Math.floor(this.elapsed * 12) & 1 : 0);
+    this.body.draw((g) => drawNewt(g, this.dashing ? Math.floor(this.elapsed * 12) & 1 : 0));
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y;
     this.sprite.scale.set(this.facing, 1);

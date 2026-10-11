@@ -1,5 +1,7 @@
 import { DB32, DEFAULT_SCALE, renderResolution, SCREEN_HEIGHT, SCREEN_WIDTH, textResolution } from '@constants';
 import { Game } from '@game';
+import { setArtMode, setFineMotion } from '@hd/art-mode';
+import type { Vec2 } from '@types';
 import { Application, type Container, Text, TextureStyle } from 'pixi.js';
 
 async function main(): Promise<void> {
@@ -74,7 +76,14 @@ async function main(): Promise<void> {
   // compile-time constant, so the production bundle carries neither the branch
   // nor the property.
   if (import.meta.env.DEV) {
-    (window as unknown as { __loamkeep?: () => unknown }).__loamkeep = () => game.snapshot();
+    // The same handle switches the art: `__loamkeep.art('split')`,
+    // `__loamkeep.fineMotion(false)`, and `__loamkeep.travel('old-keep', { x, y })`
+    // goes anywhere. A `?art=hd` in the URL works in any build.
+    (window as unknown as { __loamkeep?: () => unknown }).__loamkeep = Object.assign(() => game.snapshot(), {
+      art: setArtMode,
+      fineMotion: setFineMotion,
+      travel: (levelId: string, at?: Vec2) => game.devTravel(levelId, at),
+    });
   }
 
   console.log('Loamkeep — phase 2 running.');

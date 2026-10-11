@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, type PatrolSpec, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const STROLL_SPEED = 14;
 // A hen strolls, stops, pecks the ground a few times, and strolls on.
@@ -22,7 +23,7 @@ export class Hen implements Critter {
   };
 
   private readonly spec: PatrolSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private timer: number;
@@ -34,7 +35,7 @@ export class Hen implements Critter {
     this.x = spec.x;
     this.timer = (spec.x * 0.017) % STROLL_TIME;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('hen');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -55,8 +56,7 @@ export class Hen implements Critter {
       }
     }
     const down = this.pecking && Math.floor(this.elapsed * 6) % 2 === 0;
-    this.body.clear();
-    drawHen(this.body, down);
+    this.body.draw((g) => drawHen(g, down));
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y;
     this.sprite.scale.set(this.facing, 1);

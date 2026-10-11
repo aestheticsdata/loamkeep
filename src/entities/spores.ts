@@ -1,7 +1,9 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
+import { ArtSwarm, type SwarmMember } from '@hd/art-body';
+import type { CritterLayers } from '@hd/critter-hd';
+import { FineCanvas } from '@hd/fine-canvas';
 import type { AABB } from '@types';
-import { Graphics } from 'pixi.js';
 
 // Pixels a second the spores rise, and how far they sway as they go.
 const RISE_SPEED = 7;
@@ -11,7 +13,7 @@ const SWAY = 5;
 // few dozen cyan specks rising slowly, swaying, fading in at the bottom of
 // their box and out at the top, and starting again. Scenery, not a creature.
 export class Spores implements Entity {
-  readonly sprite: Graphics;
+  readonly sprite = new ArtSwarm('spores');
 
   private readonly area: AABB;
   private readonly seeds: readonly number[];
@@ -26,24 +28,51 @@ export class Spores implements Entity {
     // diagonal, the one thing drifting spores never do.
     this.seeds = Array.from({ length: count }, (_, i) => hash(i * 2 + area.x));
     this.phases = Array.from({ length: count }, (_, i) => hash(i * 2 + 1 + area.y));
-    this.sprite = new Graphics();
     this.update(0);
   }
 
   update(dt: number): void {
     this.elapsed += dt;
-    const g = this.sprite;
-    g.clear();
-    this.seeds.forEach((seed, i) => {
+    const spores: SwarmMember[] = this.seeds.map((seed, i) => {
       const travel = (this.phases[i] * this.area.height + this.elapsed * RISE_SPEED * (0.6 + seed)) % this.area.height;
-      const y = this.area.y + this.area.height - travel;
-      const x = this.area.x + seed * this.area.width + Math.sin(this.elapsed * 0.8 + i) * SWAY;
       // Faint at both ends of the climb, brightest in the middle.
       const t = travel / this.area.height;
       const alpha = Math.min(1, t * 4, (1 - t) * 4);
-      g.rect(Math.round(x), Math.round(y), 1, 1).fill({ color: i % 5 === 0 ? DB32.white : DB32.viking, alpha });
+      const color = i % 5 === 0 ? DB32.white : DB32.viking;
+      // HD has no alpha: the fade is how many of a 2×2 mote's fine pixels
+      // are lit, in four steps.
+      const lit = Math.round(alpha * 4);
+      return {
+        x: this.area.x + seed * this.area.width + Math.sin(this.elapsed * 0.8 + i) * SWAY,
+        y: this.area.y + this.area.height - travel,
+        draw: (g) => {
+          g.rect(0, 0, 1, 1).fill({ color, alpha });
+        },
+        hd: { key: `${color}:${lit}`, draw: () => sporeHd({ color, lit }) },
+      };
     });
+    this.sprite.draw(spores);
   }
+}
+
+// A spore on the fine grid: a 2×2 mote, `lit` of its pixels on, in the
+// order a fade-in reads best — the diagonal first.
+interface SporeMote {
+  color: number;
+  // How many of its four fine pixels are lit.
+  lit: number;
+}
+
+function sporeHd(spore: SporeMote): CritterLayers {
+  const s = new FineCanvas({ x: 0, y: 0, w: 2, h: 2 });
+  const order: [number, number][] = [
+    [0, 0],
+    [1, 1],
+    [1, 0],
+    [0, 1],
+  ];
+  for (const [x, y] of order.slice(0, spore.lit)) s.set(x, y, spore.color);
+  return { body: s, halo: null };
 }
 
 // A well-mixed 0..1 value for an integer.

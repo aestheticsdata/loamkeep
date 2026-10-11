@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, type PatrolSpec, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const SCURRY_SPEED = 48;
 const SCURRY_TIME = 0.35;
@@ -21,7 +22,7 @@ export class Mouse implements Critter {
   };
 
   private readonly spec: PatrolSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private timer: number;
@@ -33,7 +34,7 @@ export class Mouse implements Critter {
     this.x = spec.x;
     this.timer = (spec.x * 0.023) % FREEZE_TIME;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('mouse');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -53,8 +54,7 @@ export class Mouse implements Critter {
         this.facing = this.facing === 1 ? -1 : 1;
       }
     }
-    this.body.clear();
-    drawMouse(this.body, this.scurrying ? 0 : Math.floor(this.elapsed * 8) & 1);
+    this.body.draw((g) => drawMouse(g, this.scurrying ? 0 : Math.floor(this.elapsed * 8) & 1));
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y;
     this.sprite.scale.set(this.facing, 1);

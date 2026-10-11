@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const SIT_TIME = 2.8;
 const LEAP_TIME = 0.6;
@@ -29,7 +30,7 @@ export class Frog implements Critter {
   };
 
   private readonly spec: FrogSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private timer: number;
   private onFar = false;
   private leaping = false;
@@ -41,7 +42,7 @@ export class Frog implements Critter {
     this.x = spec.fromX;
     this.timer = (spec.fromX * 0.017) % SIT_TIME;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('frog');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -69,8 +70,7 @@ export class Frog implements Critter {
       this.lift = 0;
     }
     const croak = !this.leaping && this.timer % 1.4 < 0.35;
-    this.body.clear();
-    drawFrog(this.body, { croak, leaping: this.leaping });
+    this.body.draw((g) => drawFrog(g, { croak, leaping: this.leaping }));
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y - this.lift;
     this.sprite.scale.set(to > from ? 1 : -1, 1);

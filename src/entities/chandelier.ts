@@ -1,6 +1,10 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
-import { Container, Graphics } from 'pixi.js';
+import { ArtBody } from '@hd/art-body';
+import { Container, type Graphics } from 'pixi.js';
+
+// The flames' tones give light: selout leaves them lit.
+const FLAME = [DB32.white, DB32.goldenFizz, DB32.tahitiGold];
 
 // 6 Hz — same cadence as the wall candle so the chandelier and tall
 // candles flicker on the same beat. Looks like a single coherent lighting
@@ -27,8 +31,8 @@ const FLAME_FREQUENCY = 6;
 // redrawn on the frames where its 2-state phase index flips.
 export class Chandelier implements Entity {
   readonly sprite: Container;
-  private readonly body: Graphics;
-  private readonly flames: Graphics;
+  private readonly body = new ArtBody('chandelier');
+  private readonly flames = new ArtBody('chandelier-flames', { emissive: FLAME });
   private elapsedTime = 0;
   private currentFlameFrame = -1;
 
@@ -37,11 +41,9 @@ export class Chandelier implements Entity {
     this.sprite.x = x;
     this.sprite.y = y;
 
-    this.body = new Graphics();
-    drawChandelierBody(this.body);
+    this.body.draw(drawChandelierBody);
     this.sprite.addChild(this.body);
 
-    this.flames = new Graphics();
     this.sprite.addChild(this.flames);
     this.updateFlames(0);
     this.currentFlameFrame = 0;
@@ -57,8 +59,7 @@ export class Chandelier implements Entity {
   }
 
   private updateFlames(frame: number): void {
-    this.flames.clear();
-    drawChandelierFlames(this.flames, frame);
+    this.flames.draw((g) => drawChandelierFlames(g, frame));
   }
 }
 

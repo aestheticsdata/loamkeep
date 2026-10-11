@@ -102,5 +102,9 @@ export default defineConfig({
     // would have two clients acking the same frames.
     video: process.env.DEMO_RECORDER === "playwright" ? { mode: "on" as const, size: viewport } : ("off" as const),
   },
-  projects: [{ name: "demo", testMatch: /.*\.demo\.ts/, use: chrome }],
+  projects: [
+    { name: "demo", testMatch: /.*\.demo\.ts/, use: chrome },
+    // Split-view stills for the HD pass (LOA-41): `split.stills.ts`, no film.
+    { name: "split", testMatch: /.*\.stills\.ts/, use: chrome },
+  ],
 });

@@ -1,9 +1,11 @@
 import { DB32 } from '@constants';
 import { type Critter, touches } from '@entities/critter';
+import { litFireflyHd } from '@entities/critters-hd';
 import { drawGlow } from '@entities/glow';
+import { ArtSwarm, type SwarmMember } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // How many fireflies a swarm has, and how far they wander from its centre.
 const SWARM_SIZE = 7;
@@ -28,7 +30,7 @@ export class Fireflies implements Critter {
   };
 
   private readonly spec: FirefliesSpec;
-  private readonly body: Graphics;
+  private readonly body = new ArtSwarm('fireflies', { emissive: [DB32.goldenFizz] });
   private elapsed: number;
 
   constructor(spec: FirefliesSpec) {
@@ -37,26 +39,24 @@ export class Fireflies implements Critter {
     this.sprite = new Container();
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
-    this.body = new Graphics();
     this.sprite.addChild(this.body);
     this.update(0);
   }
 
   update(dt: number): void {
     this.elapsed += dt;
-    this.body.clear();
+    const flies: SwarmMember[] = [];
     for (let i = 0; i < SWARM_SIZE; i++) {
       const t = this.elapsed * (0.5 + i * 0.07) + i * 1.7;
-      const x = Math.round(Math.sin(t) * SWARM_RADIUS * (0.4 + (i % 3) * 0.3));
-      const y = Math.round(Math.cos(t * 1.3 + i) * SWARM_RADIUS * 0.5);
       const lit = Math.sin(this.elapsed * 2 + i * 2.1) > -0.2;
-      if (lit) {
-        drawGlow(this.body, { x, y, radius: 4, color: DB32.goldenFizz });
-        this.body.rect(x, y, 1, 1).fill(DB32.goldenFizz);
-      } else {
-        this.body.rect(x, y, 1, 1).fill(DB32.stinger);
-      }
+      flies.push({
+        x: Math.sin(t) * SWARM_RADIUS * (0.4 + (i % 3) * 0.3),
+        y: Math.cos(t * 1.3 + i) * SWARM_RADIUS * 0.5,
+        draw: lit ? drawLitFly : drawDarkFly,
+        ...(lit ? { hd: { key: 'lit', draw: litFireflyHd } } : {}),
+      });
     }
+    this.body.draw(flies);
   }
 
   isPlayerInRange(playerPos: Vec2, playerSize: Vec2): boolean {
@@ -77,4 +77,15 @@ export function drawFirefliesLarge(g: Graphics): void {
   g.rect(0, -8, 4, 3).fill({ color: DB32.lightSteel, alpha: 0.7 });
   g.rect(-2, -9, 3, 2).fill({ color: DB32.lightSteel, alpha: 0.5 });
   g.rect(5, -4, 1, 1).fill(DB32.white);
+}
+
+// One firefly at (0, 0): lit, a point of gold in its own glow; between
+// blinks, a dark speck.
+function drawLitFly(g: Graphics): void {
+  drawGlow(g, { x: 0, y: 0, radius: 4, color: DB32.goldenFizz });
+  g.rect(0, 0, 1, 1).fill(DB32.goldenFizz);
+}
+
+function drawDarkFly(g: Graphics): void {
+  g.rect(0, 0, 1, 1).fill(DB32.stinger);
 }

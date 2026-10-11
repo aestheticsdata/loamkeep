@@ -1,5 +1,12 @@
-import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH, textResolution } from '@constants';
-import { CanvasTextMetrics, Container, Graphics, Text, TextStyle, type TextStyleOptions } from 'pixi.js';
+import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH } from '@constants';
+import { ART_KIND, draws, registerArt } from '@hd/art-mode';
+import { ArtText } from '@hd/art-text';
+import { bake, FineSprite } from '@hd/bake';
+import { bookWrap } from '@hd/book-font';
+import { FINE } from '@hd/fine-canvas';
+import { parchmentHd, ruleHd } from '@systems/parchment-hd';
+import { shownLarge } from '@systems/portrait-hd';
+import { CanvasTextMetrics, Container, Graphics, TextStyle, type TextStyleOptions } from 'pixi.js';
 
 // One leaf of a book: the only three fields a page actually renders. A
 // landmark spec is one of these plus where it stands in the world; a creature
@@ -52,6 +59,10 @@ const TEXT_Y = FRAME_Y + 46;
 const TEXT_WRAP_W = 130;
 const TEXT_LINE_H = 13;
 
+// The chamfer passes a page's sketch takes in HD: drawn at page size, its
+// shapes are several logical pixels wide.
+const SKETCH_CHAMFER = 2;
+
 // The footer hint's own line, which the description has to stop clear of.
 const HINT_Y = FRAME_Y + FRAME_H - 16;
 
@@ -59,6 +70,12 @@ const HINT_Y = FRAME_Y + FRAME_H - 16;
 // Derived from the column rather than written down, so moving the text or the
 // hint re-budgets the page instead of quietly letting it overrun again.
 const LINES_PER_LEAF = Math.floor((HINT_Y - TEXT_Y) / TEXT_LINE_H);
+
+// The same budget for the book font in HD: lines 10 px apart, glyphs 4 px
+// (12 fine) an advance at body size.
+const BOOK_LINE_H = 10;
+const BOOK_ADVANCE_FINE = 12;
+const BOOK_LINES_PER_LEAF = Math.floor((HINT_Y - TEXT_Y) / BOOK_LINE_H);
 
 const DESCRIPTION_STYLE: TextStyleOptions = {
   fontFamily: 'monospace',
@@ -120,12 +137,19 @@ export class Sketchbook {
     // Dim the world behind the overlay.
     const backdrop = new Graphics().rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT).fill({ color: DB32.valhalla, alpha: 0.7 });
     this.container.addChild(backdrop);
+    // In HD there is no veil: the world behind steps two places down its
+    // ramp instead (rampDownFilter, applied by Game while this is open).
+    registerArt({ classic: backdrop, hd: new Container() });
 
     // Parchment-like frame with a wooden border.
     const frame = new Graphics().rect(FRAME_X, FRAME_Y, FRAME_W, FRAME_H).fill(DB32.pancho);
     const border = new Graphics().rect(FRAME_X, FRAME_Y, FRAME_W, FRAME_H).stroke({ color: DB32.oiledCedar, width: 2 });
-    this.container.addChild(frame);
-    this.container.addChild(border);
+    const paper = new Container();
+    paper.addChild(frame, border);
+    const paperHd = new FineSprite();
+    paperHd.show(bake(parchmentHd({ x: FRAME_X, y: FRAME_Y, w: FRAME_W, h: FRAME_H })));
+    registerArt({ classic: paper, hd: paperHd });
+    this.container.addChild(paper, paperHd);
 
     // Per-page content lives here, recreated each show().
     this.content = new Container();
@@ -162,8 +186,8 @@ export class Sketchbook {
 
     const note = makeText(line, { fontFamily: 'monospace', fontSize: 8, fill: DB32.valhalla });
     note.position.set(
-      FRAME_X + Math.round((FRAME_W - note.width) / 2),
-      FRAME_Y + Math.round((FRAME_H - note.height) / 2),
+      FRAME_X + Math.round((FRAME_W - note.classic.width) / 2),
+      FRAME_Y + Math.round((FRAME_H - note.classic.height) / 2),
     );
     this.content.addChild(note);
 
@@ -214,13 +238,22 @@ export class Sketchbook {
 
     // Underline separator
     const sep = new Graphics().rect(FRAME_X + 12, FRAME_Y + 32, FRAME_W - 24, 1).fill(DB32.oiledCedar);
-    this.content.addChild(sep);
+    const sepHd = new FineSprite();
+    sepHd.show(bake(ruleHd({ x: FRAME_X + 12, y: FRAME_Y + 32, w: FRAME_W - 24, h: 1 })));
+    registerArt({ classic: sep, hd: sepHd });
+    this.content.addChild(sep, sepHd);
 
     // Sketch — provided by the page. Centered in the left column.
     const sketch = new Graphics();
-    this.page.drawSketch(sketch);
+    const page = this.page;
+    page.drawSketch(sketch);
     sketch.position.set(FRAME_X + 50, FRAME_Y + 110);
-    this.content.addChild(sketch);
+    // In HD the sketch is drawn at page size, chamfered as a drawing that
+    // size, never a small sprite enlarged.
+    const sketchHd = shownLarge((g) => page.drawSketch(g), { scale: 1, chamfer: SKETCH_CHAMFER });
+    sketchHd.position.set(FRAME_X + 50, FRAME_Y + 110);
+    registerArt({ classic: sketch, hd: sketchHd });
+    this.content.addChild(sketch, sketchHd);
 
     // Description on the right column, already wrapped to the column and cut
     // to a leaf's worth of lines.
@@ -241,7 +274,7 @@ export class Sketchbook {
       fontSize: 8,
       fill: DB32.dimGray,
     });
-    hint.position.set(FRAME_X + Math.round((FRAME_W - hint.width) / 2), HINT_Y);
+    hint.position.set(FRAME_X + Math.round((FRAME_W - hint.classic.width) / 2), HINT_Y);
     this.content.addChild(hint);
 
     if (footer.corner !== undefined) {
@@ -250,7 +283,7 @@ export class Sketchbook {
         fontSize: 8,
         fill: DB32.dimGray,
       });
-      corner.position.set(FRAME_X + FRAME_W - 12 - Math.ceil(corner.width), FRAME_Y + 13);
+      corner.position.set(FRAME_X + FRAME_W - 12 - Math.ceil(corner.classic.width), FRAME_Y + 13);
       this.content.addChild(corner);
     }
   }
@@ -263,7 +296,7 @@ export class Sketchbook {
   private clearContent(): void {
     // Remove and destroy children so text textures don't pile up.
     for (const child of this.content.removeChildren()) {
-      child.destroy();
+      child.destroy({ children: true });
     }
   }
 }
@@ -273,19 +306,23 @@ export class Sketchbook {
 // the split falls exactly where the rendered line breaks do; the six short
 // descriptions come back as a single leaf holding the same lines they always
 // had.
+//
+// In HD alone the page is set in the book font, whose lines are a character
+// count and 10 px apart (RECIPES §8), so it is paged by those; classic and
+// split keep classic's breaks, which the book font always fits.
 function splitIntoLeaves(description: string): readonly string[] {
-  const { lines } = CanvasTextMetrics.measureText(description, DESCRIPTION_METRICS_STYLE);
+  const lines = draws(ART_KIND.classic)
+    ? CanvasTextMetrics.measureText(description, DESCRIPTION_METRICS_STYLE).lines
+    : bookWrap(description, Math.floor((TEXT_WRAP_W * FINE) / BOOK_ADVANCE_FINE));
+  const perLeaf = draws(ART_KIND.classic) ? LINES_PER_LEAF : BOOK_LINES_PER_LEAF;
   const leaves: string[] = [];
-  for (let i = 0; i < lines.length; i += LINES_PER_LEAF) {
-    leaves.push(lines.slice(i, i + LINES_PER_LEAF).join('\n'));
+  for (let i = 0; i < lines.length; i += perLeaf) {
+    leaves.push(lines.slice(i, i + perLeaf).join('\n'));
   }
   // An empty description still gets a leaf, so a page is never leafless.
   return leaves.length > 0 ? leaves : [''];
 }
 
-function makeText(text: string, style: TextStyleOptions): Text {
-  const t = new Text({ text, style });
-  // Rasterise at device resolution so the glyphs land 1:1 on screen pixels.
-  t.resolution = textResolution();
-  return t;
+function makeText(text: string, style: TextStyleOptions): ArtText {
+  return new ArtText({ text, style });
 }

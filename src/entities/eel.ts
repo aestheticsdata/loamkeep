@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const LENGTH = 18;
 
@@ -29,7 +30,7 @@ export class Eel implements Critter {
   };
 
   private readonly spec: EelSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private elapsed: number;
@@ -39,7 +40,7 @@ export class Eel implements Critter {
     this.x = spec.x;
     this.elapsed = spec.x * 0.01;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('eel');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -51,8 +52,7 @@ export class Eel implements Critter {
       this.x = Math.max(this.spec.minX, Math.min(this.spec.maxX, this.x));
       this.facing = this.facing === 1 ? -1 : 1;
     }
-    this.body.clear();
-    drawEel(this.body, this.elapsed * 6);
+    this.body.draw((g) => drawEel(g, this.elapsed * 6));
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y + Math.sin(this.elapsed * 0.8) * 4;
     this.sprite.scale.set(this.facing, 1);

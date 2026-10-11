@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // How far down its thread the spider lets itself, and how long a trip takes.
 const DROP = 40;
@@ -27,7 +28,7 @@ export class Spider implements Critter {
   };
 
   private readonly spec: SpiderSpec;
-  private readonly body: Graphics;
+  private readonly body = new ArtBody('spider');
   private elapsed: number;
   private drop = 0;
 
@@ -37,7 +38,6 @@ export class Spider implements Critter {
     this.sprite = new Container();
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
-    this.body = new Graphics();
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -47,10 +47,12 @@ export class Spider implements Critter {
     const t = (this.elapsed % PERIOD) / PERIOD;
     // Down slowly, a pause at the bottom, back up a little quicker.
     this.drop = Math.round(DROP * Math.min(1, Math.sin(t * Math.PI) * 1.3));
-    const g = this.body;
-    g.clear();
-    g.rect(0, 0, 1, this.drop).fill({ color: DB32.lightSteel, alpha: 0.6 });
-    drawSpiderAt(g, this.drop, Math.floor(this.elapsed * 3) & 1);
+    const drop = this.drop;
+    const wiggle = Math.floor(this.elapsed * 3) & 1;
+    this.body.draw((g) => {
+      g.rect(0, 0, 1, drop).fill({ color: DB32.lightSteel, alpha: 0.6 });
+      drawSpiderAt(g, drop, wiggle);
+    });
   }
 
   isPlayerInRange(playerPos: Vec2, playerSize: Vec2): boolean {

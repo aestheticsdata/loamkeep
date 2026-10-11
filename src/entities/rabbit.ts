@@ -1,7 +1,8 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
+import { ArtBody } from '@hd/art-body';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Body bob frequency in Hz. 2 Hz reads as a gentle walking gait — too
 // fast and it looks like the rabbit is bouncing/hopping, which would
@@ -48,7 +49,7 @@ export class Rabbit implements Entity {
   private readonly minX: number;
   private readonly maxX: number;
 
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private elapsedTime = 0;
   private currentBobFrame = -1;
 
@@ -69,7 +70,7 @@ export class Rabbit implements Entity {
     this.maxX = spec.maxX;
 
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('rabbit');
     this.sprite.addChild(this.body);
 
     this.redraw(0);
@@ -101,8 +102,7 @@ export class Rabbit implements Entity {
   }
 
   private redraw(bobFrame: number): void {
-    this.body.clear();
-    drawRabbit(this.body, bobFrame);
+    this.body.draw((g) => drawRabbit(g, bobFrame));
   }
 
   // AABB overlap between the rabbit's body silhouette and the player's

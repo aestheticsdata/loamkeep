@@ -22,11 +22,17 @@ import {
   WATER_GRAVITY,
   WATER_TERMINAL_VEL,
 } from '@constants';
+import { drawFigureHd, figureHdFinePose, figureHdKey, figureHdPose } from '@entities/figure-hd';
+import { ART_KIND, draws, fineMotion, registerArt } from '@hd/art-mode';
+import { BakeCache, FineSprite } from '@hd/bake';
 import { KEYS_DOWN, KEYS_JUMP, KEYS_LEFT, KEYS_RIGHT, type KeyReader } from '@systems/input';
 import { type Body, stepPhysics } from '@systems/physics';
 import type { Vec2 } from '@types';
 import { Tile, type Tilemap } from '@world/tilemap';
-import { Graphics } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
+
+// Every pose the figure has been seen in, baked once.
+const FIGURE_BAKES = new BakeCache();
 
 // Walk-cycle angular frequency (rad/s). One sin period spans both feet — at
 // 8 rad/s a full cycle is ≈0.78 s and you see roughly 2.5 footstep transitions
@@ -59,7 +65,11 @@ export class Player implements Body {
   readonly renderPos: Vec2;
   readonly size: Vec2 = { x: 12, y: 16 };
   onGround = false;
-  readonly sprite: Graphics;
+  // The figure in both arts: the classic drawing rebuilt every frame, and the
+  // HD one as a baked pose. art-mode shows one of them, or both in split.
+  readonly sprite = new Container();
+  private readonly classic = new Graphics();
+  private readonly hd = new FineSprite();
 
   // One-shot event flags. Set true for a single physics step when the
   // corresponding event happens; the game loop reads them after each update()
@@ -99,6 +109,9 @@ export class Player implements Body {
   private elapsedTime = 0;
   // Quantized step offset (-1 / 0 / +1) — drives the visual stride only.
   private stepOffset = 0;
+  // The walk cycle's sine the stride is rounded from: HD's fine motion steps
+  // the stride by a third of what stepOffset can.
+  private stridePhase = 0;
   // Distance traveled since the last footstep SFX. Independent of the sin
   // phase so the audio cadence stays regular.
   private footstepAccumulator = 0;
@@ -112,7 +125,8 @@ export class Player implements Body {
     this.pos = { x, y };
     this.prevPos = { x, y };
     this.renderPos = { x, y };
-    this.sprite = new Graphics();
+    this.sprite.addChild(this.classic, this.hd);
+    registerArt({ classic: this.classic, hd: this.hd });
     this.syncSprite();
     this.interpolate(1);
   }
@@ -345,6 +359,7 @@ export class Player implements Body {
     const stepping = this.onGround && this.vel.x !== 0;
     const phase = stepping ? Math.sin(this.elapsedTime * WALK_CYCLE_FREQ) : 0;
     this.stepOffset = Math.round(phase);
+    this.stridePhase = phase;
 
     // Footstep cadence — distance-based. Fires for both dry walking and
     // wading; the game loop picks the right SFX (footstep vs wadeStep)
@@ -367,11 +382,11 @@ export class Player implements Body {
   // Cost is ~20 rect() calls/frame. The drawing itself is the module-level
   // drawFigure(), shared with the title screen; this just derives the pose
   // from physics state. Water cast is applied uniformly via sprite.tint in
-  // syncSprite — drawFigure draws with original colors.
+  // syncSprite — drawFigure draws with original colors. In HD the pose picks
+  // a baked texture instead (figure-hd.ts), drawn once per pose ever.
   private paintFigure(): void {
     const walking = this.onGround && this.vel.x !== 0;
-    this.sprite.clear();
-    drawFigure(this.sprite, {
+    const pose: FigurePose = {
       airborne: !this.onGround && !this.climbing,
       swimming: this.swimming,
       climbing: this.climbing,
@@ -379,7 +394,15 @@ export class Player implements Body {
       stepOffset: this.stepOffset,
       bodyBob: walking ? -Math.abs(this.stepOffset) : 0,
       swimPhase: Math.sin(this.elapsedTime * 5),
-    });
+    };
+    if (draws(ART_KIND.classic)) {
+      this.classic.clear();
+      drawFigure(this.classic, pose);
+    }
+    if (draws(ART_KIND.hd)) {
+      const hdPose = fineMotion() ? figureHdFinePose(pose, this.stridePhase) : figureHdPose(pose);
+      this.hd.show(FIGURE_BAKES.get(figureHdKey(hdPose), () => drawFigureHd(hdPose)));
+    }
   }
 
   // Pose, facing and tint. Position is interpolate()'s job.
@@ -393,7 +416,7 @@ export class Player implements Body {
     this.sprite.scale.set(this.facing, 1);
     // Binary water cast: any tile of the body in water → whole figure
     // tinted blue; otherwise normal colors. PixiJS multiplies the tint
-    // into every pixel of the Graphics in one shot.
+    // into every pixel of both drawings in one shot.
     this.sprite.tint = this.bodyTouchesWater ? SUBMERGED_TINT : 0xffffff;
   }
 }

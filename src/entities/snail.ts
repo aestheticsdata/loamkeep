@@ -1,8 +1,10 @@
 import { DB32 } from '@constants';
 import { type Critter, type PatrolSpec, touches } from '@entities/critter';
+import { snailHd } from '@entities/critters-hd';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Pixels a second. Watch one for a while and it has moved.
 const CRAWL_SPEED = 2.5;
@@ -20,7 +22,7 @@ export class Snail implements Critter {
   };
 
   private readonly spec: PatrolSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private elapsed = 0;
@@ -30,7 +32,7 @@ export class Snail implements Critter {
     this.spec = spec;
     this.x = spec.x;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('snail');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -45,8 +47,10 @@ export class Snail implements Critter {
     const frame = Math.floor(this.elapsed * 1.5) & 1;
     if (frame !== this.frame) {
       this.frame = frame;
-      this.body.clear();
-      drawSnail(this.body, frame);
+      this.body.draw(
+        (g) => drawSnail(g, frame),
+        () => snailHd(frame),
+      );
     }
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y;

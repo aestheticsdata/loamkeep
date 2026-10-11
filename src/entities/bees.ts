@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, touches } from '@entities/critter';
+import { ArtSwarm, type SwarmMember } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const SWARM_SIZE = 6;
 const SWARM_RADIUS = 14;
@@ -25,7 +26,7 @@ export class Bees implements Critter {
   };
 
   private readonly spec: BeesSpec;
-  private readonly body: Graphics;
+  private readonly body = new ArtSwarm('bees');
   private elapsed: number;
 
   constructor(spec: BeesSpec) {
@@ -34,23 +35,27 @@ export class Bees implements Critter {
     this.sprite = new Container();
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
-    this.body = new Graphics();
     this.sprite.addChild(this.body);
     this.update(0);
   }
 
   update(dt: number): void {
     this.elapsed += dt;
-    const g = this.body;
-    g.clear();
+    const bees: SwarmMember[] = [];
     for (let i = 0; i < SWARM_SIZE; i++) {
       const t = this.elapsed * (2.2 + i * 0.3) + i * 1.9;
-      const x = Math.round(Math.sin(t) * SWARM_RADIUS * (0.5 + (i % 2) * 0.5));
-      const y = Math.round(-8 + Math.sin(t * 1.7 + i) * 6);
-      g.rect(x, y, 2, 1).fill(DB32.goldenFizz);
-      g.rect(x + 1, y, 1, 1).fill(DB32.valhalla);
-      g.rect(x, y - 1 - (Math.floor(this.elapsed * 30 + i) & 1), 1, 1).fill(DB32.lightSteel);
+      const flap = Math.floor(this.elapsed * 30 + i) & 1;
+      bees.push({
+        x: Math.sin(t) * SWARM_RADIUS * (0.5 + (i % 2) * 0.5),
+        y: -8 + Math.sin(t * 1.7 + i) * 6,
+        draw: (g) => {
+          g.rect(0, 0, 2, 1).fill(DB32.goldenFizz);
+          g.rect(1, 0, 1, 1).fill(DB32.valhalla);
+          g.rect(0, -1 - flap, 1, 1).fill(DB32.lightSteel);
+        },
+      });
     }
+    this.body.draw(bees);
   }
 
   isPlayerInRange(playerPos: Vec2, playerSize: Vec2): boolean {

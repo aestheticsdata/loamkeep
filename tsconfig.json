@@ -29,6 +29,7 @@
       "@entities/*": ["./src/entities/*"],
       "@systems/*": ["./src/systems/*"],
       "@world/*": ["./src/world/*"],
+      "@hd/*": ["./src/hd/*"],
       // The demo harness under e2e/ — its own alias rather than a reach up
       // through @/, because nothing under e2e is bundled and nothing in src
       // may import it. Playwright resolves it from this file.

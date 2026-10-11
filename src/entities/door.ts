@@ -1,8 +1,10 @@
-import { DB32, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y, textResolution } from '@constants';
+import { DB32, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y } from '@constants';
 import type { Entity, InteractContext, PromptMode } from '@entities/entity';
 import { drawGlow } from '@entities/glow';
+import { ArtBody } from '@hd/art-body';
+import { ArtText } from '@hd/art-text';
 import type { Vec2 } from '@types';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 
 // Half the visual height of a door body. Used to centre the interaction zone
 // in the middle of the door rather than at its base — matches how Landmark
@@ -95,8 +97,8 @@ export class Door implements Entity {
   readonly spec: DoorSpec;
   readonly sprite: Container;
 
-  private body: Graphics;
-  private readonly beacon: Graphics;
+  private readonly body = new ArtBody('door');
+  private readonly beacon = new ArtBody('beacon', { emissive: [DB32.goldenFizz, DB32.white] });
   private prompt: Container | null = null;
   private promptMode: PromptMode = null;
   // The name of the level beyond, shown on the prompt. Set by Game, which
@@ -109,11 +111,9 @@ export class Door implements Entity {
     this.sprite = new Container();
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
-    this.body = new Graphics();
-    (spec.drawBody ?? drawDefaultDoor)(this.body);
+    this.body.draw(spec.drawBody ?? drawDefaultDoor);
     this.sprite.addChild(this.body);
-    this.beacon = new Graphics();
-    drawBeacon(this.beacon);
+    this.beacon.draw(drawBeacon);
     this.beacon.y = BEACON_Y;
     this.sprite.addChild(this.beacon);
     this.elapsed = (spec.x * 0.01) % 3;
@@ -182,14 +182,13 @@ export class Door implements Entity {
 
   private makeLabel(label: string): Container {
     const c = new Container();
-    const text = new Text({
+    const text = new ArtText({
       text: label,
       style: { fontFamily: 'monospace', fontSize: 7, fill: DB32.valhalla },
     });
-    text.resolution = textResolution();
     const pad = 3;
-    const w = Math.ceil(text.width);
-    const h = Math.ceil(text.height);
+    const w = Math.ceil(text.classic.width);
+    const h = Math.ceil(text.classic.height);
     const boxBottom = -25;
     const boxTop = boxBottom - h - pad * 2;
 

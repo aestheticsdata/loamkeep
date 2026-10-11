@@ -5,34 +5,34 @@ import { Graphics } from 'pixi.js';
 // purpose. Every dark DB32 tone (valhalla, opal, loulou) carries a
 // chromatic tint that reads as purple/green/blue at small scale. These
 // two are RGB-balanced (R=G=B) so they're pure grey, no bias.
-const CRYPT_WALL = 0x202020; // near-black neutral grey (wall base)
-const CRYPT_FLOOR = 0x303030; // slightly lighter neutral grey (floor base)
-const CRYPT_HI = 0xcfcfcf; // bright cool-white "reflet" highlight
-const CRYPT_LO = 0x000000; // pure black mortar
+export const CRYPT_WALL = 0x202020; // near-black neutral grey (wall base)
+export const CRYPT_FLOOR = 0x303030; // slightly lighter neutral grey (floor base)
+export const CRYPT_HI = 0xcfcfcf; // bright cool-white "reflet" highlight
+export const CRYPT_LO = 0x000000; // pure black mortar
 
 // The glow grotto's rock: blue-black base, a lighter grain, and the odd
 // cyan fleck of the same light the glowcaps give off.
-const GROTTO_ROCK = 0x1a2030;
-const GROTTO_GRAIN = 0x2a3346;
+export const GROTTO_ROCK = 0x1a2030;
+export const GROTTO_GRAIN = 0x2a3346;
 
 // The observatory hill at night. Moss gone blue-black under the moon, peat
 // darker still, and granite the colour of the sky an hour after sunset.
-const HEATH_MOSS = 0x26332f;
-const HEATH_FROST = 0x9fb0cc;
-const HEATHER = 0x6a4a7e;
-const HEATHER_HI = 0x9a6aa8;
-const PEAT = 0x241c22;
-const PEAT_ROOT = 0x3a2c32;
-const GRANITE = 0x3b4354;
-const GRANITE_HI = 0x58627a;
-const GRANITE_CRACK = 0x232836;
-const LICHEN = 0x7d8a6a;
-const PUFFBALL = 0xd9c6de;
+export const HEATH_MOSS = 0x26332f;
+export const HEATH_FROST = 0x9fb0cc;
+export const HEATHER = 0x6a4a7e;
+export const HEATHER_HI = 0x9a6aa8;
+export const PEAT = 0x241c22;
+export const PEAT_ROOT = 0x3a2c32;
+export const GRANITE = 0x3b4354;
+export const GRANITE_HI = 0x58627a;
+export const GRANITE_CRACK = 0x232836;
+export const LICHEN = 0x7d8a6a;
+export const PUFFBALL = 0xd9c6de;
 // Autumn turf: grass gone the colour of straw in the low sun.
-const TURF = 0x9a8a3e;
-const TURF_LIGHT = 0xd2c26a;
-const TURF_DARK = 0x6c5e2a;
-const PUFFBALL_SHADE = 0xa98fb4;
+export const TURF = 0x9a8a3e;
+export const TURF_LIGHT = 0xd2c26a;
+export const TURF_DARK = 0x6c5e2a;
+export const PUFFBALL_SHADE = 0xa98fb4;
 
 // Tile type. Uses a const object (not enum) so it plays nicely with
 // `isolatedModules` in tsconfig.
@@ -112,7 +112,7 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   a: Tile.AutumnTurf,
 };
 
-const TILE_COLORS: Record<Tile, number> = {
+export const TILE_COLORS: Record<Tile, number> = {
   [Tile.Empty]: 0,
   [Tile.Grass]: DB32.eltGreen,
   [Tile.Dirt]: DB32.oiledCedar,
@@ -292,7 +292,7 @@ function computeWaterBodies(width: number, height: number, tiles: readonly Tile[
 // Stable per-tile pseudo-random in [0, 1). Different tiles get reproducibly
 // different decoration patterns — we want a stone block to look the same every
 // time the level renders, never animated by frame.
-function tileHash(tx: number, ty: number, salt: number): number {
+export function tileHash(tx: number, ty: number, salt: number): number {
   const n = (tx * 374761393 + ty * 668265263 + salt * 1274126177) | 0;
   // Knuth multiplicative hash; final `>>> 0` keeps it unsigned, divide for [0,1).
   return (((n ^ (n >>> 13)) * 1274126177) >>> 0) / 0xffffffff;
@@ -326,7 +326,7 @@ export function renderTilemap(map: Tilemap): Graphics {
 // tiles. They sit inside the level body and render as solid blue, so a lake
 // passing under a stone overhang doesn't draw a fake "surface line"
 // underneath the stone.
-function isWaterSurface(map: Tilemap, tx: number, ty: number): boolean {
+export function isWaterSurface(map: Tilemap, tx: number, ty: number): boolean {
   if (map.at(tx, ty) !== Tile.Water) return false;
   return map.at(tx, ty - 1) === Tile.Empty;
 }
@@ -449,7 +449,7 @@ export function renderWaterSurfaceInto(g: Graphics, map: Tilemap, surfaceOffset:
   }
 }
 
-function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: number): void {
+export function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: number): void {
   // A ladder has no fill — the backdrop shows between its rungs.
   if (t === Tile.Ladder) {
     drawLadder(g, x, y);
@@ -997,10 +997,10 @@ export function renderCryptBackdrop(width: number, startY: number, endY: number)
 // a 4-px grid (per-pixel would be millions of checks for a level this size),
 // strata that waver across the whole width, and one cell in sixty holding a
 // faint cyan glint, the glowcaps' light caught in the stone.
-const GROTTO_BACK = 0x0c1220;
-const GROTTO_BACK_GRAIN = 0x131b2d;
-const GROTTO_BACK_STRATA = 0x182236;
-const GROTTO_BACK_GLINT = 0x2a6b7a;
+export const GROTTO_BACK = 0x0c1220;
+export const GROTTO_BACK_GRAIN = 0x131b2d;
+export const GROTTO_BACK_STRATA = 0x182236;
+export const GROTTO_BACK_GLINT = 0x2a6b7a;
 
 export function renderGrottoBackdrop(width: number, startY: number, endY: number): Graphics {
   const g = new Graphics();
@@ -1031,9 +1031,9 @@ export function renderGrottoBackdrop(width: number, startY: number, endY: number
 // wood's, so the room reads as books all the way up without the back wall
 // ever competing with the stacks in front of it. Sampled per spine, not per
 // pixel, so a hall this size is a few thousand rects.
-const LIBRARY_BACK = 0x1c1418;
-const LIBRARY_SHELF = 0x2e2018;
-const LIBRARY_SPINES = [0x3a2228, 0x2a2a3a, 0x24342a, 0x3a3020, 0x302430] as const;
+export const LIBRARY_BACK = 0x1c1418;
+export const LIBRARY_SHELF = 0x2e2018;
+export const LIBRARY_SPINES = [0x3a2228, 0x2a2a3a, 0x24342a, 0x3a3020, 0x302430] as const;
 
 export function renderLibraryBackdrop(width: number, startY: number, endY: number): Graphics {
   const g = new Graphics();
@@ -1060,10 +1060,11 @@ export function renderLibraryBackdrop(width: number, startY: number, endY: numbe
 // Masonry backdrop — the cistern's back wall: blocks 32 × 16 in running bond,
 // darker than the crypt brick in front, damp streaks running down from some
 // joints, and the odd patch of moss. Sampled per block.
-const MASONRY_BACK = 0x14171c;
-const MASONRY_JOINT = 0x0a0c10;
-const MASONRY_LIGHT = 0x1c2128;
-const MASONRY_DAMP = 0x101820;
+export const MASONRY_BACK = 0x14171c;
+export const MASONRY_JOINT = 0x0a0c10;
+export const MASONRY_LIGHT = 0x1c2128;
+export const MASONRY_DAMP = 0x101820;
+export const MASONRY_MOSS = 0x1e2a1e;
 
 export function renderMasonryBackdrop(width: number, startY: number, endY: number): Graphics {
   const g = new Graphics();
@@ -1077,7 +1078,7 @@ export function renderMasonryBackdrop(width: number, startY: number, endY: numbe
       const h = (((n ^ (n >>> 13)) * 1274126177) >>> 0) / 0xffffffff;
       if (h < 0.3) g.rect(x + 2, y + 2, 26, 1).fill(MASONRY_LIGHT);
       if (h > 0.85) g.rect(x + 6 + Math.floor(h * 16), y + 1, 2, 30).fill(MASONRY_DAMP);
-      if (h > 0.6 && h < 0.63) g.rect(x + 4, y + 11, 8, 4).fill(0x1e2a1e);
+      if (h > 0.6 && h < 0.63) g.rect(x + 4, y + 11, 8, 4).fill(MASONRY_MOSS);
     }
   }
   return g;
@@ -1091,5 +1092,5 @@ export function renderMasonryBackdrop(width: number, startY: number, endY: numbe
 //   never-animated body of water starts. The surface (highlight + sheen)
 //   animates between these two — when it rises by 1 px, the surface line
 //   moves up but the body stays put.
-const WATER_REST_DEPRESSION = 2;
-const STATIC_BODY_TOP_OFFSET = WATER_REST_DEPRESSION + 4;
+export const WATER_REST_DEPRESSION = 2;
+export const STATIC_BODY_TOP_OFFSET = WATER_REST_DEPRESSION + 4;

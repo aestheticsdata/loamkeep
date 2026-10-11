@@ -1,8 +1,9 @@
-import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH, textResolution } from '@constants';
+import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH } from '@constants';
+import { ArtText } from '@hd/art-text';
 import { type Input, KEYS_BACK, KEYS_DOWN, KEYS_INTERACT, KEYS_LEFT, KEYS_RIGHT, KEYS_UP } from '@systems/input';
 import { drawPixelText, measurePixelText } from '@systems/pixel-font';
 import { ATLAS, type AtlasPlace } from '@world/atlas';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 
 export type MapEvent = 'moved' | 'closed' | null;
 
@@ -40,7 +41,7 @@ export class WorldMap {
     this.box = new Container();
     this.container.addChild(this.box);
     const hint = smallText(HINT, INK_FAINT);
-    hint.position.set(Math.round((SCREEN_WIDTH - hint.width) / 2), BOX_Y + BOX_H + 3);
+    hint.position.set(Math.round((SCREEN_WIDTH - hint.classic.width) / 2), BOX_Y + BOX_H + 3);
     this.container.addChild(hint);
   }
 
@@ -138,8 +139,8 @@ function drawPath(g: Graphics, a: AtlasPlace, b: AtlasPlace): void {
   }
 }
 
-function smallText(text: string, color: number, wrapWidth = 0): Text {
-  const t = new Text({
+function smallText(text: string, color: number, wrapWidth = 0): ArtText {
+  return new ArtText({
     text,
     style: {
       fontFamily: 'monospace',
@@ -150,6 +151,4 @@ function smallText(text: string, color: number, wrapWidth = 0): Text {
       lineHeight: 8,
     },
   });
-  t.resolution = textResolution();
-  return t;
 }

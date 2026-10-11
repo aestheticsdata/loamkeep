@@ -1,7 +1,8 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
+import { ArtBody } from '@hd/art-body';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Tail-wiggle frequency in Hz. 5 Hz feels alive without being frantic —
 // matches the slow drift of a fish in a calm pool.
@@ -48,7 +49,7 @@ export class Fish implements Entity {
   // fish.
   readonly color: number;
 
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private elapsedTime = 0;
   private currentTailFrame = -1;
 
@@ -62,7 +63,7 @@ export class Fish implements Entity {
     this.color = spec.color ?? DB32.tahitiGold;
 
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('fish');
     this.sprite.addChild(this.body);
 
     this.redraw(0);
@@ -96,8 +97,7 @@ export class Fish implements Entity {
   }
 
   private redraw(tailFrame: number): void {
-    this.body.clear();
-    drawFish(this.body, tailFrame, this.color);
+    this.body.draw((g) => drawFish(g, tailFrame, this.color));
   }
 
   // AABB overlap between the fish body's bounding box and the player's

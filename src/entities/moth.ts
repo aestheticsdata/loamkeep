@@ -1,7 +1,9 @@
 import { DB32 } from '@constants';
+import { mothHd } from '@entities/critters-hd';
 import type { Entity } from '@entities/entity';
+import { ArtBody } from '@hd/art-body';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Wing beats per second. Fast, the way a moth's are, against the slow loop
 // it flies.
@@ -24,7 +26,7 @@ export class Moth implements Entity {
   readonly sprite: Container;
 
   private readonly spec: MothSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private readonly pos: Vec2 = { x: 0, y: 0 };
   private elapsedTime: number;
   private wingFrame = -1;
@@ -37,7 +39,7 @@ export class Moth implements Entity {
     // Start each moth somewhere different on its loop.
     this.elapsedTime = (spec.x * 0.07) % spec.period;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('moth');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -52,8 +54,10 @@ export class Moth implements Entity {
     const frame = Math.floor(this.elapsedTime * FLAP_FREQUENCY) & 1;
     if (frame !== this.wingFrame) {
       this.wingFrame = frame;
-      this.body.clear();
-      drawMoth(this.body, frame);
+      this.body.draw(
+        (g) => drawMoth(g, frame),
+        () => mothHd(frame),
+      );
     }
     this.sprite.x = this.pos.x;
     this.sprite.y = this.pos.y;

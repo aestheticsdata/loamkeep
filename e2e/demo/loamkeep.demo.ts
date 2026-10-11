@@ -434,6 +434,9 @@ test("loamkeep, end to end", async ({ demo }) => {
   await walkRightTo(CRYPT.gapEdge);
   await demo.dwell(800);
   await jumpRightTo(() => whenLandedAbove(page, CRYPT.landing, CRYPT.floorY));
+  // Right is held for the whole arc, so the landing slides on past the lid, out of reach of
+  // its sixteen pixels. Back onto col 12 — never further, the grave is the tile behind it.
+  await demo.holdWhile(KEY.left, () => whenLeftOf(page, CRYPT.landing + 2));
   await demo.dwell(700);
   await demo.press(KEY.interact);
   await whenSketchbook(page, true);

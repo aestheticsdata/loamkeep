@@ -1,5 +1,10 @@
-import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH, textResolution } from '@constants';
-import { Container, Graphics, Text } from 'pixi.js';
+import { DB32, SCREEN_HEIGHT, SCREEN_WIDTH } from '@constants';
+import { registerArt } from '@hd/art-mode';
+import { ArtText } from '@hd/art-text';
+import { bake, FineSprite } from '@hd/bake';
+import { parchmentHd } from '@systems/parchment-hd';
+import { shownLarge } from '@systems/portrait-hd';
+import { Container, Graphics } from 'pixi.js';
 
 // Frame geometry inside the 320×224 logical viewport. Same proportions
 // as the Sketchbook overlay so the modals feel related.
@@ -58,20 +63,26 @@ export class Greeting {
     // Dim backdrop behind the frame.
     const backdrop = new Graphics().rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT).fill({ color: DB32.valhalla, alpha: 0.7 });
     this.container.addChild(backdrop);
+    // In HD there is no veil: the world behind steps two places down its
+    // ramp instead (rampDownFilter, applied by Game while this is open).
+    registerArt({ classic: backdrop, hd: new Container() });
 
     // Parchment-coloured frame + 2-px wooden border.
     const frame = new Graphics().rect(FRAME_X, FRAME_Y, FRAME_W, FRAME_H).fill(DB32.pancho);
     const border = new Graphics().rect(FRAME_X, FRAME_Y, FRAME_W, FRAME_H).stroke({ color: DB32.oiledCedar, width: 2 });
-    this.container.addChild(frame);
-    this.container.addChild(border);
+    const paper = new Container();
+    paper.addChild(frame, border);
+    const paperHd = new FineSprite();
+    paperHd.show(bake(parchmentHd({ x: FRAME_X, y: FRAME_Y, w: FRAME_W, h: FRAME_H })));
+    registerArt({ classic: paper, hd: paperHd });
+    this.container.addChild(paper, paperHd);
 
     // Static "move to continue" hint at the bottom of the frame.
-    const hint = new Text({
+    const hint = new ArtText({
       text: '[ move to continue ]',
       style: { fontFamily: 'monospace', fontSize: 8, fill: DB32.dimGray },
     });
-    hint.resolution = textResolution();
-    hint.position.set(FRAME_X + (FRAME_W - Math.ceil(hint.width)) / 2, FRAME_Y + FRAME_H - 16);
+    hint.position.set(FRAME_X + (FRAME_W - Math.ceil(hint.classic.width)) / 2, FRAME_Y + FRAME_H - 16);
     this.container.addChild(hint);
 
     // Per-show content goes here.
@@ -88,7 +99,14 @@ export class Greeting {
     spec.drawSubject(subject);
     subject.scale.set(spec.subjectScale, spec.subjectScale);
     subject.position.set(SUBJECT_CENTER_X, SUBJECT_BOTTOM_Y);
-    this.content.addChild(subject);
+    // In HD the subject is drawn at the size it is seen, not enlarged.
+    const subjectHd = shownLarge((g) => spec.drawSubject(g), {
+      scale: spec.subjectScale,
+      chamfer: Math.max(1, Math.floor(spec.subjectScale / 2)),
+    });
+    subjectHd.position.set(SUBJECT_CENTER_X, SUBJECT_BOTTOM_Y);
+    registerArt({ classic: subject, hd: subjectHd });
+    this.content.addChild(subject, subjectHd);
 
     // Speech bubble.
     const bubble = new Graphics();
@@ -112,7 +130,7 @@ export class Greeting {
     this.content.addChild(tail);
 
     // Speech line. PixiJS wordWrap on the bubble's inner width.
-    const speech = new Text({
+    const speech = new ArtText({
       text: spec.speech,
       style: {
         fontFamily: 'monospace',
@@ -123,7 +141,6 @@ export class Greeting {
         wordWrapWidth: BUBBLE_W - 16,
       },
     });
-    speech.resolution = textResolution();
     speech.position.set(BUBBLE_X + 8, BUBBLE_Y + 8);
     this.content.addChild(speech);
 

@@ -1,8 +1,10 @@
 import { DB32 } from '@constants';
 import { type Critter, type PatrolSpec, touches } from '@entities/critter';
+import { hareHd } from '@entities/critters-hd';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // A mountain hare in its winter coat. It sits, twitches an ear, and then goes
 // off in a burst of long low bounds before sitting again — never a walk.
@@ -23,7 +25,7 @@ export class Hare implements Critter {
   };
 
   private readonly spec: PatrolSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private timer: number;
@@ -34,7 +36,7 @@ export class Hare implements Critter {
     this.x = spec.x;
     this.timer = (spec.x * 0.013) % SIT_TIME;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('hare');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -60,8 +62,11 @@ export class Hare implements Critter {
       if (Math.random() < 0.4) this.facing = this.facing === 1 ? -1 : 1;
     }
     const ear = this.boundsLeft === 0 && this.timer % 1.1 < 0.15 ? 1 : 0;
-    this.body.clear();
-    drawHare(this.body, { bounding: this.boundsLeft > 0, ear });
+    const pose = { bounding: this.boundsLeft > 0, ear };
+    this.body.draw(
+      (g) => drawHare(g, pose),
+      () => hareHd(pose),
+    );
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y - hop;
     this.sprite.scale.set(this.facing, 1);

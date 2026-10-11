@@ -50,23 +50,35 @@ which is why `settle()` here waits for a canvas instead of for `document.fonts.r
 
 ## The take
 
-Nine chapters, one per beat, at the default `DEMO_SPEED=1`. The picture never cuts. The route only
+Nine chapters, one per beat, filmed in HD, at the default `DEMO_SPEED=1`. The picture never cuts. The route only
 ever goes down, because that is how the meadow is built — there is no way back up a shaft and no
 death to end a wrong turn, so the storyboard walks off a ledge where a player would.
 
 | | | |
 |---|---|---|
 | 0:00 | The title | the painted dawn — seven sky bands, the sun coming up behind the keep, the rabbit that also lives in the meadow — and the second entry reading LANDMARKS 0/31, because the browser is cold; then ENTER THE MEADOW and the twenty-frame wave wipe that carries the title under in 16-px squares |
-| 0:05 | The meadow | a few steps left to the ledge over the first shaft, the stone marker on its platform across it, and a jump on the spot: the whole platforming vocabulary, since holding the key goes higher than tapping it |
-| 0:09 | A first meeting | the rabbit paces this platform at 32 px/s and the player walks at 72, so walking right is enough; the parchment popup, its line of speech, and any movement key closing it |
+| 0:06 | The meadow | a few steps left to the ledge over the first shaft, the stone marker on its platform across it, and a jump on the spot: the whole platforming vocabulary, since holding the key goes higher than tapping it |
+| 0:10 | A first meeting | the rabbit paces this platform at 32 px/s and the player walks at 72, so walking right is enough; the parchment popup, its line of speech, and any movement key closing it |
 | 0:15 | Under the meadow | off the end of the grass, down the one-tile shaft onto the shelf at row 13, off that and into the cavern pool |
-| 0:20 | A page written | wading is slower than walking and the submerged half of the player is tinted blue under a rippling surface; the sunken stone on the pool floor, E, and the page it writes |
-| 0:26 | The deep water | out over the pool's one-tile shore, right along the cavern floor and down the three steps the right-hand side of the level is, then left off the last one into the deep lake: a dive, the fish, and the exit pop back onto the bank |
-| 0:41 | The old keep | the door on the bottom step; inside, cool grey brick, a polished floor, gold pillars and candles the length of the hall — walked end to end because the only way down is the hole at the far end, then back along the basement to the door under it |
-| 1:01 | The crypt | near-black masonry in two neutral greys mixed outside the palette on purpose, a chandelier and a candelabrum; the floor has a hole in it, and the inscription is across the hole |
-| 1:11 | The sketchbook | Esc fades back to a title that now counts pages, and the gallery reads the book back: both pages the take wrote, then the leaf that says how many are still blank — never which ones |
+| 0:21 | A page written | wading is slower than walking and the submerged half of the player is tinted blue under a rippling surface; the sunken stone on the pool floor, E, and the page it writes |
+| 0:27 | The deep water | out over the pool's one-tile shore, right along the cavern floor and down the three steps the right-hand side of the level is, then left off the last one into the deep lake: a dive, the fish, and the exit pop back onto the bank |
+| 0:42 | The old keep | the door on the bottom step; inside, cool grey brick, a polished floor, gold pillars and candles the length of the hall — walked end to end because the only way down is the hole at the far end, then back along the basement to the door under it |
+| 1:02 | The crypt | near-black masonry in two neutral greys mixed outside the palette on purpose, a chandelier and a candelabrum; the floor has a hole in it, and the inscription is across the hole |
+| 1:12 | The sketchbook | Esc fades back to a title that now counts pages, and the gallery reads the book back: both pages the take wrote, then the leaf that says how many are still blank — never which ones |
 
 ## What this run actually measured
+
+**The HD take** (LOA-41), filmed on 2026-10-11 at `DEMO_SPEED=1`, 1280×720 at a device scale factor
+of 3, in the art the game now opens in:
+
+- 1:25 of film, 85.4 s, nine chapters. The screencast delivered 5015 frames at 58.7 fps; the HD
+  pass costs the recording nothing.
+- The mp4 is 3.4 MB at CRF 26, 0.32 Mbit/s, against 0.20 for classic's take of the same storyboard
+  on the same day. The dither and the selout are detail the encoder has to keep, which makes it
+  half as much again. CRF 26 holds: that is still a fraction of the consoles' band, and the
+  dither survives the encode without crawling.
+- Nine stills at 3840×2160, 52 KB–66 KB each.
+- The crypt was rebuilt after the last take, and its beat was the one to break: see the trap below.
 
 The take shipped to the landing page, filmed on 2026-09-15 at `DEMO_SPEED=1`, 1280×720 at a device
 scale factor of 3:
@@ -104,6 +116,15 @@ the film saved losslessly at twice its resolution.
 | `07-the-crypt.png` | the crypt by candlelight |
 | `08-the-title.png` | the title again, its entry now counting the pages the take wrote |
 | `09-the-gallery.png` | the gallery, page one of two |
+
+## Classic beside HD: `pnpm video:split`
+
+A second project in the same config, with no film: `split.stills.ts` opens the game at `?art=split`
+(classic on the left half of the screen, HD on the right), shoots the title, then drops the player
+at each of the nine levels' spawns through the dev handle `__loamkeep.travel` and shoots again.
+That makes ten stills in about fifteen seconds, in `out/split/00-title.png` … `09-cairn-observatory.png`,
+taken from the running game. They are the before and after the HD tickets are judged by.
+`pnpm video:generate` runs only the take.
 
 ## For the landing page's films: `events.json`
 
@@ -159,6 +180,11 @@ timeout.
 one, so the slab cannot be stood under. The jump lands on col 12 and E is pressed from there —
 fourteen pixels from the slab's centre, inside the sixteen the interact range allows. Walking left
 to centre the player on it walks them into the hole.
+
+**A jump keeps walking after it lands.** Right is held for the whole arc, and the wait that
+releases it resolves a few frames after touchdown. In the rebuilt crypt that slide carried the
+player some forty pixels past the lid, well outside the sixteen the interact range allows, and E
+read nothing. The beat now walks back left onto col 12 before pressing E.
 
 **`import.meta.dirname`, not `__dirname`.** This package is `"type": "module"` where Halcyon's is
 not, so the harness is loaded as ESM. The failure reads `No tests found`, with the real error a few

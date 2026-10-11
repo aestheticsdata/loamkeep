@@ -1,7 +1,12 @@
-import { DB32, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y, textResolution } from '@constants';
+import { DB32, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y } from '@constants';
+import { ArtBody } from '@hd/art-body';
+import { ArtText } from '@hd/art-text';
 import type { SketchbookPage } from '@systems/sketchbook';
 import type { Vec2 } from '@types';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
+
+// Tones that give light in a landmark, which selout leaves lit.
+const LIGHTS = [DB32.goldenFizz, DB32.white, DB32.viking, DB32.tahitiGold];
 
 // Half the height of a landmark body. Used to compute the y-center of the
 // interaction zone (which sits in the middle of the visible column, not at
@@ -37,7 +42,7 @@ export class Landmark {
   discovered = false;
   readonly sprite: Container;
 
-  private body: Graphics;
+  private body: ArtBody;
   private prompt: Container | null = null;
   private promptMode: PromptMode = null;
 
@@ -90,10 +95,14 @@ export class Landmark {
   // We always pass `false` as the discovered flag here: per the design above,
   // the in-world appearance never changes after discovery. The flag is kept
   // on the `LandmarkSpec` interface in case a future design wants it.
-  private makeBody(): Graphics {
-    const g = new Graphics();
-    this.spec.drawBody(g, false);
-    return g;
+  //
+  // In HD the body takes the common recipe (RECIPES §1–3: rounded, selout,
+  // its glows as opaque halos), with the tones that give light — lamps,
+  // flames, the glowing caps — left lit.
+  private makeBody(): ArtBody {
+    const body = new ArtBody('landmark', { emissive: LIGHTS });
+    body.draw((g) => this.spec.drawBody(g, false));
+    return body;
   }
 
   // Small "!" indicator hovering above the landmark — used after the player
@@ -111,14 +120,13 @@ export class Landmark {
   // before they've ever discovered anything.
   private makeTutorialPrompt(): Container {
     const c = new Container();
-    const text = new Text({
+    const text = new ArtText({
       text: 'press E',
       style: { fontFamily: 'monospace', fontSize: 7, fill: DB32.valhalla },
     });
-    text.resolution = textResolution();
     const pad = 3;
-    const w = Math.ceil(text.width);
-    const h = Math.ceil(text.height);
+    const w = Math.ceil(text.classic.width);
+    const h = Math.ceil(text.classic.height);
     const boxBottom = -19; // a couple of px above the landmark cap
     const boxTop = boxBottom - h - pad * 2;
 

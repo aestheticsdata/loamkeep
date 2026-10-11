@@ -1,7 +1,9 @@
 import { FLORA_NOTICE_RANGE_X, FLORA_NOTICE_RANGE_Y } from '@constants';
 import type { FloraId } from '@entities/plants';
+import { ArtBody } from '@hd/art-body';
+import { plantHd } from '@hd/critter-hd';
 import type { Vec2 } from '@types';
-import { Graphics } from 'pixi.js';
+import type { Graphics } from 'pixi.js';
 
 // A purely visual world element — tree, bush, rock, mushroom, etc. No state
 // and nothing to press. Lives in the world container so it scrolls with the
@@ -21,15 +23,17 @@ export interface DecorationSpec {
 }
 
 export class Decoration {
-  readonly sprite: Graphics;
+  // Plants take the plant recipe, the rest of the scenery the common one;
+  // identical drawings share their bake.
+  readonly sprite: ArtBody;
   readonly species: FloraId | undefined;
 
   constructor(spec: DecorationSpec) {
-    this.sprite = new Graphics();
+    this.sprite = new ArtBody(spec.species ? 'plants' : 'scenery');
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
     this.species = spec.species;
-    spec.draw(this.sprite);
+    this.sprite.draw(spec.draw, spec.species ? plantHd : undefined);
   }
 
   // True if the player is close enough for the flora book to write this

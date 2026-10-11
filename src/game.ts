@@ -1,4 +1,4 @@
-import { DB32, PHYSICS_STEP, PHYSICS_STEP_SLACK, TILE_SIZE } from '@constants';
+import { DB32, PHYSICS_STEP, PHYSICS_STEP_SLACK, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE } from '@constants';
 import { Bird, drawBird } from '@entities/bird';
 import { isCritter } from '@entities/critter';
 import { Decoration } from '@entities/decoration';
@@ -12,6 +12,10 @@ import { drawOwl, Owl } from '@entities/owl';
 import { Player } from '@entities/player';
 import { drawPumpkin, Pumpkin } from '@entities/pumpkin';
 import { drawRabbit, Rabbit } from '@entities/rabbit';
+import { ART_KIND, type ArtPair, draws, fineMotion, registerArt, unregisterArt } from '@hd/art-mode';
+import { FINE } from '@hd/fine-canvas';
+import { rampDownFilter } from '@hd/ramp-filter';
+import { SplitView } from '@hd/split-view';
 import { Audio } from '@systems/audio';
 import { Camera } from '@systems/camera';
 import { Greeting } from '@systems/greeting';
@@ -41,7 +45,9 @@ import { TitleScreen } from '@systems/title-screen';
 import { TitleSketchbook } from '@systems/title-sketchbook';
 import { WorldMap } from '@systems/world-map';
 import { WorldState } from '@systems/world-state';
+import type { Vec2 } from '@types';
 import type { CreatureId } from '@world/creatures';
+import { GroundHd } from '@world/ground-hd';
 import type { Level } from '@world/level';
 import { LEVEL_SPECS, type LevelId, loadLevel, STARTING_LEVEL_ID } from '@world/levels';
 import { ParallaxBackground } from '@world/parallax';
@@ -93,6 +99,9 @@ export interface GameSnapshot {
   fading: boolean;
   sketchbookOpen: boolean;
   greetingOpen: boolean;
+  /** Top-left of the view in the world, logical pixels: world (x, y) is on screen at ×3 of (x − cameraX, y − cameraY). */
+  cameraX: number;
+  cameraY: number;
   /** Pages written across every book, and how many there are in total. */
   pagesWritten: number;
   pagesTotal: number;
@@ -142,6 +151,7 @@ export class Game {
   // The world map, opened from the title.
   private readonly worldMap = new WorldMap();
   private readonly fade: ScreenFade;
+  private readonly splitView: SplitView;
   // True until the player has entered the world once. The constructor
   // mounts the starting level at its default spawn, which is exactly what
   // ENTER THE MEADOW asks for, so the first entry skips the rebuild; every
@@ -155,6 +165,13 @@ export class Game {
   // Animated water surface — recreated as a fresh Graphics each mount so we
   // don't keep stale draws around when the level swaps.
   private waterSurface: Graphics;
+  // The same ground in HD — backdrops, tiles and water baked in chunks around
+  // the camera — paired with the classic Graphics for art-mode to flip.
+  private groundHd: GroundHd | null = null;
+  private groundArt: ArtPair | null = null;
+  // The world behind an open book or greeting, in HD: two steps down its ramp.
+  private readonly rampDown = rampDownFilter();
+  private veiled = false;
 
   private readonly player: Player;
   private readonly camera: Camera;
@@ -230,6 +247,11 @@ export class Game {
     this.fade = new ScreenFade();
     app.stage.addChild(this.fade.container);
 
+    // The classic/HD comparison sits over everything, the fade included, so
+    // what it compares is the whole picture.
+    this.splitView = new SplitView(app);
+    app.stage.addChild(this.splitView.container);
+
     // Placeholder; mountLevelContent() overwrites this immediately.
     this.waterSurface = new Graphics();
 
@@ -257,6 +279,7 @@ export class Game {
         this.tickPlaying(dt);
       }
       this.input.endFrame();
+      this.splitView.update();
     });
   }
 
@@ -326,8 +349,9 @@ export class Game {
     } else {
       this.waterAnimTime = 0;
     }
-    const surfaceOffset = Math.round(Math.sin(this.waterAnimTime * WATER_BOB_FREQ) * WATER_BOB_AMPLITUDE);
-    renderWaterSurfaceInto(this.waterSurface, tilemap, surfaceOffset, activeBodyId);
+    const swing = Math.sin(this.waterAnimTime * WATER_BOB_FREQ) * WATER_BOB_AMPLITUDE;
+    const surfaceOffset = Math.round(swing);
+    if (draws(ART_KIND.classic)) renderWaterSurfaceInto(this.waterSurface, tilemap, surfaceOffset, activeBodyId);
 
     if (this.greeting.isVisible() || this.sketchbook.isVisible()) {
       // Paused: a press latched just before the popup opened must not fire
@@ -421,6 +445,25 @@ export class Game {
       this.camera.applyTo(this.world);
       this.parallax.update(this.camera);
     }
+
+    this.veilWorld(draws(ART_KIND.hd) && (this.greeting.isVisible() || this.sketchbook.isVisible()));
+
+    if (draws(ART_KIND.hd)) {
+      // Fine motion steps the bob by the fine pixel and runs the ripple
+      // along it; without it the surface moves exactly as classic does.
+      const fine = fineMotion();
+      this.groundHd?.update(
+        { x: this.camera.pos.x, y: this.camera.pos.y, w: SCREEN_WIDTH, h: SCREEN_HEIGHT },
+        {
+          activeId: activeBodyId,
+          motion: {
+            offset: fine ? Math.round(swing * FINE) : surfaceOffset * FINE,
+            wave: fine && activeBodyId >= 0 ? 1 : 0,
+            t: this.waterAnimTime,
+          },
+        },
+      );
+    }
   }
 
   // Put the title in front of whatever was playing. Called at boot and from
@@ -492,6 +535,28 @@ export class Game {
   // later). Synchronous — by the time it returns, the world has been
   // rebuilt and the camera snapped.
   //
+  // Puts the ramp-down filter on the world and its sky, or takes it off.
+  private veilWorld(on: boolean): void {
+    if (on === this.veiled) return;
+    this.veiled = on;
+    const filters = on ? [this.rampDown] : [];
+    this.world.filters = filters;
+    this.parallax.container.filters = filters;
+  }
+
+  // Dev only (main.ts wires it to __loamkeep): go straight to a level and,
+  // optionally, put the player at (x, y) in it — how a check reaches a tile
+  // or a pool without a storyboard walking there.
+  devTravel(levelId: string, at?: Vec2): void {
+    if (levelId !== this.currentLevel.spec.id) this.transitionTo(levelId, loadLevel(levelId).spec.defaultSpawnId);
+    if (!at) return;
+    this.player.placeAt(at.x, at.y);
+    this.aimCameraAtPlayer();
+    this.camera.snap();
+    this.camera.applyTo(this.world);
+    this.parallax.update(this.camera);
+  }
+
   // Defensive ordering: build + validate the NEW level first (loadLevel and
   // spawn() both throw on bad ids). Only after they succeed do we tear down
   // the current one — that way an authoring typo in a door spec doesn't
@@ -542,6 +607,7 @@ export class Game {
     // Either one band, full width, from rockBgStartRow down; or, when the
     // level names regions, only behind those — a hill with caves inside it
     // and open sky either side of it.
+    const classicGround = new Container();
     const regions = level.spec.backdropRegions ?? [
       { col: 0, row: level.spec.rockBgStartRow, cols: tilemap.width, rows: tilemap.height - level.spec.rockBgStartRow },
     ];
@@ -564,19 +630,24 @@ export class Game {
         backdrop = renderIndoorBackdrop(width, top, bottom);
       }
       backdrop.x = region.col * TILE_SIZE;
-      this.levelLayer.addChild(backdrop);
+      classicGround.addChild(backdrop);
     }
 
     // Static tilemap (everything except water).
-    this.levelLayer.addChild(renderTilemap(tilemap));
+    classicGround.addChild(renderTilemap(tilemap));
 
     // Water — body + animated surface. Body goes first so surface renders
     // over it. The waterSurface field is REASSIGNED here — the old Graphics
     // from a previous level was already removed by clearLevelLayer().
-    this.levelLayer.addChild(renderWaterBody(tilemap));
+    classicGround.addChild(renderWaterBody(tilemap));
     this.waterSurface = new Graphics();
     renderWaterSurfaceInto(this.waterSurface, tilemap, 0, -1);
-    this.levelLayer.addChild(this.waterSurface);
+    classicGround.addChild(this.waterSurface);
+
+    // The ground in HD, in the same place in the layer; art-mode shows one.
+    this.groundHd = new GroundHd(level);
+    this.levelLayer.addChild(classicGround, this.groundHd.container);
+    this.groundArt = registerArt({ classic: classicGround, hd: this.groundHd.container });
 
     // Decorations. Held onto only when they are a plant: those are the ones
     // the flora book asks about the player's distance from, every frame.
@@ -624,6 +695,11 @@ export class Game {
   // shortly. Acceptable at this content scale.
   private clearLevelLayer(): void {
     this.levelLayer.removeChildren();
+    // The HD ground owns chunk textures that would otherwise outlive it.
+    if (this.groundArt) unregisterArt(this.groundArt);
+    this.groundHd?.destroy();
+    this.groundHd = null;
+    this.groundArt = null;
     this.currentLandmarks = [];
     this.currentEntities = [];
     this.currentPlants = [];
@@ -948,6 +1024,8 @@ export class Game {
       fading: this.fade.running,
       sketchbookOpen: this.sketchbook.isVisible(),
       greetingOpen: this.greeting.isVisible(),
+      cameraX: this.camera.pos.x,
+      cameraY: this.camera.pos.y,
       pagesWritten: written,
       pagesTotal: total,
     };

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LOAMKEEP · HD pass prototype</title>
+<style>
+  html, body { margin: 0; background: #0a0a12; color: #cbdbfc; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  a { color: #eec39a; } a:hover { color: #ffffff; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 20px 0 32px; }
+  canvas { width: 960px; height: 672px; image-rendering: pixelated; display: block; }
+  .bar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; width: 960px; }
+  button { font: inherit; background: #222034; color: #cbdbfc; border: 1px solid #3f3f74; padding: 5px 10px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #eec39a; color: #222034; border-color: #eec39a; }
+  .keys { width: 960px; color: #9badb7; display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  kbd { color: #eec39a; }
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <button data-page="1">1 Meadow</button><button data-page="2">2 Figure &amp; creatures</button><button data-page="3">3 Tiles &amp; type</button><button data-page="4">4 Belfry night</button><button data-page="5">5 Sketchbook</button>
+    <span style="width:18px"></span>
+    <button data-mode="classic">Classic</button><button data-mode="hd">HD</button><button data-mode="split">Split</button><button id="fine">Fine motion</button>
+  </div>
+  <canvas id="stage" width="960" height="672"></canvas>
+  <div class="keys"><span><kbd>C</kbd> classic / HD</span><span><kbd>V</kbd> split</span><span><kbd>M</kbd> fine motion</span><span><kbd>1-5</kbd> pages</span><span><kbd>← →</kbd> walk · <kbd>Space</kbd> jump (page 1)</span><span><a href="../RECIPES.md">recipes (README)</a></span></div>
+</main>
+<script src="engine.js"></script>
+<script src="classic.js"></script>
+<script src="hd.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

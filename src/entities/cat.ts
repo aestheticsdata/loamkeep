@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Seconds between two tail flicks, and between two big stretches.
 const FLICK_EVERY = 2.3;
@@ -28,7 +29,7 @@ export class Cat implements Critter {
   };
 
   private readonly spec: CatSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private elapsed: number;
   private drawn = '';
 
@@ -38,7 +39,7 @@ export class Cat implements Critter {
     this.sprite = new Container();
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
-    this.body = new Graphics();
+    this.body = new ArtBody('cat');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -50,8 +51,7 @@ export class Cat implements Critter {
     const key = `${stretching}${flick}`;
     if (key === this.drawn) return;
     this.drawn = key;
-    this.body.clear();
-    drawCat(this.body, { stretching, flick });
+    this.body.draw((g) => drawCat(g, { stretching, flick }));
   }
 
   isPlayerInRange(playerPos: Vec2, playerSize: Vec2): boolean {

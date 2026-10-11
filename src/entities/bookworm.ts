@@ -1,8 +1,9 @@
 import { DB32 } from '@constants';
 import { type Critter, type PatrolSpec, touches } from '@entities/critter';
+import { ArtBody } from '@hd/art-body';
 import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 const INCH_SPEED = 5;
 
@@ -18,7 +19,7 @@ export class Bookworm implements Critter {
   };
 
   private readonly spec: PatrolSpec;
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
   private x: number;
   private facing: 1 | -1 = 1;
   private elapsed = 0;
@@ -28,7 +29,7 @@ export class Bookworm implements Critter {
     this.spec = spec;
     this.x = spec.x;
     this.sprite = new Container();
-    this.body = new Graphics();
+    this.body = new ArtBody('bookworm');
     this.sprite.addChild(this.body);
     this.update(0);
   }
@@ -44,8 +45,7 @@ export class Bookworm implements Critter {
     }
     if (frame !== this.frame) {
       this.frame = frame;
-      this.body.clear();
-      drawBookworm(this.body, frame);
+      this.body.draw((g) => drawBookworm(g, frame));
     }
     this.sprite.x = this.x;
     this.sprite.y = this.spec.y;

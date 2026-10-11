@@ -1,7 +1,8 @@
 import { DB32 } from '@constants';
 import type { Entity } from '@entities/entity';
+import { ArtBody } from '@hd/art-body';
 import type { Vec2 } from '@types';
-import { Container, Graphics } from 'pixi.js';
+import { Container, type Graphics } from 'pixi.js';
 
 // Hop dynamics — tuned by feel for a small "petit saut" arc.
 //   HOP_VEL   - initial upward velocity in px/s (negative-y direction)
@@ -63,7 +64,7 @@ export class Pumpkin implements Entity {
   private isAirborne = false;
   private cooldownTimer = COOLDOWN;
 
-  private readonly body: Graphics;
+  private readonly body: ArtBody;
 
   // Pumpkin extent in entity-local coordinates (around posX, posY = base).
   // Matches drawPumpkin's widest band and its stem, so the hitbox tracks the
@@ -82,8 +83,8 @@ export class Pumpkin implements Entity {
     this.maxX = spec.maxX;
 
     this.sprite = new Container();
-    this.body = new Graphics();
-    drawPumpkin(this.body);
+    this.body = new ArtBody('pumpkin');
+    this.body.draw(drawPumpkin);
     this.sprite.addChild(this.body);
 
     this.syncSprite();
