@@ -1,6 +1,8 @@
 import { DB32, PHYSICS_STEP, PHYSICS_STEP_SLACK, TILE_SIZE } from '@constants';
 import { Bird, drawBird } from '@entities/bird';
+import { isCritter } from '@entities/critter';
 import { Decoration } from '@entities/decoration';
+import { Door } from '@entities/door';
 import type { Entity, InteractContext } from '@entities/entity';
 import { drawFishLarge, Fish } from '@entities/fish';
 import { drawGlowfishLarge, Glowfish } from '@entities/glowfish';
@@ -40,7 +42,7 @@ import { TitleSketchbook } from '@systems/title-sketchbook';
 import { WorldState } from '@systems/world-state';
 import type { CreatureId } from '@world/creatures';
 import type { Level } from '@world/level';
-import { loadLevel, STARTING_LEVEL_ID } from '@world/levels';
+import { LEVEL_SPECS, type LevelId, loadLevel, STARTING_LEVEL_ID } from '@world/levels';
 import { ParallaxBackground } from '@world/parallax';
 import {
   renderCryptBackdrop,
@@ -188,10 +190,10 @@ export class Game {
     this.currentLevel = loadLevel(STARTING_LEVEL_ID);
 
     // Parallax on stage BEHIND the world container.
-    this.parallax = new ParallaxBackground(
-      this.currentLevel.spec.parallax,
-      this.currentLevel.tilemap.width * TILE_SIZE,
-    );
+    this.parallax = new ParallaxBackground(this.currentLevel.spec.parallax, {
+      x: this.currentLevel.tilemap.width * TILE_SIZE,
+      y: this.currentLevel.tilemap.height * TILE_SIZE,
+    });
     app.stage.addChild(this.parallax.container);
     app.stage.addChild(this.world);
 
@@ -387,6 +389,7 @@ export class Game {
       this.checkOwlEncounter();
       this.checkGlowfishEncounter();
       this.checkMothEncounter();
+      this.checkCritterEncounters();
       this.noticeNearbyPlants();
 
       this.runInteractionLoop();
@@ -488,7 +491,10 @@ export class Game {
     // clamp; snap+apply puts the viewport on the player immediately so
     // there's no smooth pan from the old position.
     this.camera.setBounds(next.tilemap, next.spec.openSky);
-    this.parallax.rebuild(next.spec.parallax, next.tilemap.width * TILE_SIZE);
+    this.parallax.rebuild(next.spec.parallax, {
+      x: next.tilemap.width * TILE_SIZE,
+      y: next.tilemap.height * TILE_SIZE,
+    });
     this.aimCameraAtPlayer();
     this.camera.snap();
     this.camera.applyTo(this.world);
@@ -574,6 +580,10 @@ export class Game {
     // pose because its target flag is already true).
     const ctx = this.makeInteractContext();
     this.currentEntities = [...level.spec.createEntities(ctx)];
+    // Every door is told the name of the level it leads to, for its prompt.
+    for (const entity of this.currentEntities) {
+      if (entity instanceof Door) entity.setDestination(LEVEL_SPECS[entity.spec.targetLevelId as LevelId].name);
+    }
     for (const entity of this.currentEntities) {
       this.levelLayer.addChild(entity.sprite);
     }
@@ -808,6 +818,23 @@ export class Game {
         });
         return;
       }
+    }
+  }
+
+  // Every creature written to the Critter contract: one loop for the lot, and
+  // one popup a frame at most.
+  private checkCritterEncounters(): void {
+    for (const entity of this.currentEntities) {
+      if (!isCritter(entity)) continue;
+      // Asked every frame even once met: the hedgehog curls up from it.
+      const inRange = entity.isPlayerInRange(this.player.pos, this.player.size);
+      const flag = `${entity.species}-greeted`;
+      if (this.greeting.isVisible() || this.metCreature(entity.species, flag)) continue;
+      if (entity.greetsOnlyOnGround && !this.player.onGround) continue;
+      if (!inRange) continue;
+      this.worldState.set(flag, true);
+      this.sketchbookStore.add(CREATURES_BOOK_ID, entity.species);
+      this.greeting.show(entity.greeting);
     }
   }
 

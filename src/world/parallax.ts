@@ -45,11 +45,11 @@ const AUTUMN_HORIZON_Y = 14 * 16;
 // The observatory's sky. Screen-space like the night's, but deeper and far
 // fuller, with a band of faint dust across it and the spiral constellation
 // overhead — placed, in screen coordinates, so that from the summit (camera
-// at about x 552, y -40) it hangs centred above the Sighting Stone.
+// at about x 1574, y 408) it hangs centred above the Sighting Stone.
 const ZENITH_SKY = 0x0c0b1a;
 const ZENITH_FACTOR = 0.05;
-const SPIRAL_CENTRE_X = 196;
-const SPIRAL_CENTRE_Y = 58;
+const SPIRAL_CENTRE_X = 247;
+const SPIRAL_CENTRE_Y = 78;
 const AUTUMN_BANDS: readonly (readonly [number, number])[] = [
   // [height above the horizon where the band starts, colour]
   [0, 0xf4cf7a],
@@ -64,7 +64,7 @@ const AUTUMN_BANDS: readonly (readonly [number, number])[] = [
 // its x/y is offset every frame by a fraction of the camera position to fake
 // depth. Far layer is drawn first (behind), near layer on top.
 //
-// One instance per session — `rebuild(flavor, widthPx)` swaps the layer set
+// One instance per session — `rebuild(flavor, levelSize)` swaps the layer set
 // on level transition. The 'meadow' flavor is the outdoor mountain stack
 // (sky + 3 hill silhouettes); the 'keep' flavor renders nothing (an indoor
 // castle has no distant horizon — the rock backdrop in the world container
@@ -73,15 +73,17 @@ export class ParallaxBackground {
   readonly container: Container;
   private layers: ParallaxLayer[] = [];
 
-  constructor(flavor: ParallaxFlavor, levelWidthPx: number) {
+  constructor(flavor: ParallaxFlavor, levelSize: Vec2) {
     this.container = new Container();
-    this.rebuild(flavor, levelWidthPx);
+    this.rebuild(flavor, levelSize);
   }
 
   // Replace the layer set for a new level. Clears the existing container,
   // destroys the old Graphics (Pixi otherwise keeps the GPU buffers around
   // until next GC), then populates fresh layers per the flavor's recipe.
-  rebuild(flavor: ParallaxFlavor, levelWidthPx: number): void {
+  // `levelSize` is the level in pixels: x its width, y its height.
+  rebuild(flavor: ParallaxFlavor, levelSize: Vec2): void {
+    const levelWidthPx = levelSize.x;
     for (const layer of this.layers) {
       layer.graphics.destroy();
     }
@@ -91,7 +93,7 @@ export class ParallaxBackground {
     if (flavor === 'meadow') {
       this.buildMeadowLayers(levelWidthPx);
     } else if (flavor === 'zenith') {
-      this.buildZenithLayers(levelWidthPx);
+      this.buildZenithLayers(levelSize);
     } else if (flavor === 'autumn') {
       this.buildAutumnLayers(levelWidthPx);
     } else if (flavor === 'night') {
@@ -164,8 +166,9 @@ export class ParallaxBackground {
     );
   }
 
-  private buildZenithLayers(levelWidthPx: number): void {
-    const width = levelWidthPx + SCREEN_WIDTH;
+  private buildZenithLayers(levelSize: Vec2): void {
+    const width = levelSize.x + SCREEN_WIDTH;
+    const levelHeightPx = levelSize.y;
     // One flat colour: a lighter horizon band, glued to the screen as the
     // sky is, showed as a box behind the terraces. The dust band is the
     // variation this sky has.
@@ -173,8 +176,11 @@ export class ParallaxBackground {
     sky.rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT).fill(ZENITH_SKY);
     this.addLayer(sky, { x: 0, y: 0 });
     this.addLayer(makeDustBand(width), { x: ZENITH_FACTOR, y: ZENITH_FACTOR });
-    this.addLayer(makeStarField(width, 0x51a7), { x: ZENITH_FACTOR, y: ZENITH_FACTOR });
-    this.addLayer(makeStarField(width, 0x0b5e), { x: ZENITH_FACTOR * 1.6, y: ZENITH_FACTOR * 1.6 });
+    // Tall enough for the observatory's camera to run its whole height
+    // without the field's bottom edge ever coming up into view.
+    const fieldHeight = SCREEN_HEIGHT + levelHeightPx * ZENITH_FACTOR * 1.6;
+    this.addLayer(makeStarField(width, 0x51a7, fieldHeight), { x: ZENITH_FACTOR, y: ZENITH_FACTOR });
+    this.addLayer(makeStarField(width, 0x0b5e, fieldHeight), { x: ZENITH_FACTOR * 1.6, y: ZENITH_FACTOR * 1.6 });
     this.addLayer(makeSpiralConstellation(), { x: ZENITH_FACTOR, y: ZENITH_FACTOR });
   }
 
@@ -377,7 +383,7 @@ function makeSkyGradient(width: number, horizonY: number): Graphics {
 // factor of 0.06 the whole belfry climb moves them about thirty pixels. Seeded,
 // so the sky is the same every visit. Most are 1-px dim points; one in nine is
 // a bright one with a cross of fainter pixels round it.
-function makeStarField(width: number, seed: number): Graphics {
+function makeStarField(width: number, seed: number, height = SCREEN_HEIGHT): Graphics {
   const g = new Graphics();
   let state = seed;
   const next = (): number => {
@@ -385,7 +391,7 @@ function makeStarField(width: number, seed: number): Graphics {
     return state / 0x7fffffff;
   };
   const top = -40;
-  const bottom = SCREEN_HEIGHT - 40;
+  const bottom = height - 40;
   const count = Math.floor((width * (bottom - top)) / 260);
   for (let i = 0; i < count; i++) {
     const x = Math.floor(next() * width);
@@ -477,7 +483,8 @@ function makeDustBand(width: number): Graphics {
   for (let i = 0; i < width * 3; i++) {
     const x = next() * width;
     const across = (next() + next() + next() - 1.5) * 22;
-    const y = 150 - x * 0.35 + across;
+    // From low on the left to high on the right, whatever the level's width.
+    const y = 170 - (x / width) * 140 + across;
     g.rect(Math.floor(x), Math.floor(y), 1, 1).fill({ color: DB32.deepKoamaru, alpha: 0.9 });
   }
   return g;

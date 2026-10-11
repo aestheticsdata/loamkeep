@@ -27,6 +27,8 @@ const GRANITE = 0x3b4354;
 const GRANITE_HI = 0x58627a;
 const GRANITE_CRACK = 0x232836;
 const LICHEN = 0x7d8a6a;
+const PUFFBALL = 0xd9c6de;
+const PUFFBALL_SHADE = 0xa98fb4;
 
 // Tile type. Uses a const object (not enum) so it plays nicely with
 // `isolatedModules` in tsconfig.
@@ -49,6 +51,8 @@ const LICHEN = 0x7d8a6a;
 //              in night colours rather than tinted, and not the meadow's
 //              grass, earth and brick: frost on the heath, roots in the
 //              peat, granite in irregular blocks with lichen on it.
+//   - Puffball: a giant mushroom cap on the hill. Solid, and it bounces
+//              whoever lands on it (see Player).
 //   - Timber:  the belfry's beams and plank floors. Warm brown against
 //              the tower's grey brick, so a ledge reads as "something to
 //              stand on" before the eye has found its edge.
@@ -72,6 +76,7 @@ export const Tile = {
   Heath: 15,
   Peat: 16,
   Granite: 17,
+  Puffball: 18,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -96,6 +101,7 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   h: Tile.Heath,
   p: Tile.Peat,
   g: Tile.Granite,
+  U: Tile.Puffball,
 };
 
 const TILE_COLORS: Record<Tile, number> = {
@@ -144,6 +150,7 @@ const TILE_COLORS: Record<Tile, number> = {
   [Tile.Heath]: HEATH_MOSS,
   [Tile.Peat]: PEAT,
   [Tile.Granite]: GRANITE,
+  [Tile.Puffball]: PUFFBALL,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -172,6 +179,7 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.Heath]: true,
   [Tile.Peat]: true,
   [Tile.Granite]: true,
+  [Tile.Puffball]: true,
 };
 
 export class Tilemap {
@@ -435,6 +443,11 @@ function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: nu
   // A ladder has no fill — the backdrop shows between its rungs.
   if (t === Tile.Ladder) {
     drawLadder(g, x, y);
+    return;
+  }
+  // Nor does a puffball's rounded top.
+  if (t === Tile.Puffball) {
+    drawPuffball(g, x, y, tx);
     return;
   }
 
@@ -864,6 +877,19 @@ function drawGranite(g: Graphics, x: number, y: number, tx: number, ty: number):
       g.rect(x + lx + 1, y + ly + 1, 1, 1).fill(LICHEN);
     }
   }
+}
+
+// Puffball: a fat round cap filling the tile, rounded off at the top corners,
+// pale lilac with a darker underside and a couple of soft spots. Its stalk is
+// whatever is drawn under it.
+function drawPuffball(g: Graphics, x: number, y: number, tx: number): void {
+  g.rect(x + 3, y + 1, TILE_SIZE - 6, 1).fill(PUFFBALL);
+  g.rect(x + 1, y + 2, TILE_SIZE - 2, 2).fill(PUFFBALL);
+  g.rect(x, y + 4, TILE_SIZE, TILE_SIZE - 7).fill(PUFFBALL);
+  g.rect(x, y + TILE_SIZE - 3, TILE_SIZE, 3).fill(PUFFBALL_SHADE);
+  g.rect(x + 4, y + 2, 3, 1).fill(DB32.white);
+  g.rect(x + 3 + (tx % 3) * 3, y + 7, 2, 2).fill(PUFFBALL_SHADE);
+  g.rect(x + 10 - (tx % 2) * 4, y + 5, 2, 1).fill(PUFFBALL_SHADE);
 }
 
 // Golden classical column. Vertical "round column" shading per tile: a

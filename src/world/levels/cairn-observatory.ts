@@ -1,104 +1,170 @@
 import { DB32, TILE_SIZE } from '@constants';
+import { Bat } from '@entities/bat';
 import type { DecorationSpec } from '@entities/decoration';
 import { Door } from '@entities/door';
 import type { Entity } from '@entities/entity';
+import { Fireflies } from '@entities/fireflies';
+import { Frog } from '@entities/frog';
 import { drawGlow } from '@entities/glow';
+import { Hare } from '@entities/hare';
+import { Hedgehog } from '@entities/hedgehog';
 import type { LandmarkSpec } from '@entities/landmark';
 import { Owl } from '@entities/owl';
 import { type FloraId, PLANTS } from '@entities/plants';
+import { Snail } from '@entities/snail';
 import type { LevelSpec, SpawnPoint } from '@world/level';
 import type { Graphics } from 'pixi.js';
 
 // The Cairn Observatory — the hill above the meadow, at night: the last place,
 // where the spiral turns out to be the sky.
 //
-// 96 wide × 50 tall, and three ways round it that loop into each other:
+// 192 wide × 100 tall. West to east:
 //
-//   Outside, west: from the foot of the hill (row 44, cols 0-16) a chimney of
-//     granite ledges up the west face — cols 8-10 and 12-14, three rows
-//     apart, a column of air between the two sides — to the shoulder (row 17),
-//     then three crags (rows 14, 11, 8) up to the summit's cornice (row 5).
-//   Inside: a cave mouth at the foot of the face (col 17) leads into a tunnel
-//     and the hall (rows 34-41), where the Fallen Star lies. The hall's pool
-//     drops under its east wall into a flooded shaft (cols 46-48) that rises
-//     the height of the hill to a grotto under the summit (rows 13-16), and a
-//     ladder climbs from the grotto through a hole in the summit (col 51).
-//     The bottom of the shaft also runs east, flooded, to a basin.
-//   Outside, east: from the summit, steps down to the ridge (row 17, cols
-//     67-82) and the Watcher's Bothy; off the end of the ridge, a long drop to
-//     the valley (row 44) and its tarn; a cave in the valley wall back to the
-//     basin, the flooded tunnel and the shaft.
+//   The moor (cols 0-63) — the gate back to the meadow, heath at three
+//     heights, hares and hedgehogs, and under it the warren: a tunnel two
+//     rows high with holes up through the heath, and a lower burrow whose
+//     puffball throws you straight back out onto the moor.
+//   The west face — two ways up to the shoulder: a chimney of ledges (cols
+//     51-53 and 55-57, three rows apart, a column of air between the sides)
+//     with a long ledge out west, or the ladder bolted to the face (col 63).
+//   The shoulder (row 53) — a puffball throws you onto P1, P1's onto P2,
+//     P2's onto the summit's cornice.
+//   The summit (row 33, cols 86-130) — the Sighting Stone under the spiral
+//     of stars; a hole at col 120 drops down a ladder to the grotto.
+//   The bridge (row 33, cols 131-159) — across the valley to the north tor,
+//     one plank missing: the way down to the tarn.
+//   The north tor (cols 160-191) — a puffball shortcut, steps up to the peak
+//     (row 13) and the Watcher's Bothy.
+//   The valley (row 86) — the tarn, its frogs, and the cavern's mouth.
+//   Inside the hill — the west tunnel from the foot of the face to the hall
+//     (the Fallen Star, a gallery reached by puffball), the hall's pool and
+//     the one-row crawlway east to the bat cavern; the cavern's puffball well
+//     up to the grotto and the ladder; and under it all the flooded tunnel
+//     from the hall's pool to the bottom of the tarn.
 //
 // Every jump is two rows up, or three with a column of air before the ledge
-// and nothing overhead — a three-row jump onto a ledge that starts in the very
-// next column puts the head under its corner. Checked with a port of the
+// and nothing overhead, or a puffball's eight. Checked with a port of the
 // player's physics: every place is reachable from the gate, and the gate from
 // every place.
 //
 // Legend (see CHAR_TO_TILE in tilemap.ts):
-//   . sky   h heath   p peat   g granite   W water   H ladder
+//   . sky   h heath   p peat   g granite   W water   H ladder   T timber
+//   U puffball
 const CAIRN_OBSERVATORY_ROWS = [
-  '................................................................................................', //  0
-  '................................................................................................', //  1
-  '................................................................................................', //  2
-  '................................................................................................', //  3
-  '................................................................................................', //  4
-  '............................hhhhhhhhhhhhhhhhhhhhhhhHhhhhh.......................................', //  5  SUMMIT (cols 28-56; cornice 28-31) — the ladder hole at col 51
-  '............................ggggpppppppppppppppppppHppppp.......................................', //  6
-  '................................pppppppppppppppppppHppppphh.....................................', //  7  east steps down: 57-58, 59-60, 61-62, 63-64, 65-66
-  '.......................ggg......gggggggggggggggggggHgggggpp.....................................', //  8  crag (cols 23-25)
-  '................................gggggggggggggggggggHgggggpphh...................................', //  9
-  '................................gggggggggggggggggggHgggggggpp...................................', // 10
-  '...........................ggg..gggggggggggggggggggHgggggggpphh.................................', // 11  crag (cols 27-29)
-  '................................gggggggggggggggggggHgggggggggpp.................................', // 12
-  '................................gggggggggg.........H.ggggggggpphh...............................', // 13  the grotto (rows 13-16, cols 42-52)
-  '.......................ggg......gggggggggg.........H.ggggggggggpp...............................', // 14  crag (cols 23-25)
-  '................................gggggggggg.........H.ggggggggggpphh.............................', // 15
-  '................................gggggggggg.........H.ggggggggggggpp.............................', // 16
-  '.............hhhhhhhhhhhhhhhhhhhggggggggggggggWWWggggggggggggggggpphhhhhhhhhhhhhhhh.............', // 17  SHOULDER (cols 13-31; cornice 13-16) + EAST RIDGE (cols 67-82) + top of the shaft
-  '.............ggggpppppppppppppppggggggggggggggWWWggggggggggggggggggpppppppppppppppp.............', // 18
-  '.................pppppppppppppppggggggggggggggWWWggggggggggggggggggpppppppppppppppp.............', // 19
-  '........ggg......gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 20  west chimney: ledges at cols 8-10 and 12-14, three rows apart
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 21
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 22
-  '............ggg..gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 23
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 24
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 25
-  '........ggg......gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 26
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 27
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 28
-  '............ggg..gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 29
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 30
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 31
-  '...gggggggg......gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 32  the long west ledge (cols 3-10)
-  '.................gggggggggggggggggggggggggggggWWWgggggggggggggggggggggggggggggggggg.............', // 33
-  '.................gggggggggggggg..............gWWWgggggggggggggggggggggggggggggggggg.............', // 34  the hall (rows 34-41, cols 31-44)
-  '............ggg..gggggggggggggg..............gWWWgggggggggggggggggggggggggggggggggg.............', // 35
-  '.................gggggggggggggg..............gWWWgggggggggggggggggggggggggggggggggg.............', // 36
-  '.................gggggggggggggg..............gWWWgggggggggggggggggggggggggggggggggg.............', // 37
-  '........ggg......gggggggggggggg..............gWWWgggggggggggggggggggggggggggggggggg.............', // 38
-  '.................gggggggggggggg..............gWWWgggggggggggggggggggggggggggggggggg.............', // 39
-  '.............................................gWWWgggggggggggggggggggggggggggggggggg.............', // 40  west tunnel (rows 40-43) from the mouth at col 17
-  '............ggg..............................gWWWggggggggggggg..................................', // 41  east tunnel (rows 41-43, cols 62-82) to the valley
-  '...............................ggggggggggWWWWWWWWggggggggggggg..................................', // 42  hall floor (cols 31-40) + hall pool (cols 41-45)
-  '...............................ggggggggggWWWWWWWWggggggggggggg..................................', // 43
-  'hhhhhhhhhhhhhhhhhggggggggggggggggggggggggWWWWWWWWgggggggggggggWWWWggggggggggggggggghhhWWWWWWhhhh', // 44  WEST FOOT (cols 0-16) + basin (cols 62-65) + EAST VALLEY (cols 83-95) and tarn (86-91)
-  'pppppppppppppppppggggggggggggggggggggggggWWWWWWWWgggggggggggggWWWWgggggggggggggggggpppWWWWWWpppp', // 45
-  'pppppppppppppppppgggggggggggggggggggggggggggggWWWWWWWWWWWWWWWWWWWWgggggggggggggggggpppWWWWWWpppp', // 46  flooded tunnel (rows 46-48) from the shaft to the basin
-  'ggggggggggggggggggggggggggggggggggggggggggggggWWWWWWWWWWWWWWWWWWWWgggggggggggggggggggggggggggggg', // 47
-  'ggggggggggggggggggggggggggggggggggggggggggggggWWWWWWWWWWWWWWWWWWWWgggggggggggggggggggggggggggggg', // 48
-  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // 49
+  '................................................................................................................................................................................................', //  0
+  '................................................................................................................................................................................................', //  1
+  '................................................................................................................................................................................................', //  2
+  '................................................................................................................................................................................................', //  3
+  '................................................................................................................................................................................................', //  4
+  '................................................................................................................................................................................................', //  5
+  '................................................................................................................................................................................................', //  6
+  '................................................................................................................................................................................................', //  7
+  '................................................................................................................................................................................................', //  8
+  '................................................................................................................................................................................................', //  9
+  '................................................................................................................................................................................................', // 10
+  '................................................................................................................................................................................................', // 11
+  '................................................................................................................................................................................................', // 12
+  '........................................................................................................................................................................................hhhhhhhh', // 13  the north tor's peak (cols 184-191) — the Watcher's Bothy
+  '........................................................................................................................................................................................pppppppp', // 14
+  '......................................................................................................................................................................................hhpppppppp', // 15
+  '......................................................................................................................................................................................ppgggggggg', // 16
+  '....................................................................................................................................................................................hhppgggggggg', // 17
+  '....................................................................................................................................................................................ppgggggggggg', // 18
+  '..................................................................................................................................................................................hhppgggggggggg', // 19
+  '..................................................................................................................................................................................ppgggggggggggg', // 20
+  '................................................................................................................................................................................hhppgggggggggggg', // 21
+  '................................................................................................................................................................................ppgggggggggggggg', // 22
+  '..............................................................................................................................................................................hhppgggggggggggggg', // 23
+  '..............................................................................................................................................................................ppgggggggggggggggg', // 24
+  '................................................................................................................................................................ggggg.......hhppgggggggggggggggg', // 25  a crag at the tor's foot (cols 160-164)
+  '............................................................................................................................................................................ppgggggggggggggggggg', // 26
+  '..........................................................................................................................................................................hhppgggggggggggggggggg', // 27
+  '..........................................................................................................................................................................ppgggggggggggggggggggg', // 28
+  '........................................................................................................................................................................hhppgggggggggggggggggggg', // 29
+  '........................................................................................................................................................................ppgggggggggggggggggggggg', // 30
+  '......................................................................................................................................................................hhppgggggggggggggggggggggg', // 31
+  '.......................................................................................................................g.g............................................ppgggggggggggggggggggggggg', // 32  a stone lip either side of the ladder hole (cols 119, 121)
+  '......................................................................................hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhHhhhhhhhhhhTTTTTTTTTTTTTT..TTTTTTTTTTTTThhhUhhppgggggggggggggggggggggggg', // 33  SUMMIT (cols 86-130; cornice 86-91) — ladder hole col 120 — the BRIDGE (cols 131-159, a plank missing at 145-146) — the tor's foot (cols 160-165)
+  '......................................................................................ggggggppppppppppppppppppppppppppppHpppppppppp.............................ppppppgggggggggggggggggggggggggg', // 34
+  '............................................................................................ppppppppppppppppppppppppppppHpppppppppp.............................ppppppgggggggggggggggggggggggggg', // 35
+  '............................................................................................ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 36
+  '............................................................................................ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 37
+  '............................................................................................ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 38
+  '.................................................................................ggggU......ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 39  P2, the second puffball ledge (cols 81-85)
+  '............................................................................................ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 40
+  '............................................................................................ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 41
+  '............................................................................................ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 42
+  '............................................................................................ggggggggggggggggggggggggggggHgggggggggg.............................gggggggggggggggggggggggggggggggg', // 43
+  '............................................................................................gggggggggggggggg...................gggg.............................gggggggggggggggggggggggggggggggg', // 44  the grotto (rows 44-47, cols 108-126)
+  '............................................................................................gggggggggggggggg...................gggg.............................gggggggggggggggggggggggggggggggg', // 45
+  '............................................................ggggg.........gggggU............gggggggggggggggg...................gggg.............................gggggggggggggggggggggggggggggggg', // 46  P1, the first puffball ledge (cols 74-79), and a crag (cols 60-64)
+  '............................................................................................gggggggggggggggg...................gggg.............................gggggggggggggggggggggggggggggggg', // 47
+  '............................................................................................gggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 48  the well's throat (rows 48-57, cols 112-118)
+  '............................................................................................gggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 49
+  '............................................................................................gggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 50
+  '............................................................................................gggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 51
+  '............................................................................................gggggggggggggggggggg..ggU..gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 52
+  '........................................................hhhhhhhHhhhhhhhhUhhhhhhhhhhhhhhhhhhhgggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 53  SHOULDER (cols 56-91; cornice 56-62) with a puffball at col 72 — the face ladder (col 63) to row 85
+  '........................................................gggggggHppppppppppppppppppppppppppppgggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 54
+  '...............................................................Hppppppppppppppppppppppppppppgggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 55
+  '...................................................ggg.........Hgggggggggggggggggggggggggggggggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 56  west chimney: ledges at cols 51-53 and 55-57, three rows apart, rows 56-83
+  '...............................................................Hgggggggggggggggggggggggggggggggggggggggggggggggg.......gggggggggggg.............................gggggggggggggggggggggggggggggggg', // 57
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg.Ugg......g...g.g..g.............................gggggggggggggggggggggggggggggggg', // 58  the bat cavern (rows 58-85, cols 111-129)
+  '.......................................................ggg.....Hggggggggggggggggggggggggggggggggggggggggggggggg..........g...g.g..g.............................gggggggggggggggggggggggggggggggg', // 59
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg..........g...g....g.............................gggggggggggggggggggggggggggggggg', // 60
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg..............g....g.............................gggggggggggggggggggggggggggggggg', // 61
+  '...................................................ggg.........Hggggggggggggggggggggggggggggggggggggggggggggggg..............g....g.............................gggggggggggggggggggggggggggggggg', // 62
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 63
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 64
+  '.......................................................ggg.....Hggggggggggggggggggggggggggggggggggggggggggggggg......Uggg.........g.............................gggggggggggggggggggggggggggggggg', // 65
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 66
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 67
+  '..........................................gggggggggggg.........Hggggggggggggggggggggggggggggggggggggggggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 68  the long ledge west of the chimney (cols 42-53)
+  '...............................................................Hggggggggggggggggggggggggggggggggggggggggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 69
+  '...............................................................Hggggggggggggggggg.........gg.........gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 70  the hall (rows 70-85, cols 81-100)
+  '.......................................................ggg.....Hggggggggggggggggg.........gg.........gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 71
+  '...............................................................Hggggggggggggggggg.........gg.........gggggggggg.........gggU......g.............................gggggggggggggggggggggggggggggggg', // 72
+  '...............................................................Hggggggggggggggggg.........gg.........gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 73
+  '...................................................ggg.........Hggggggggggggggggg....................gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 74
+  '...............................................................Hggggggggggggggggg....................gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 75
+  '...............................................................Hggggggggggggggggg....................gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 76
+  '.......................................................ggg.....Hggggggggggggggggg....................gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 77
+  '...............................................................Hggggggggggggggggg....................gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 78
+  '...............................................................Hggggggggggggggggggggggg..............gggggggggg....Uggg...........g.............................gggggggggggggggggggggggggggggggg', // 79  the hall's gallery (cols 81-86)
+  '...................................................ggg.........Hggggggggggggggggg....................gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 80
+  '...............................................................Hggggggggggggggggg....................gggggggggg...................g.............................gggggggggggggggggggggggggggggggg', // 81
+  '...............................................................H.....................................gggggggggg.................................................gggggggggggggggggggggggggggggggg', // 82  west tunnel (rows 82-85) from the mouth at col 64 — the cavern's mouth onto the valley at col 130
+  '.......................................................ggg.....H.....................................gggggggggg.................................................gggggggggggggggggggggggggggggggg', // 83
+  '................hhhhhhhhhhhh...................................H.....................................gggggggggg.................................................gggggggggggggggggggggggggggggggg', // 84  the moor's rise (cols 16-27)
+  '..............hhpppppppppppphh.................................H................................................................................................gggggggggggggggggggggggggggggggg', // 85  the crawlway (cols 101-110), one row high
+  'hhhhhhhhhhhh..pppppppppppppppphhhh..hhhhhhhh..hhhhhhhhhhhhhhhhhhggggggggggggggggggggggggUggggggWWWWWWgggggggggggggggggggggUgggggggghhhhhhhWWWWWWWWWWWWWWWhhhhhhhgggggggggggggggggggggggggggggggg', // 86  THE MOOR (cols 0-63) — hall floor with puffball (88) and pool (95-100) — cavern floor with puffball (122) — THE VALLEY (cols 131-159) and the tarn (138-152)
+  'pppp...........................................pppppppppppppppppgggggggggggggggggggggggggggggggWWWWWWggggggggggggggggggggggggggggggpppppppWWWWWWWWWWWWWWWpppppppgggggggggggggggggggggggggggggggg', // 87  the warren (rows 87-88, cols 4-46) under holes at cols 12-13, 34-35, 44-45
+  'pppp...........................................pppppppppppppppppgggggggggggggggggggggggggggggggWWWWWWggggggggggggggggggggggggggggggpppppppWWWWWWWWWWWWWWWpppppppgggggggggggggggggggggggggggggggg', // 88
+  'ggggggggggggggggggggggggggg..ggggg..gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggWWWWWWgggggggggggggggggggggggggggggggggggggWWWWWWWWWWWWWWWggggggggggggggggggggggggggggggggggggggg', // 89
+  'gggggggggggggggggggggggg.................ggggggggggggggggggggggggggggggggggggggggggggggggggggggWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWggggggggggggggggggggggggggggggggggggggg', // 90  the lower burrow (rows 90-91, cols 24-40) and the flooded tunnel (rows 90-93, cols 95-152)
+  'gggggggggggggggggggggggg.................ggggggggggggggggggggggggggggggggggggggggggggggggggggggWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWggggggggggggggggggggggggggggggggggggggg', // 91
+  'ggggggggggggggggggggggggggggggggggUggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWggggggggggggggggggggggggggggggggggggggg', // 92
+  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWggggggggggggggggggggggggggggggggggggggg', // 93
+  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // 94
+  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // 95
+  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // 96
+  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // 97
+  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // 98
+  'gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg', // 99
 ] as const;
 
-const FOOT_Y = 44 * TILE_SIZE;
-const SUMMIT_Y = 5 * TILE_SIZE;
-const SHOULDER_Y = 17 * TILE_SIZE;
-const RIDGE_Y = 17 * TILE_SIZE;
-const HALL_Y = 42 * TILE_SIZE;
+const T = TILE_SIZE;
+const MOOR_Y = 86 * T;
+const RISE_Y = 84 * T;
+const SHOULDER_Y = 53 * T;
+const SUMMIT_Y = 33 * T;
+const PEAK_Y = 13 * T;
+const HALL_Y = 86 * T;
+const VALLEY_Y = 86 * T;
 
-const RETURN_DOOR_X = 3 * TILE_SIZE + 8;
+const RETURN_DOOR_X = 3 * T + 8;
 
-const CAIRN_OBSERVATORY_SPAWNS: SpawnPoint[] = [{ id: 'from-meadow', x: 5 * TILE_SIZE + 2, y: FOOT_Y - TILE_SIZE }];
+const CAIRN_OBSERVATORY_SPAWNS: SpawnPoint[] = [{ id: 'from-meadow', x: 5 * T + 2, y: MOOR_Y - T }];
 
 // The trail head: two rough uprights with a flat stone across them, and the
 // path running on between. Both ends of the trail use it — the meadow's
@@ -148,9 +214,18 @@ function drawThornTree(g: Graphics): void {
   g.rect(-1, -14, 1, 14).fill(DB32.topaz);
 }
 
+// A burrow mouth in the heath, beside a warren hole: a dark half-moon with a
+// fan of spoil in front of it. 14 wide × 5 tall.
+function drawBurrowMouth(g: Graphics): void {
+  g.rect(-7, -1, 14, 1).fill(0x3a2c32);
+  g.rect(-5, -4, 10, 3).fill(0x3a2c32);
+  g.rect(-3, -4, 6, 3).fill(DB32.black);
+  g.rect(-2, -5, 4, 1).fill(DB32.black);
+}
+
 // ---------------------------------------------------------------------------
 // Landmarks — the Sighting Stone on the summit, the Fallen Star in the hall,
-// the Watcher's Bothy on the ridge.
+// the Watcher's Bothy on the north tor.
 // ---------------------------------------------------------------------------
 
 const SPIRAL_CORNERS: readonly (readonly [number, number])[] = [
@@ -169,7 +244,7 @@ const SPIRAL_CORNERS: readonly (readonly [number, number])[] = [
 const CAIRN_OBSERVATORY_LANDMARKS: LandmarkSpec[] = [
   {
     id: 'sighting-stone',
-    x: 44 * TILE_SIZE + 8,
+    x: 108 * T + 8,
     y: SUMMIT_Y,
     name: 'Sighting Stone',
     description:
@@ -225,7 +300,7 @@ const CAIRN_OBSERVATORY_LANDMARKS: LandmarkSpec[] = [
   },
   {
     id: 'fallen-star',
-    x: 35 * TILE_SIZE + 8,
+    x: 84 * T + 8,
     y: HALL_Y,
     name: 'Fallen Star',
     description:
@@ -269,11 +344,11 @@ const CAIRN_OBSERVATORY_LANDMARKS: LandmarkSpec[] = [
   },
   {
     id: 'watchers-bothy',
-    x: 75 * TILE_SIZE + 8,
-    y: RIDGE_Y,
+    x: 188 * T + 8,
+    y: PEAK_Y,
     name: "Watcher's Bothy",
     description:
-      'A drystone hut on the ridge, one room, the roof long gone. Someone kept watch from here, night after ' +
+      'A drystone hut on the north tor, one room, the roof long gone. Someone kept watch from here, night after ' +
       'night: the doorpost is scored with notches in rows of five, too many to count, and the hearth faces ' +
       'not the fire but the open sky to the east.',
     drawBody(g) {
@@ -313,12 +388,12 @@ const CAIRN_OBSERVATORY_LANDMARKS: LandmarkSpec[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Decorations — waymarks, the stone ring, thorns, heather.
+// Decorations — waymarks, the stone ring, thorns, pines, heather, burrows.
 // ---------------------------------------------------------------------------
 
 const at = (col: number, surfaceRow: number, draw: (g: Graphics) => void): DecorationSpec => ({
-  x: col * TILE_SIZE + 8,
-  y: surfaceRow * TILE_SIZE,
+  x: col * T + 8,
+  y: surfaceRow * T,
   draw,
 });
 
@@ -328,31 +403,46 @@ const plant = (col: number, surfaceRow: number, species: FloraId): DecorationSpe
 });
 
 const CAIRN_OBSERVATORY_DECORATIONS: DecorationSpec[] = [
-  // The foot of the hill.
-  plant(10, 44, 'pine-tree'),
-  plant(13, 44, 'heather'),
-  at(15, 44, drawWaymark),
-  // The long west ledge, a resting place half way up the chimney.
-  plant(4, 32, 'heather'),
-  at(6, 32, drawThornTree),
+  // The moor.
+  plant(1, 86, 'pine-tree'),
+  plant(6, 86, 'heather'),
+  at(10, 86, drawBurrowMouth),
+  plant(8, 86, 'heather'),
+  plant(18, 84, 'pine-tree'),
+  plant(21, 84, 'heather'),
+  at(25, 84, drawThornTree),
+  plant(31, 86, 'bush'),
+  at(37, 86, drawBurrowMouth),
+  plant(41, 86, 'heather'),
+  plant(48, 86, 'pine-tree'),
+  plant(55, 86, 'heather'),
+  at(60, 86, drawWaymark),
+  // The long ledge out west of the chimney.
+  plant(43, 68, 'heather'),
+  at(46, 68, drawThornTree),
   // The shoulder.
-  at(18, 17, drawWaymark),
-  plant(24, 17, 'heather'),
-  at(28, 17, drawThornTree),
-  // The summit: the stone ring round the Sighting Stone, and a cairn on the
-  // cornice.
-  at(30, 5, drawWaymark),
-  at(39, 5, drawStandingStone),
-  at(49, 5, drawStandingStone),
-  plant(36, 5, 'heather'),
-  plant(54, 5, 'heather'),
-  // The ridge.
-  at(68, 17, drawWaymark),
-  plant(71, 17, 'heather'),
-  at(80, 17, drawThornTree),
+  at(58, 53, drawWaymark),
+  plant(66, 53, 'heather'),
+  at(76, 53, drawThornTree),
+  plant(84, 53, 'heather'),
+  plant(88, 53, 'heather'),
+  // The summit: the stone ring round the Sighting Stone.
+  at(88, 33, drawWaymark),
+  at(102, 33, drawStandingStone),
+  at(114, 33, drawStandingStone),
+  plant(96, 33, 'heather'),
+  plant(110, 33, 'heather'),
+  plant(126, 33, 'heather'),
+  // The north tor.
+  plant(161, 33, 'heather'),
+  at(171, 27, drawWaymark),
+  plant(177, 21, 'heather'),
+  at(185, 13, drawThornTree),
   // The valley.
-  plant(84, 44, 'heather'),
-  plant(93, 44, 'heather'),
+  plant(132, 86, 'heather'),
+  plant(136, 86, 'bush'),
+  plant(155, 86, 'heather'),
+  plant(158, 86, 'pine-tree'),
 ];
 
 export const cairnObservatoryLevel: LevelSpec = {
@@ -364,16 +454,16 @@ export const cairnObservatoryLevel: LevelSpec = {
   landmarks: CAIRN_OBSERVATORY_LANDMARKS,
   decorations: CAIRN_OBSERVATORY_DECORATIONS,
   parallax: 'zenith',
-  // Inside the hill the backdrop is pure black — the caves are lit by nothing
-  // but the Fallen Star — and only inside it: the chimney and the valley are
-  // open sky, so the backdrop covers the caves and nothing else.
+  // Inside the hill the backdrop is pure black — lit by nothing but the
+  // Fallen Star — and only inside it: the moor, the chimney, the shoulder and
+  // the valley are open sky.
   backdrop: 'crypt-black',
   rockBgStartRow: CAIRN_OBSERVATORY_ROWS.length,
   backdropRegions: [
-    { col: 17, row: 33, cols: 29, rows: 14 }, // west tunnel, hall and its pool
-    { col: 41, row: 12, cols: 13, rows: 37 }, // grotto and the flooded shaft
-    { col: 51, row: 5, cols: 1, rows: 8 }, // the ladder's chimney
-    { col: 49, row: 40, cols: 34, rows: 9 }, // flooded tunnel, basin, east tunnel
+    { col: 4, row: 87, cols: 43, rows: 13 }, // the warren and the lower burrow
+    { col: 64, row: 54, cols: 28, rows: 46 }, // under the shoulder: west tunnel, hall
+    { col: 92, row: 33, cols: 39, rows: 67 }, // under the summit: cavern, well, grotto, ladder
+    { col: 131, row: 87, cols: 22, rows: 13 }, // under the valley: the flooded tunnel
   ],
   openSky: true,
   createEntities(): readonly Entity[] {
@@ -381,15 +471,55 @@ export const cairnObservatoryLevel: LevelSpec = {
       new Door({
         id: 'observatory-return-door',
         x: RETURN_DOOR_X,
-        y: FOOT_Y,
+        y: MOOR_Y,
         targetLevelId: 'meadow',
-        targetSpawnId: 'from-observatory',
+        targetSpawnId: 'from-meadow',
         promptLabel: 'go down',
         drawBody: drawTrailGate,
       }),
-      new Owl({ x: 22 * TILE_SIZE + 8, y: SHOULDER_Y }),
-      new Owl({ x: 8 * TILE_SIZE + 8, y: 32 * TILE_SIZE }),
-      new Owl({ x: 79 * TILE_SIZE + 8, y: RIDGE_Y }),
+      // Hares, on the flats of the moor, the summit and the valley.
+      new Hare({ x: 20 * T, y: RISE_Y, minX: 16 * T + 6, maxX: 28 * T - 6 }),
+      new Hare({ x: 52 * T, y: MOOR_Y, minX: 47 * T, maxX: 62 * T }),
+      new Hare({ x: 100 * T, y: SUMMIT_Y, minX: 93 * T, maxX: 118 * T }),
+      new Hare({ x: 134 * T, y: VALLEY_Y, minX: 131 * T + 6, maxX: 137 * T }),
+      // Hedgehogs.
+      new Hedgehog({ x: 39 * T, y: MOOR_Y, minX: 36 * T + 6, maxX: 44 * T - 6 }),
+      new Hedgehog({ x: 66 * T, y: SHOULDER_Y, minX: 64 * T, maxX: 71 * T }),
+      new Hedgehog({ x: 156 * T, y: VALLEY_Y, minX: 153 * T + 6, maxX: 160 * T - 6 }),
+      new Hedgehog({ x: 4 * T, y: MOOR_Y, minX: 0 * T + 8, maxX: 11 * T }),
+      // Snails on the granite.
+      new Snail({ x: 52 * T, y: 74 * T, minX: 51 * T + 4, maxX: 54 * T - 4 }),
+      new Snail({ x: 48 * T, y: 68 * T, minX: 42 * T + 4, maxX: 50 * T }),
+      new Snail({ x: 76 * T, y: 46 * T, minX: 74 * T + 4, maxX: 79 * T - 4 }),
+      new Snail({ x: 162 * T, y: 25 * T, minX: 160 * T + 4, maxX: 165 * T - 4 }),
+      new Snail({ x: 84 * T, y: 79 * T, minX: 81 * T + 4, maxX: 87 * T - 4 }),
+      // Bats: hung in the hall and the cavern, and one low in the west tunnel
+      // and one in the crawlway, where a walker meets them.
+      new Bat({ x: 72 * T, y: 82 * T }),
+      new Bat({ x: 105 * T, y: 85 * T }),
+      new Bat({ x: 83 * T + 8, y: 70 * T }),
+      new Bat({ x: 90 * T + 16, y: 74 * T }),
+      new Bat({ x: 97 * T, y: 70 * T }),
+      new Bat({ x: 119 * T + 8, y: 58 * T }),
+      new Bat({ x: 121 * T + 8, y: 61 * T }),
+      new Bat({ x: 125 * T + 8, y: 63 * T }),
+      new Bat({ x: 127 * T + 8, y: 60 * T }),
+      new Bat({ x: 129 * T, y: 58 * T }),
+      // Frogs, each jumping the tarn from one bank to the other.
+      new Frog({ fromX: 135 * T, toX: 155 * T, y: VALLEY_Y }),
+      new Frog({ fromX: 137 * T, toX: 153 * T + 8, y: VALLEY_Y }),
+      // Fireflies, low over the heath and the water.
+      new Fireflies({ x: 12 * T, y: MOOR_Y - 22 }),
+      new Fireflies({ x: 24 * T, y: RISE_Y - 26 }),
+      new Fireflies({ x: 46 * T, y: 68 * T - 22 }),
+      new Fireflies({ x: 145 * T, y: VALLEY_Y - 30 }),
+      new Fireflies({ x: 95 * T, y: SUMMIT_Y - 22 }),
+      new Fireflies({ x: 188 * T, y: PEAK_Y - 30 }),
+      new Fireflies({ x: 122 * T, y: 46 * T }),
+      // Owls on the shoulder, the long ledge and the tor.
+      new Owl({ x: 80 * T + 8, y: SHOULDER_Y }),
+      new Owl({ x: 44 * T + 8, y: 68 * T }),
+      new Owl({ x: 173 * T, y: 25 * T }),
     ];
   },
 };

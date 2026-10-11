@@ -1,17 +1,23 @@
 import { DB32 } from '@constants';
+import { drawBatLarge } from '@entities/bat';
 import { drawBird } from '@entities/bird';
+import { drawFirefliesLarge } from '@entities/fireflies';
 import { drawFishLarge } from '@entities/fish';
+import { drawFrog } from '@entities/frog';
 import { drawGlowfishLarge } from '@entities/glowfish';
+import { drawHare } from '@entities/hare';
+import { drawHedgehog } from '@entities/hedgehog';
 import { drawMothLarge } from '@entities/moth';
 import { drawOwl } from '@entities/owl';
 import { drawPumpkin } from '@entities/pumpkin';
 import { drawRabbit } from '@entities/rabbit';
+import { drawSnail } from '@entities/snail';
 import { type SketchbookPage, scaledSketch } from '@systems/sketchbook';
 
 // The creatures sketchbook's table of contents: one page per species, in the
 // order the wanderer is likely to meet them — the meadow's three, the one
 // in the keep's garden, then the belfry's owl, the cistern's glowfish and the
-// grotto's moth.
+// grotto's moth, then the crowd on the observatory hill.
 //
 // Keyed by species, not by level. Meeting a rabbit is meeting rabbits, and the
 // meadow has two of them; the ids are bare where the landmarks book's are
@@ -20,7 +26,20 @@ import { type SketchbookPage, scaledSketch } from '@systems/sketchbook';
 // The pages are a record, never the event. The greeting popup is what fires
 // when the player touches one — it lives in Game, next to the WorldState flag
 // that stops it firing twice.
-export type CreatureId = 'rabbit' | 'fish' | 'bird' | 'pumpkin' | 'owl' | 'glowfish' | 'moth';
+export type CreatureId =
+  | 'rabbit'
+  | 'fish'
+  | 'bird'
+  | 'pumpkin'
+  | 'owl'
+  | 'glowfish'
+  | 'moth'
+  | 'hare'
+  | 'hedgehog'
+  | 'bat'
+  | 'snail'
+  | 'frog'
+  | 'fireflies';
 
 export interface CreaturePage {
   id: CreatureId;
@@ -105,6 +124,66 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
         'Pale, soft and never still, flying the same loop round the same glowcap until you could draw it. ' +
         'Two dark spots on its wings, like eyes, and it is the one doing the watching.',
       drawSketch: scaledSketch(drawMothLarge, 5, -10, 0),
+    },
+  },
+  {
+    id: 'hare',
+    page: {
+      name: 'Mountain Hare',
+      description:
+        'White as the frost it sits in, with black tips to its ears. It will not walk anywhere: it sits, then ' +
+        'goes off in a run of long low bounds, then sits again, as if walking were beneath it.',
+      drawSketch: scaledSketch((g) => drawHare(g, { bounding: false, ear: 0 }), 4, -14, 0),
+    },
+  },
+  {
+    id: 'hedgehog',
+    page: {
+      name: 'Hedgehog',
+      description:
+        'It trundles over the heath nose first, in no hurry. Come any closer and it is a ball of spines, and ' +
+        'it will stay one for exactly as long as you stand there looking at it.',
+      drawSketch: scaledSketch((g) => drawHedgehog(g, { curled: false, step: 0 }), 5, -8, 0),
+    },
+  },
+  {
+    id: 'bat',
+    page: {
+      name: 'Bat',
+      description:
+        'Hung up by its feet from the cave roof, wrapped in its own wings like a folded umbrella. Every so ' +
+        'often it lets go, flies one small tight circle, and hangs itself up again in exactly the same place.',
+      drawSketch: scaledSketch(drawBatLarge, 4, -15, 0),
+    },
+  },
+  {
+    id: 'snail',
+    page: {
+      name: 'Snail',
+      description:
+        'Crossing a slab of granite at the speed granite weathers. The shell is a spiral, of course; ' +
+        'everything up here is.',
+      drawSketch: scaledSketch((g) => drawSnail(g, 0), 6, -8, 0),
+    },
+  },
+  {
+    id: 'frog',
+    page: {
+      name: 'Frog',
+      description:
+        'It sits on the bank of the tarn with its throat going in and out, and every so often it jumps the ' +
+        'whole tarn in one go, lands, and looks round to see if anyone saw.',
+      drawSketch: scaledSketch((g) => drawFrog(g, { croak: true, leaping: false }), 6, -7, 0),
+    },
+  },
+  {
+    id: 'fireflies',
+    page: {
+      name: 'Fireflies',
+      description:
+        'A loose knot of small lights, low over the heath, blinking out of time with one another. From the ' +
+        'summit they are hard to tell from the stars, which may be the point.',
+      drawSketch: scaledSketch(drawFirefliesLarge, 5, -9, 0),
     },
   },
 ];

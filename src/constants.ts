@@ -144,6 +144,11 @@ export const LADDER_EXIT_BOOST = 225;
 // Distance climbed between two rung footsteps.
 export const CLIMB_STEP_DISTANCE = 14;
 
+// Puffballs — the observatory hill's giant mushrooms. Landing on one throws
+// the player up at PUFFBALL_VELOCITY: 126 px, nearly eight tiles, against a
+// jump's four. Holding down lands without the bounce, to stand on one.
+export const PUFFBALL_VELOCITY = 420;
+
 // Camera smoothing: higher = snappier follow. Time-based so it's framerate-independent.
 // f = 1 - exp(-RATE * dt). At 60fps with RATE=10, f ≈ 0.155 per frame.
 export const CAMERA_SMOOTHING_RATE = 10;

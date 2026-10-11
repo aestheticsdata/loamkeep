@@ -8,6 +8,7 @@ import {
   JUMP_RELEASE_MULT,
   JUMP_VELOCITY,
   LADDER_EXIT_BOOST,
+  PUFFBALL_VELOCITY,
   SUBMERGED_TINT,
   SWIM_DOWN_SPEED,
   SWIM_HORIZONTAL_SPEED,
@@ -285,6 +286,14 @@ export class Player implements Body {
 
       this.vel.x = move * WALK_SPEED;
 
+      // On a puffball: thrown up, unless down is held to stand on it.
+      if (this.onGround && !downHeld && standingOn(this, tilemap) === Tile.Puffball) {
+        this.vel.y = -PUFFBALL_VELOCITY;
+        this.coyoteTimer = 0;
+        this.jumpBufferTimer = 0;
+        this.didJumpThisFrame = true;
+      }
+
       if (this.coyoteTimer > 0 && this.jumpBufferTimer > 0) {
         this.vel.y = -JUMP_VELOCITY;
         this.coyoteTimer = 0;
@@ -499,6 +508,13 @@ export function drawFigure(g: Graphics, pose: FigurePose): void {
     g.rect(-2 + armDx, -5 + bodyBob, 1, 1).fill(strap);
     g.rect(-1 + armDx, -4 + bodyBob, 1, 1).fill(strap);
   }
+}
+
+// The tile under the middle of the body's feet.
+function standingOn(body: Body, tilemap: Tilemap): Tile {
+  const tx = Math.floor((body.pos.x + body.size.x / 2) / TILE_SIZE);
+  const ty = Math.floor((body.pos.y + body.size.y) / TILE_SIZE);
+  return tilemap.at(tx, ty);
 }
 
 // True if there is a solid tile in the row immediately above the player's

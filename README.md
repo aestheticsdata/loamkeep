@@ -11,8 +11,10 @@ find them.
 > the hill; the old keep, with its kitchen garden, the library behind the
 > bookshelf, the belfry up to the roof at night, and the crypt down to a
 > flooded cistern — with doorway transitions, wildlife (rabbits, fish, birds,
-> a hopping pumpkin, owls, glowfish, moths), water you can wade and swim
-> through, ladders, and a procedural Amiga-500 art direction. Everything ships as TypeScript — there are still no PNGs or
+> a hopping pumpkin, owls, glowfish, moths, and on the observatory hill
+> mountain hares, hedgehogs, bats, snails, frogs and fireflies), water you can
+> wade and swim through, ladders, puffballs that bounce you high, and a
+> procedural Amiga-500 art direction. Everything ships as TypeScript — there are still no PNGs or
 > audio samples.
 
 ## Design constraints
@@ -83,6 +85,8 @@ src/
     fish.ts         # Swimming wildlife — colour-aware, lives in water bodies
     glowfish.ts     # The cistern's fish — carries its own pulsing light
     owl.ts          # Perched belfry wildlife — blinks, turns its head
+    critter.ts      # The Critter contract: species, greeting, one loop greets them all
+    hare.ts / hedgehog.ts / bat.ts / snail.ts / frog.ts / fireflies.ts  # The hill's crowd
     moth.ts         # Grotto wildlife — circles a glowcap
     falling-leaf.ts # The kitchen garden's leaves, drifting down
     glow.ts         # Soft round light behind glowing things
@@ -117,7 +121,7 @@ src/
       glow-grotto.ts     # The mushroom-lit cave past the meadow maze
       kitchen-garden.ts  # The walled autumn garden, the pumpkin's home
       old-keep-library.ts  # Behind the bookshelf: stacks and ladders
-      cairn-observatory.ts # The hill at night: chimney, caves, flooded shaft, ridge — the spiral in the stars
+      cairn-observatory.ts # 192×100 hill at night: moor and warren, face, puffballs, bridge, tor, caves
     parallax.ts     # Procedural parallax background (per-flavor)
 ```
 
@@ -150,7 +154,8 @@ src/
   contents. `landmarks` derives its own by walking the level registry, so
   adding a landmark anywhere updates its count and gallery order for free;
   `creatures` is authored in `world/creatures.ts`, one page per species —
-  rabbit, fish, bird, pumpkin, owl, glowfish, moth — because a species is not registered on a level
+  rabbit, fish, bird, pumpkin, owl, glowfish, moth, hare, hedgehog, bat, snail,
+  frog, fireflies — because a species is not registered on a level
   the way a landmark is. Registering a book is the whole of adding one; the
   title screen has no per-book code. Four books is the comfortable ceiling
   before the menu plate reaches the key line.
@@ -197,6 +202,12 @@ src/
   drifts to the middle of the ladder's column, and leaving the top with
   upward speed gets the same pop as leaving water, enough to step onto the
   ledge the ladder leans against.
+- **Puffballs**: giant mushroom caps on the observatory hill. Landing on one
+  throws the player up about eight tiles; hold ↓ to land without the bounce.
+- **Doors between levels are marked**: every one, whatever it looks like — a
+  keep door, a bookshelf, a crack in the rock, a stone gate — carries the same
+  golden beacon bobbing over it, and its prompt names the level beyond
+  (`E  The Library`).
 - **Wildlife**: rabbits pacing platforms, fish swimming in water bodies, birds
   silhouetted across the sky, a hopping pumpkin with its own gravity, owls
   perched in the belfry, glowfish lighting the cistern, moths circling the
@@ -230,7 +241,7 @@ src/
   character is a tile type (`.` sky, `G` grass, `D` dirt, `S` stone,
   `K` dark stone, `W` water, `B`/`F`/`P` castle bricks/floor/pillar,
   `c`/`v` crypt bricks/floor, `T` timber, `R` grotto rock, `L` bookcase,
-  `H` ladder, `h`/`p`/`g` heath/peat/granite). Easy to hand-edit and read.
+  `H` ladder, `h`/`p`/`g` heath/peat/granite, `U` puffball). Easy to hand-edit and read.
 - **Logical resolution is 320×224.** The PixiJS stage upscales it ×3 to a
   fixed 960×672 canvas — the same size in every window, centred on the page's
   near-black ground, so a logical pixel is always exactly three of them.
@@ -298,6 +309,7 @@ Other actions:
 - **Jump / swim up**: Space / ↑ / W / Z (AZERTY)
 - **Dive (while in water)**: ↓ / S
 - **Climb a ladder**: ↑ / ↓ while on it
+- **Stand on a puffball instead of bouncing**: hold ↓
 - **Interact / close sketchbook**: E
 - **Turn the leaves of a long sketchbook page**: ← →
 - **Respawn at level's default spawn**: R

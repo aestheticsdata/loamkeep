@@ -1,5 +1,6 @@
 import { DB32, LANDMARK_INTERACT_RANGE_X, LANDMARK_INTERACT_RANGE_Y, textResolution } from '@constants';
 import type { Entity, InteractContext, PromptMode } from '@entities/entity';
+import { drawGlow } from '@entities/glow';
 import type { Vec2 } from '@types';
 import { Container, Graphics, Text } from 'pixi.js';
 
@@ -7,6 +8,14 @@ import { Container, Graphics, Text } from 'pixi.js';
 // in the middle of the door rather than at its base — matches how Landmark
 // places its prompt.
 const DOOR_HALF_HEIGHT = 11;
+
+// The beacon over every door to another level: where it hangs above the
+// door's base, how far it bobs, and how fast. Doors come in every shape — a
+// keep door, a bookshelf, a crack in the rock, a stone gate — and the beacon
+// is the one thing they share, so a way through always looks like one.
+const BEACON_Y = -36;
+const BEACON_BOB = 2;
+const BEACON_SPEED = 2.4;
 
 // Authored description of a door. The target identifies WHERE pressing E
 // leads: which level to load and which spawn point inside that level to
@@ -87,8 +96,13 @@ export class Door implements Entity {
   readonly sprite: Container;
 
   private body: Graphics;
+  private readonly beacon: Graphics;
   private prompt: Container | null = null;
   private promptMode: PromptMode = null;
+  // The name of the level beyond, shown on the prompt. Set by Game, which
+  // owns the level registry; until then the prompt says only what to press.
+  private destination = '';
+  private elapsed = 0;
 
   constructor(spec: DoorSpec) {
     this.spec = spec;
@@ -98,6 +112,24 @@ export class Door implements Entity {
     this.body = new Graphics();
     (spec.drawBody ?? drawDefaultDoor)(this.body);
     this.sprite.addChild(this.body);
+    this.beacon = new Graphics();
+    drawBeacon(this.beacon);
+    this.beacon.y = BEACON_Y;
+    this.sprite.addChild(this.beacon);
+    this.elapsed = (spec.x * 0.01) % 3;
+  }
+
+  update(dt: number): void {
+    this.elapsed += dt;
+    this.beacon.y = BEACON_Y + Math.round(Math.sin(this.elapsed * BEACON_SPEED) * BEACON_BOB);
+  }
+
+  setDestination(name: string): void {
+    this.destination = name;
+    // Rebuild a prompt that is already up, so it carries the name.
+    const mode = this.promptMode;
+    this.setPromptMode(null);
+    this.setPromptMode(mode);
   }
 
   // True if the player's body-center is inside the interaction rectangle
@@ -119,6 +151,8 @@ export class Door implements Entity {
       this.prompt = null;
     }
     this.promptMode = mode;
+    // The prompt takes the beacon's place while the player is at the door.
+    this.beacon.visible = mode === null;
     if (mode !== null) {
       this.prompt = mode === 'tutorial' ? this.makeTutorialPrompt() : this.makeSimplePrompt();
       this.sprite.addChild(this.prompt);
@@ -131,24 +165,23 @@ export class Door implements Entity {
     ctx.transitionTo(this.spec.targetLevelId, this.spec.targetSpawnId);
   }
 
-  // Same "!" indicator as Landmark — a tiny golden exclamation hovering just
-  // above the door's top edge. Familiar to anyone who's already approached a
-  // landmark.
+  // Once the player knows E, a door still says where it goes: a small label
+  // with the key and the name of the level beyond. A landmark's "!" is not
+  // enough here — the question at a door is not whether, but where to.
   private makeSimplePrompt(): Container {
-    const c = new Container();
-    const g = new Graphics();
-    g.rect(-1, -30, 2, 4).fill(DB32.goldenFizz);
-    g.rect(-1, -25, 2, 2).fill(DB32.goldenFizz);
-    c.addChild(g);
-    return c;
+    return this.makeLabel(this.destination ? `E  ${this.destination}` : 'E');
   }
 
   // Full tutorial tooltip — "press E to enter" by default; doors can pass a
   // custom label via spec.promptLabel for context-specific hints (e.g.
   // "press E to climb" for a future ladder).
   private makeTutorialPrompt(): Container {
+    const action = `press E to ${this.spec.promptLabel ?? 'enter'}`;
+    return this.makeLabel(this.destination ? `${action}: ${this.destination}` : action);
+  }
+
+  private makeLabel(label: string): Container {
     const c = new Container();
-    const label = `press E to ${this.spec.promptLabel ?? 'enter'}`;
     const text = new Text({
       text: label,
       style: { fontFamily: 'monospace', fontSize: 7, fill: DB32.valhalla },
@@ -170,4 +203,21 @@ export class Door implements Entity {
     c.addChild(text);
     return c;
   }
+}
+
+// The beacon: a golden lantern-diamond with a white heart and a small arrow
+// under it pointing down at the way through, in a soft round glow. Drawn
+// around (0, 0); the door hangs it at BEACON_Y and bobs it.
+function drawBeacon(g: Graphics): void {
+  drawGlow(g, { x: 0, y: 0, radius: 11, color: DB32.goldenFizz });
+  g.rect(-1, -4, 3, 1).fill(DB32.goldenFizz);
+  g.rect(-2, -3, 5, 1).fill(DB32.goldenFizz);
+  g.rect(-3, -2, 7, 3).fill(DB32.goldenFizz);
+  g.rect(-2, 1, 5, 1).fill(DB32.goldenFizz);
+  g.rect(-1, 2, 3, 1).fill(DB32.goldenFizz);
+  g.rect(0, -2, 1, 3).fill(DB32.white);
+  g.rect(-3, -2, 1, 3).fill(DB32.tahitiGold);
+  // The arrow.
+  g.rect(0, 5, 1, 3).fill(DB32.goldenFizz);
+  g.rect(-1, 7, 3, 1).fill(DB32.goldenFizz);
 }
