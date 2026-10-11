@@ -32,6 +32,22 @@ export const RAMP: ReadonlyMap<number, readonly [lit: number, shade: number]> = 
   [DB32.brown, [DB32.pancho, DB32.clairvoyant]],
 ]);
 
+// A ramp: each tone's lit neighbour and its shadow neighbour.
+export type Ramp = ReadonlyMap<number, readonly [lit: number, shade: number]>;
+
+// The ramp light steps along in a lit level (the potting shed's house,
+// world/lighting.ts): the game's, plus the tones a lit room shades that it
+// has no step for — the shed's terracotta, the lavender, the brass of lamps
+// and the two blues of a pool's surface. Every other sprite keeps RAMP.
+export const LIT_RAMP: Ramp = new Map([
+  ...RAMP,
+  [DB32.tahitiGold, [DB32.twine, DB32.rope]],
+  [DB32.smokeyAsh, [DB32.mandy, DB32.loulou]],
+  [DB32.rainforest, [DB32.plum, DB32.stinger]],
+  [DB32.cornflower, [DB32.lightSteel, DB32.royalBlue]],
+  [DB32.royalBlue, [DB32.cornflower, DB32.deepKoamaru]],
+]);
+
 export function hiOf(color: number): number {
   return RAMP.get(color)?.[0] ?? color;
 }

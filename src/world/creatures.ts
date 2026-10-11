@@ -5,6 +5,7 @@ import { drawBird } from '@entities/bird';
 import { drawBookworm } from '@entities/bookworm';
 import { drawCat } from '@entities/cat';
 import { drawCrab } from '@entities/crab';
+import { drawEarthwormLarge } from '@entities/earthworm';
 import { drawEel } from '@entities/eel';
 import { drawFirefliesLarge } from '@entities/fireflies';
 import { drawFishLarge } from '@entities/fish';
@@ -13,6 +14,7 @@ import { drawGlowfishLarge } from '@entities/glowfish';
 import { drawHare } from '@entities/hare';
 import { drawHedgehog } from '@entities/hedgehog';
 import { drawHen } from '@entities/hen';
+import { drawMoleLarge } from '@entities/mole';
 import { drawMothLarge } from '@entities/moth';
 import { drawMouse } from '@entities/mouse';
 import { drawNewt } from '@entities/newt';
@@ -59,7 +61,9 @@ export type CreatureId =
   | 'crab'
   | 'eel'
   | 'pigeon'
-  | 'spider';
+  | 'spider'
+  | 'mole'
+  | 'earthworm';
 
 export interface CreaturePage {
   id: CreatureId;
@@ -304,6 +308,26 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
         'Small and round, on a thread from the clock room ceiling, letting itself down and winding itself back ' +
         'up again all night, in time with the clock, as near as anyone can tell.',
       drawSketch: scaledSketch((g) => drawSpider(g, 0), 5, -10, 0),
+    },
+  },
+  {
+    id: 'mole',
+    page: {
+      name: 'Mole',
+      description:
+        'Velvet-black, pink-handed and as good as blind, shuffling along the tunnels under the potting shed. It ' +
+        'stops every few steps to sniff, and seems to know exactly who has come down the ladder.',
+      drawSketch: scaledSketch(drawMoleLarge, 1, -22, 2),
+    },
+  },
+  {
+    id: 'earthworm',
+    page: {
+      name: 'Earthworm',
+      description:
+        'Pink, ringed and patient, crossing the tunnel floor a hump at a time. It has the same way of going ' +
+        'about things as the bookworm upstairs, and nothing at all to read.',
+      drawSketch: scaledSketch(drawEarthwormLarge, 1, -15, 0),
     },
   },
 ];

@@ -1,6 +1,7 @@
 import type { DecorationSpec } from '@entities/decoration';
 import type { Entity, InteractContext } from '@entities/entity';
 import type { LandmarkSpec } from '@entities/landmark';
+import type { Vec2 } from '@types';
 import { Tilemap } from '@world/tilemap';
 
 // A named point inside a level. Doors target these by id, the level's default
@@ -50,6 +51,59 @@ export interface TileRect {
   rows: number;
 }
 
+// Whether a tile (column, row) lies inside a rectangle of tiles.
+export function holdsTile(r: TileRect, tile: Vec2): boolean {
+  return tile.x >= r.col && tile.x < r.col + r.cols && tile.y >= r.row && tile.y < r.row + r.rows;
+}
+
+// What the back wall of a lit room is made of, in HD (room-backdrops-hd.ts).
+// Each is the room's own material one ramp step down, so anything that can
+// be stood on reads in front of it.
+export const ROOM_BACKDROP = {
+  shed: 'shed',
+  drawers: 'drawers',
+  kitchen: 'kitchen',
+  wallGreen: 'wall-green',
+  wallRose: 'wall-rose',
+  rafters: 'rafters',
+  brick: 'brick',
+  earth: 'earth',
+  pool: 'pool',
+} as const;
+export type RoomBackdrop = (typeof ROOM_BACKDROP)[keyof typeof ROOM_BACKDROP];
+
+// A room of a level lit room by room (the potting shed's house): where it
+// is, what its back wall is, and how much light it has of its own — 0.62 is
+// a room as it is drawn, every 0.16 less a step down the ramp.
+export interface LitRoom extends TileRect {
+  id: string;
+  name: string;
+  backdrop: RoomBackdrop;
+  ambient: number;
+  // The camera holds still on this room while the player is in it, instead
+  // of following them: the shed, so that it looks no bigger than outside.
+  holdsCamera?: boolean;
+}
+
+// A light in a lit level, in tiles: a lamp, a candle, the stove (warm: they
+// scatter specks of their light on the wall behind them) or a window (cool:
+// light only). It adds `strength` at its centre, falling to nothing at
+// `radius`.
+export interface LightSource {
+  x: number;
+  y: number;
+  radius: number;
+  strength: number;
+  warm: boolean;
+}
+
+// A level lit room by room. HD only: classic draws it as it draws any dark
+// interior.
+export interface LevelLighting {
+  rooms: readonly LitRoom[];
+  lights: readonly LightSource[];
+}
+
 // Authored description of a level. Pure data + factory functions — the
 // runtime `Level` (below) is built from this and mounted by Game.
 //
@@ -92,6 +146,9 @@ export interface LevelSpec {
   // True when sky lies above the top row, so the camera may follow a jump
   // above it. False under a ceiling: the camera stops at row 0.
   openSky: boolean;
+  // Rooms with back walls and light of their own, and the lamps in them.
+  // Rooms not yet entered stay dark until the player walks in.
+  lighting?: LevelLighting;
 }
 
 // Materialised level: spec + built Tilemap. Mounting still happens in Game,

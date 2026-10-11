@@ -21,7 +21,8 @@ export interface AtlasPlace {
 }
 
 // The order ← and → walk the places in: the meadow, what leads off it, then
-// the keep and what leads off that, then the crypt's cistern.
+// the keep and what leads off that (the garden's potting shed after the
+// garden), then the crypt's cistern.
 export const ATLAS: readonly AtlasPlace[] = [
   {
     level: 'meadow',
@@ -116,6 +117,27 @@ export const ATLAS: readonly AtlasPlace[] = [
       g.rect(-4, -2, 7, 5).fill(DB32.tahitiGold);
       g.rect(-1, -4, 1, 2).fill(DB32.dell);
       g.rect(5, -6, 1, 8).fill(DB32.rope);
+    },
+  },
+  {
+    level: 'potting-shed',
+    label: 'SHED',
+    x: 208,
+    y: 104,
+    from: 'kitchen-garden',
+    howTo:
+      'From the garden: the door of the little potting shed, between the raised beds and the greenhouse. ' +
+      'It is bigger inside.',
+    draw(g) {
+      g.rect(-10, -8, 20, 15).fill(DB32.valhalla);
+      g.rect(-6, -4, 12, 11).fill(DB32.rope);
+      g.rect(-7, -6, 14, 2).fill(DB32.oiledCedar);
+      g.rect(-4, 0, 4, 7).fill(DB32.oiledCedar);
+      g.rect(-4, 0, 1, 7).fill(DB32.valhalla);
+      g.rect(2, -2, 3, 3).fill(DB32.valhalla);
+      g.rect(3, -1, 1, 2).fill(DB32.tahitiGold);
+      g.rect(-9, -7, 1, 1).fill(DB32.goldenFizz);
+      g.rect(8, 4, 1, 1).fill(DB32.goldenFizz);
     },
   },
   {

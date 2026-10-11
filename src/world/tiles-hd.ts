@@ -20,8 +20,10 @@ import {
   PEAT_ROOT,
   PUFFBALL,
   PUFFBALL_SHADE,
+  rootAt,
   TILE_COLORS,
   Tile,
+  type TileFaces,
   TURF,
   TURF_DARK,
   TURF_LIGHT,
@@ -37,6 +39,9 @@ export const TILE_FINE = 48;
 export interface TileSpot {
   tx: number;
   ty: number;
+  // Which faces are open to the air, for the kinds that draw them (the
+  // house's floorboards). Absent: both, as when a tile is drawn alone.
+  faces?: TileFaces;
 }
 
 interface Origin {
@@ -44,6 +49,7 @@ interface Origin {
   y: number;
   tx: number;
   ty: number;
+  faces: TileFaces;
 }
 
 // The HD drawing of one tile, into a canvas in world fine coordinates. Each
@@ -54,7 +60,13 @@ interface Origin {
 // Recipes: design_handoff_hd_pass/RECIPES.md §5 (grass, dirt, the brick
 // shader, ladder) — the other kinds are drawn by its laws.
 export function drawTileHd(canvas: FineCanvas, tile: Tile, spot: TileSpot): void {
-  const o: Origin = { x: spot.tx * TILE_FINE, y: spot.ty * TILE_FINE, tx: spot.tx, ty: spot.ty };
+  const o: Origin = {
+    x: spot.tx * TILE_FINE,
+    y: spot.ty * TILE_FINE,
+    tx: spot.tx,
+    ty: spot.ty,
+    faces: spot.faces ?? { up: true, down: true },
+  };
   const draw = RECIPES[tile];
   if (draw) draw(canvas, o);
 }
@@ -80,6 +92,10 @@ const RECIPES: Partial<Record<Tile, Recipe>> = {
   [Tile.Granite]: granite,
   [Tile.Puffball]: puffball,
   [Tile.AutumnTurf]: autumnTurf,
+  [Tile.Floorboards]: floorboards,
+  [Tile.PlankWall]: plankWall,
+  [Tile.PackedEarth]: packedEarth,
+  [Tile.RootEarth]: rootEarth,
 };
 
 const T = TILE_FINE;
@@ -545,4 +561,100 @@ function goldPillar(s: FineCanvas, o: Origin): void {
   s.rect(col(24, 2), DB32.stinger).dither(col(26, 1), half(DB32.stinger));
   s.dither(col(33, 3), quarter(DB32.stinger)).dither(col(36, 3), half(DB32.stinger));
   s.rect(col(39, 3), DB32.stinger).rect(col(42, 3), DB32.oiledCedar).dither(col(45, 2), half(DB32.oiledCedar));
+}
+
+// ---------------------------------------------------------------- the potting shed's house
+// design_handoff_potting_shed/RECIPES.md §2.
+
+// A floor in section: the void between two floors in loulou with a quarter
+// of valhalla, a joist standing in it with a lit left edge, the board face
+// on top where air is above (a lit lip, grain, a joint, a nail head), and
+// the lath and plaster of the ceiling below where air is below.
+function floorboards(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty } = o;
+  fill(s, o, DB32.loulou);
+  s.dither(box(x, y, T, T), quarter(DB32.valhalla));
+  const jx = x + (tx & 1 ? 6 : 30);
+  s.rect(box(jx, y + 15, 9, 24), DB32.oiledCedar)
+    .rect(box(jx, y + 15, 1, 24), DB32.rope)
+    .rect(box(jx + 8, y + 15, 1, 24), DB32.loulou);
+  if (o.faces.up) {
+    s.rect(box(x, y, T, 2), DB32.twine)
+      .rect(box(x, y + 2, T, 1), DB32.rope)
+      .dither(box(x, y + 2, T, 1), half(DB32.twine))
+      .rect(box(x, y + 3, T, 9), DB32.rope)
+      .rect(box(x, y + 12, T, 2), DB32.oiledCedar)
+      .rect(box(x, y + 14, T, 1), DB32.loulou);
+    for (let i = 0; i < 3; i++) {
+      const gx = x + Math.floor(h(tx, ty, 700 + i) * 40);
+      const gy = y + 5 + Math.floor(h(tx, ty, 703 + i) * 5);
+      s.rect(box(gx, gy, 6 + i * 2, 1), DB32.oiledCedar);
+    }
+    const joint = x + FINE * (h(tx, ty, 600) < 0.5 ? 5 : 11);
+    s.rect(box(joint, y + 3, 2, 9), DB32.oiledCedar).rect(box(joint - 1, y + 3, 1, 9), DB32.twine);
+    if (h(tx, ty, 601) < 0.4) s.rect(box(x + 6, y + 6, 2, 2), DB32.topaz).set(x + 6, y + 6, DB32.heather);
+  }
+  if (o.faces.down) {
+    s.rect(box(x, y + 39, T, 2), DB32.rope)
+      .rect(box(x, y + 41, T, 7), DB32.twine)
+      .dither(box(x, y + 45, T, 3), quarter(DB32.pancho));
+  }
+}
+
+// Boards 12 fine wide: a 2-fine loulou gap, a lit edge, the oiled cedar
+// face with two grain marks each (a dark mark with its lit partner, L6), and
+// the odd nail.
+function plankWall(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty } = o;
+  for (let i = 0; i < 4; i++) {
+    const bx = x + i * 12;
+    s.rect(box(bx, y, 12, T), DB32.oiledCedar)
+      .rect(box(bx, y, 2, T), DB32.loulou)
+      .rect(box(bx + 2, y, 1, T), DB32.rope);
+    for (let k = 0; k < 2; k++) {
+      const gy = y + Math.floor(h(tx * 4 + i, ty, 680 + k) * 44);
+      s.rect(box(bx + 5 + k * 3, gy, 1, 4), DB32.loulou).rect(box(bx + 4 + k * 3, gy, 1, 4), DB32.rope);
+    }
+    if (h(tx * 4 + i * 4, ty, 610) < 0.25) s.rect(box(bx + 6, y + 9, 2, 2), DB32.twine).set(bx + 7, y + 10, DB32.rope);
+  }
+}
+
+// Clods lit along the top, dark grains, and in one tile in four a stone with
+// its lit cap, its shaded underside and its shadow on the earth.
+function packedEarth(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty } = o;
+  fill(s, o, DB32.loulou);
+  for (let i = 0; i < 14; i++) {
+    const cx = x + Math.floor(h(tx, ty, 720 + i) * 42);
+    const cy = y + 1 + Math.floor(h(tx, ty, 740 + i) * 44);
+    s.rect(box(cx, cy, 6, 2), DB32.oiledCedar).rect(box(cx + 1, cy - 1, 4, 1), DB32.rope);
+  }
+  for (let i = 0; i < 9; i++) {
+    s.rect(box(x + Math.floor(h(tx, ty, 760 + i) * 46), y + Math.floor(h(tx, ty, 770 + i) * 46), 2, 1), DB32.valhalla);
+  }
+  if (h(tx, ty, 660) < 0.25) {
+    const px = x + 9 + Math.floor(h(tx, ty, 661) * 27);
+    const py = y + 9 + Math.floor(h(tx, ty, 662) * 27);
+    s.rect(box(px, py + 6, 6, 1), DB32.valhalla).disc({ cx: px + 3, cy: py + 3, r: 3.2 }, DB32.topaz);
+    s.rect(box(px + 1, py, 3, 1), DB32.heather).rect(box(px, py + 1, 1, 2), DB32.heather);
+    s.rect(box(px + 2, py + 5, 3, 1), DB32.dimGray);
+  }
+}
+
+// Packed earth with two roots out of its underside, on the classic roots'
+// columns: 2 fine wide, rope with a twine lit edge, wavering by a fine pixel
+// inside their column, a twine tip, and on the long ones a side root.
+function rootEarth(s: FineCanvas, o: Origin): void {
+  packedEarth(s, o);
+  const { x, y, tx, ty } = o;
+  for (let i = 0; i < 2; i++) {
+    const root = rootAt(tx, ty, i);
+    const rx = x + FINE * root.x;
+    const end = y + T + FINE * (root.length + 1);
+    for (let k = 30; k < end - y; k++) {
+      const wob = Math.sin((k + rx) * 0.35) > 0 ? 1 : 0;
+      s.rect(box(rx + wob, y + k, 2, 1), k >= end - y - 2 ? DB32.twine : DB32.rope).set(rx + wob, y + k, DB32.twine);
+    }
+    if (root.length > 3) s.rect(box(rx + FINE, y + 51, 2, 6), DB32.rope).set(rx + FINE, y + 51, DB32.twine);
+  }
 }

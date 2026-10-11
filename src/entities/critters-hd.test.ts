@@ -6,6 +6,7 @@ import { drawBookworm } from '@entities/bookworm';
 import { drawCat } from '@entities/cat';
 import { drawCrab } from '@entities/crab';
 import { glowfishHd, glowfishLargeHd, hareHd, mothHd, mothLargeHd, snailHd } from '@entities/critters-hd';
+import { drawEarthworm, drawEarthwormLarge } from '@entities/earthworm';
 import { drawEel } from '@entities/eel';
 import { drawLeaf, leafHd } from '@entities/falling-leaf';
 import { drawFirefliesLarge } from '@entities/fireflies';
@@ -15,6 +16,7 @@ import { drawGlowfish, drawGlowfishLarge } from '@entities/glowfish';
 import { drawHare } from '@entities/hare';
 import { drawHedgehog } from '@entities/hedgehog';
 import { drawHen } from '@entities/hen';
+import { drawMole, drawMoleLarge } from '@entities/mole';
 import { drawMoth, drawMothLarge } from '@entities/moth';
 import { drawMouse } from '@entities/mouse';
 import { drawNewt } from '@entities/newt';
@@ -80,6 +82,10 @@ const CASES: [string, Draw, (() => CritterLayers)?][] = [
   ),
   ...[false, true].map((p): [string, Draw] => [`hen ${p}`, (g) => drawHen(g, p)]),
   ...[0, 1].map((w): [string, Draw] => [`mouse ${w}`, (g) => drawMouse(g, w)]),
+  ...[0, 1].map((p): [string, Draw] => [`mole ${p}`, (g) => drawMole(g, p)]),
+  ['mole portrait', drawMoleLarge],
+  ...[0, 1].map((f): [string, Draw] => [`earthworm ${f}`, (g) => drawEarthworm(g, f)]),
+  ['earthworm portrait', drawEarthwormLarge],
   ...[0, 1].map((s): [string, Draw] => [`newt ${s}`, (g) => drawNewt(g, s)]),
   ...[false, true].flatMap((blink) =>
     ([-1, 0, 1] as const).map((look): [string, Draw] => [`owl ${blink} ${look}`, (g) => drawOwl(g, { blink, look })]),

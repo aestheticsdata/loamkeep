@@ -129,8 +129,14 @@ const CELLAR_Y = 68 * T;
 const LOFT_Y = 24 * T;
 
 const RETURN_DOOR_X = 5 * T;
+// The middle of the shed's door, 29 px left of the shed's own middle
+// (32 * T + 8), where drawShed used to draw it.
+const SHED_DOOR_X = 30 * T + 11;
 
-const KITCHEN_GARDEN_SPAWNS: SpawnPoint[] = [{ id: 'from-keep', x: 7 * T + 2, y: GROUND_Y - T }];
+const KITCHEN_GARDEN_SPAWNS: SpawnPoint[] = [
+  { id: 'from-keep', x: 7 * T + 2, y: GROUND_Y - T },
+  { id: 'from-shed', x: SHED_DOOR_X - 6, y: GROUND_Y - T },
+];
 
 // ---------------------------------------------------------------------------
 // Landmarks — the Sundial between the beds, the Seed Store in the cellar,
@@ -272,21 +278,27 @@ const plant = (col: number, surfaceRow: number, species: FloraId): DecorationSpe
   species,
 });
 
-// The potting shed under its roof (row 50): boards, a door ajar, a window. 112
-// wide × 96 tall, standing on the ground; the roof tiles are the platform.
+// The potting shed under its roof (row 50): boards and a window. 112 wide ×
+// 96 tall, standing on the ground; the roof tiles are the platform. Its door
+// is the door into the house (drawShedDoor), drawn over it by the Door.
 function drawShed(g: Graphics): void {
   const board = DB32.rope;
   const boardDark = DB32.oiledCedar;
   g.rect(-56, -96, 112, 96).fill(board);
   for (let x = -56; x < 56; x += 8) g.rect(x, -96, 1, 96).fill(boardDark);
-  g.rect(-40, -44, 22, 44).fill(boardDark);
-  g.rect(-40, -44, 4, 44).fill(DB32.valhalla);
-  g.rect(-22, -24, 2, 2).fill(DB32.twine);
   g.rect(10, -72, 30, 22).fill(DB32.valhalla);
   g.rect(24, -72, 1, 22).fill(boardDark);
   g.rect(10, -62, 30, 1).fill(boardDark);
   g.rect(16, -56, 8, 6).fill(DB32.tahitiGold);
   g.rect(19, -60, 1, 4).fill(DB32.dell);
+}
+
+// The shed's door, ajar, around its own foot: the way into the house (the
+// potting shed level), where drawShed used to draw it.
+function drawShedDoor(g: Graphics): void {
+  g.rect(-11, -44, 22, 44).fill(DB32.oiledCedar);
+  g.rect(-11, -44, 4, 44).fill(DB32.valhalla);
+  g.rect(7, -24, 2, 2).fill(DB32.twine);
 }
 
 // The greenhouse's glass: 304 wide × 224 tall under its roof, panes of
@@ -487,6 +499,16 @@ export const kitchenGardenLevel: LevelSpec = {
         targetLevelId: 'old-keep',
         targetSpawnId: 'from-garden',
         promptLabel: 'go in',
+      }),
+      // The potting shed's door, into a house far bigger than the shed.
+      new Door({
+        id: 'potting-shed-door',
+        x: SHED_DOOR_X,
+        y: GROUND_Y,
+        targetLevelId: 'potting-shed',
+        targetSpawnId: 'from-garden',
+        promptLabel: 'go in',
+        drawBody: drawShedDoor,
       }),
       // The pumpkins: two along the beds, one between them, one on the meadow.
       new Pumpkin({ x: 12 * T, y: BED_Y, minX: 10 * T + 4, maxX: 15 * T - 4, facing: 1 }),

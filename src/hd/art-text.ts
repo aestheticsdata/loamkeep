@@ -38,8 +38,13 @@ export class ArtText extends Container {
     this.classic = new Text({ text: spec.text, style: spec.style });
     this.classic.resolution = textResolution();
     this.addChild(this.classic, this.hd);
-    registerArt({ classic: this.classic, hd: this.hd });
     this.box = bakes.get(key(spec), () => bookCanvas(spec));
+    registerArt({ classic: this.classic, hd: this.hd, refresh: () => this.showHd() });
+    this.showHd();
+  }
+
+  // The HD lines, baked once, shown whenever HD is.
+  private showHd(): void {
     if (draws(ART_KIND.hd)) this.hd.show(this.box);
   }
 

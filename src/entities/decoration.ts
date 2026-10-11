@@ -1,7 +1,8 @@
 import { FLORA_NOTICE_RANGE_X, FLORA_NOTICE_RANGE_Y } from '@constants';
 import type { FloraId } from '@entities/plants';
 import { ArtBody } from '@hd/art-body';
-import { plantHd } from '@hd/critter-hd';
+import type { ClassicRecorder } from '@hd/classic-recorder';
+import { type CritterLayers, plantHd } from '@hd/critter-hd';
 import type { Vec2 } from '@types';
 import type { Graphics } from 'pixi.js';
 
@@ -20,6 +21,9 @@ export interface DecorationSpec {
   // pebbles — which is the whole of the difference between the two.
   species?: FloraId;
   draw(g: Graphics): void;
+  // Its own HD recipe (the potting shed's props take propHd); absent, a
+  // plant takes the plant recipe and the rest of the scenery the common one.
+  hd?: (recorded: ClassicRecorder) => CritterLayers;
 }
 
 export class Decoration {
@@ -29,11 +33,11 @@ export class Decoration {
   readonly species: FloraId | undefined;
 
   constructor(spec: DecorationSpec) {
-    this.sprite = new ArtBody(spec.species ? 'plants' : 'scenery');
+    this.sprite = new ArtBody(spec.species ? 'plants' : spec.hd ? 'props' : 'scenery');
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
     this.species = spec.species;
-    this.sprite.draw(spec.draw, spec.species ? plantHd : undefined);
+    this.sprite.draw(spec.draw, spec.species ? plantHd : spec.hd);
   }
 
   // True if the player is close enough for the flora book to write this

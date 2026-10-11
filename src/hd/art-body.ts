@@ -1,9 +1,11 @@
+import { DB32 } from '@constants';
 import { paintGlow } from '@entities/glow';
 import { ART_KIND, draws, fineMotion, registerArt } from '@hd/art-mode';
 import { BakeCache, FineSprite } from '@hd/bake';
 import { type ClassicRecorder, record } from '@hd/classic-recorder';
 import { type CritterHdOptions, type CritterLayers, critterHd, flatten } from '@hd/critter-hd';
-import { FINE } from '@hd/fine-canvas';
+import { FINE, FineCanvas } from '@hd/fine-canvas';
+import { LIT_RAMP } from '@hd/palette';
 import { Container, Graphics } from 'pixi.js';
 
 // A sprite's body in both arts, for every creature that redraws a Graphics
@@ -20,29 +22,92 @@ export class ArtBody extends Container {
   private readonly options: CritterHdOptions;
   private shownClassic: string | null = null;
   private shownHd: string | null = null;
+  // The last drawing, kept so a change of light can redraw it.
+  private last: Drawing | null = null;
+  // How many steps down LIT_RAMP the HD drawing is shaded.
+  private steps = 0;
 
   constructor(species: string, options: CritterHdOptions = {}) {
     super();
     this.bakes = cacheFor(species);
     this.options = options;
     this.addChild(this.classic, this.hd);
-    registerArt({ classic: this.classic, hd: this.hd });
+    registerArt({ classic: this.classic, hd: this.hd, refresh: () => this.refresh() });
   }
 
   draw(classic: (g: Graphics) => void, hd?: (recorded: ClassicRecorder) => CritterLayers): void {
     const recorded = record(classic);
-    const key = signature(recorded);
-    if (draws(ART_KIND.classic) && key !== this.shownClassic) {
-      this.shownClassic = key;
-      this.classic.clear();
-      classic(this.classic);
-    }
-    if (draws(ART_KIND.hd) && key !== this.shownHd) {
-      this.shownHd = key;
-      this.hd.show(this.bakes.get(key, () => flatten(hd ? hd(recorded) : critterHd(recorded, this.options))));
-      showGlows(this.hd, recorded, this.options.softLight);
-    }
+    this.last = { classic, recorded, key: signature(recorded), hd };
+    this.refresh();
   }
+
+  // Brings each drawing the mode shows up to the last pose drawn.
+  private refresh(): void {
+    if (draws(ART_KIND.classic)) this.showClassic();
+    if (draws(ART_KIND.hd)) this.showHd();
+  }
+
+  private showClassic(): void {
+    const last = this.last;
+    if (!last || last.key === this.shownClassic) return;
+    this.shownClassic = last.key;
+    this.classic.clear();
+    last.classic(this.classic);
+  }
+
+  // Shades the HD drawing `steps` down LIT_RAMP — the light where it stands
+  // in a lit level (world/lighting.ts). Classic is never shaded.
+  setShade(steps: number): void {
+    if (steps === this.steps) return;
+    this.steps = steps;
+    if (draws(ART_KIND.hd)) this.showHd();
+  }
+
+  private showHd(): void {
+    const last = this.last;
+    if (!last) return;
+    const key = this.steps > 0 ? `${last.key}|${this.steps}` : last.key;
+    if (key === this.shownHd) return;
+    this.shownHd = key;
+    this.hd.show(
+      this.bakes.get(key, () => {
+        const layers = flatten(last.hd ? last.hd(last.recorded) : critterHd(last.recorded, this.options));
+        return this.steps > 0 ? stepDown(layers, this.steps) : layers;
+      }),
+    );
+    showGlows(this.hd, last.recorded, this.options.softLight);
+  }
+}
+
+// What an ArtBody last drew: the classic drawing, its recording and key,
+// and its own HD recipe if it has one.
+interface Drawing {
+  classic: (g: Graphics) => void;
+  recorded: ClassicRecorder;
+  key: string;
+  hd?: (recorded: ClassicRecorder) => CritterLayers;
+}
+
+// Tones that are a light themselves — a flame, a lamp's heart — and stay lit
+// however dark the room round them.
+const LIGHTS: readonly number[] = [DB32.goldenFizz, DB32.white];
+
+// A copy of a raster with every pixel `steps` down LIT_RAMP, but its lights.
+function stepDown(canvas: FineCanvas, steps: number): FineCanvas {
+  const out = new FineCanvas({ x: canvas.x0, y: canvas.y0, w: canvas.w, h: canvas.h });
+  canvas.forInk((x, y, c) => {
+    let shaded = c;
+    if (!LIGHTS.includes(c)) for (let i = 0; i < steps; i++) shaded = LIT_RAMP.get(shaded)?.[1] ?? shaded;
+    out.set(x, y, shaded);
+  });
+  return out;
+}
+
+// Shades every body in a sprite (a creature, a landmark, a decoration) by
+// the light it stands in.
+export function shadeArt(sprite: Container, steps: number): void {
+  if (sprite instanceof ArtBody) sprite.setShade(steps);
+  for (const child of sprite.children) if (child instanceof ArtBody) child.setShade(steps);
 }
 
 // Classic's soft light under an HD sprite, in its own logical space: the

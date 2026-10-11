@@ -62,6 +62,11 @@ export const PUFFBALL_SHADE = 0xa98fb4;
 //   - Timber:  the belfry's beams and plank floors. Warm brown against
 //              the tower's grey brick, so a ledge reads as "something to
 //              stand on" before the eye has found its edge.
+//   - House:   the potting shed's insides. Floorboards (a floor seen in
+//              section: boards where air is above it, plaster where air is
+//              below), PlankWall (the mass between rooms), PackedEarth (the
+//              ground under the house) and RootEarth (the same over a
+//              tunnel, with roots hanging out of its underside).
 // Water is shared (lakes happen in both biomes).
 export const Tile = {
   Empty: 0,
@@ -84,6 +89,10 @@ export const Tile = {
   Granite: 17,
   Puffball: 18,
   AutumnTurf: 19,
+  Floorboards: 20,
+  PlankWall: 21,
+  PackedEarth: 22,
+  RootEarth: 23,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -110,6 +119,10 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   g: Tile.Granite,
   U: Tile.Puffball,
   a: Tile.AutumnTurf,
+  f: Tile.Floorboards,
+  j: Tile.PlankWall,
+  e: Tile.PackedEarth,
+  r: Tile.RootEarth,
 };
 
 export const TILE_COLORS: Record<Tile, number> = {
@@ -160,6 +173,13 @@ export const TILE_COLORS: Record<Tile, number> = {
   [Tile.Granite]: GRANITE,
   [Tile.Puffball]: PUFFBALL,
   [Tile.AutumnTurf]: TURF,
+  // The house's floors and walls: the cedar of the shed outside, a step
+  // darker for the walls so a floor reads in front of them.
+  [Tile.Floorboards]: DB32.loulou,
+  [Tile.PlankWall]: DB32.oiledCedar,
+  // The earth under the house, darker than the garden's soil.
+  [Tile.PackedEarth]: DB32.loulou,
+  [Tile.RootEarth]: DB32.loulou,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -190,6 +210,10 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.Granite]: true,
   [Tile.Puffball]: true,
   [Tile.AutumnTurf]: true,
+  [Tile.Floorboards]: true,
+  [Tile.PlankWall]: true,
+  [Tile.PackedEarth]: true,
+  [Tile.RootEarth]: true,
 };
 
 export class Tilemap {
@@ -314,10 +338,26 @@ export function renderTilemap(map: Tilemap): Graphics {
       if (t === Tile.Empty || t === Tile.Water) continue;
       const x = tx * TILE_SIZE;
       const y = ty * TILE_SIZE;
-      drawTile(g, t, x, y, tx, ty);
+      drawTile(g, t, x, y, tx, ty, tileFaces(map, tx, ty));
     }
   }
   return g;
+}
+
+// Which of a tile's faces are open to the air: the tile above and the tile
+// below, each neither solid nor water. A floor shows its boards only where
+// it can be stood on, and its plaster only where it is a ceiling.
+export interface TileFaces {
+  up: boolean;
+  down: boolean;
+}
+
+// Both faces open: how a tile is drawn when there is no map around it.
+export const OPEN_FACES: TileFaces = { up: true, down: true };
+
+export function tileFaces(map: Tilemap, tx: number, ty: number): TileFaces {
+  const open = (y: number) => !map.isSolid(tx, y) && map.at(tx, y) !== Tile.Water;
+  return { up: open(ty - 1), down: open(ty + 1) };
 }
 
 // True for a water tile whose neighbor directly above is EMPTY (air) — only
@@ -449,7 +489,15 @@ export function renderWaterSurfaceInto(g: Graphics, map: Tilemap, surfaceOffset:
   }
 }
 
-export function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number, ty: number): void {
+export function drawTile(
+  g: Graphics,
+  t: Tile,
+  x: number,
+  y: number,
+  tx: number,
+  ty: number,
+  faces: TileFaces = OPEN_FACES,
+): void {
   // A ladder has no fill — the backdrop shows between its rungs.
   if (t === Tile.Ladder) {
     drawLadder(g, x, y);
@@ -514,6 +562,92 @@ export function drawTile(g: Graphics, t: Tile, x: number, y: number, tx: number,
     case Tile.AutumnTurf:
       drawAutumnTurf(g, x, y, tx, ty);
       break;
+    case Tile.Floorboards:
+      drawFloorboards(g, x, y, tx, ty, faces);
+      break;
+    case Tile.PlankWall:
+      drawPlankWall(g, x, y, tx, ty);
+      break;
+    case Tile.PackedEarth:
+      drawPackedEarth(g, x, y, tx, ty);
+      break;
+    case Tile.RootEarth:
+      drawPackedEarth(g, x, y, tx, ty);
+      drawRoots(g, x, y, tx, ty);
+      break;
+  }
+}
+
+// A floor of the potting shed's house, seen in section: a joist in the void
+// between two floors, boards on top where air is above it, and the lath and
+// plaster of the ceiling below where air is below it.
+function drawFloorboards(g: Graphics, x: number, y: number, tx: number, ty: number, faces: TileFaces): void {
+  g.rect(x + (tx & 1 ? 2 : 10), y + 5, 3, 8).fill(DB32.oiledCedar);
+  if (faces.up) {
+    g.rect(x, y, TILE_SIZE, 4).fill(DB32.rope);
+    g.rect(x, y, TILE_SIZE, 1).fill(DB32.twine);
+    g.rect(x, y + 4, TILE_SIZE, 1).fill(DB32.oiledCedar);
+    g.rect(x + (tileHash(tx, ty, 600) < 0.5 ? 5 : 11), y + 1, 1, 3).fill(DB32.oiledCedar);
+    if (tileHash(tx, ty, 601) < 0.4) g.rect(x + 2, y + 2, 1, 1).fill(DB32.topaz);
+  }
+  if (faces.down) {
+    g.rect(x, y + 13, TILE_SIZE, 3).fill(DB32.twine);
+    g.rect(x, y + 13, TILE_SIZE, 1).fill(DB32.rope);
+  }
+}
+
+// The house's walls and the mass between its rooms: 4-px boards, each with
+// a dark gap and a lit left edge, and the odd nail head.
+function drawPlankWall(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  for (let i = 0; i < TILE_SIZE; i += 4) {
+    g.rect(x + i, y, 1, TILE_SIZE).fill(DB32.loulou);
+    g.rect(x + i + 1, y, 1, TILE_SIZE).fill(DB32.rope);
+    if (tileHash(tx * 4 + i, ty, 610) < 0.25) g.rect(x + i + 2, y + 3, 1, 1).fill(DB32.twine);
+  }
+}
+
+// The earth under the house: clods, a few dark grains, and in one tile in
+// four a stone.
+function drawPackedEarth(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  for (let i = 0; i < 5; i++) {
+    const px = Math.floor(tileHash(tx, ty, 620 + i) * 14);
+    const py = Math.floor(tileHash(tx, ty, 630 + i) * 15);
+    g.rect(x + px, y + py, 2, 1).fill(DB32.oiledCedar);
+  }
+  for (let i = 0; i < 3; i++) {
+    const px = Math.floor(tileHash(tx, ty, 640 + i) * 15);
+    const py = Math.floor(tileHash(tx, ty, 650 + i) * 15);
+    g.rect(x + px, y + py, 1, 1).fill(DB32.valhalla);
+  }
+  if (tileHash(tx, ty, 660) < 0.25) {
+    const px = x + 3 + Math.floor(tileHash(tx, ty, 661) * 9);
+    const py = y + 3 + Math.floor(tileHash(tx, ty, 662) * 9);
+    g.rect(px, py, 2, 2).fill(DB32.topaz);
+    g.rect(px, py, 1, 1).fill(DB32.heather);
+  }
+}
+
+// One of the two roots out of the underside of an earth tile into the tunnel
+// below: its column in the tile, and how far it hangs past the tile's foot.
+// The longer ones carry a side root.
+export interface HangingRoot {
+  x: number;
+  length: number;
+}
+
+export function rootAt(tx: number, ty: number, i: number): HangingRoot {
+  return {
+    x: 2 + Math.floor(tileHash(tx, ty, 670 + i) * 12),
+    length: 2 + Math.floor(tileHash(tx, ty, 672 + i) * 5),
+  };
+}
+
+function drawRoots(g: Graphics, x: number, y: number, tx: number, ty: number): void {
+  for (let i = 0; i < 2; i++) {
+    const root = rootAt(tx, ty, i);
+    g.rect(x + root.x, y + 10, 1, 6 + root.length).fill(DB32.rope);
+    g.rect(x + root.x, y + TILE_SIZE + root.length, 1, 1).fill(DB32.twine);
+    if (root.length > 3) g.rect(x + root.x + 1, y + 17, 1, 2).fill(DB32.rope);
   }
 }
 

@@ -9,6 +9,7 @@ import { oldKeepLevel } from '@world/levels/old-keep';
 import { oldKeepBelfryLevel } from '@world/levels/old-keep-belfry';
 import { oldKeepCryptLevel } from '@world/levels/old-keep-crypt';
 import { oldKeepLibraryLevel } from '@world/levels/old-keep-library';
+import { pottingShedLevel } from '@world/levels/potting-shed';
 
 // Registry of every authored level in the game. Keys are the string ids used
 // by Door entities and (eventually) save data. Adding a new level is a
@@ -19,6 +20,7 @@ export type LevelId =
   | 'glow-grotto'
   | 'old-keep'
   | 'kitchen-garden'
+  | 'potting-shed'
   | 'old-keep-library'
   | 'old-keep-belfry'
   | 'old-keep-crypt'
@@ -30,6 +32,7 @@ export const LEVEL_SPECS: Record<LevelId, LevelSpec> = {
   'glow-grotto': glowGrottoLevel,
   'old-keep': oldKeepLevel,
   'kitchen-garden': kitchenGardenLevel,
+  'potting-shed': pottingShedLevel,
   'old-keep-library': oldKeepLibraryLevel,
   'old-keep-belfry': oldKeepBelfryLevel,
   'old-keep-crypt': oldKeepCryptLevel,
@@ -53,7 +56,7 @@ export function loadLevel(id: string): Level {
 }
 
 // Every landmark in the game, in registry order (meadow → grotto → keep →
-// garden → library → belfry → crypt → cistern → observatory, then authoring order inside each level). This is the sketchbook's table of
+// garden → potting shed → library → belfry → crypt → cistern → observatory, then authoring order inside each level). This is the sketchbook's table of
 // contents: the title screen's page count and the gallery's page order both
 // come from here, so adding a landmark to any level updates both for free.
 export interface LandmarkPage {

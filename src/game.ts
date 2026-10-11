@@ -12,7 +12,16 @@ import { drawOwl, Owl } from '@entities/owl';
 import { Player } from '@entities/player';
 import { drawPumpkin, Pumpkin } from '@entities/pumpkin';
 import { drawRabbit, Rabbit } from '@entities/rabbit';
-import { ART_KIND, type ArtPair, draws, fineMotion, registerArt, unregisterArt } from '@hd/art-mode';
+import { shadeArt } from '@hd/art-body';
+import {
+  ART_KIND,
+  type ArtPair,
+  draws,
+  fineMotion,
+  registerArt,
+  unregisterArt,
+  unregisterArtUnder,
+} from '@hd/art-mode';
 import { FINE } from '@hd/fine-canvas';
 import { rampDownFilter } from '@hd/ramp-filter';
 import { SplitView } from '@hd/split-view';
@@ -50,7 +59,9 @@ import type { CreatureId } from '@world/creatures';
 import { GroundHd } from '@world/ground-hd';
 import type { Level } from '@world/level';
 import { LEVEL_SPECS, type LevelId, loadLevel, STARTING_LEVEL_ID } from '@world/levels';
+import { LightField } from '@world/lighting';
 import { ParallaxBackground } from '@world/parallax';
+import { RoomReveal } from '@world/room-reveal';
 import {
   renderCryptBackdrop,
   renderGrottoBackdrop,
@@ -106,6 +117,10 @@ export interface GameSnapshot {
   pagesWritten: number;
   pagesTotal: number;
 }
+
+// In a lit level a landmark is never shaded more than this many steps: in
+// the darkest dead end it still has to be found.
+const LANDMARK_SHADE = 1;
 
 // The Game owns one Player, one Camera, one Parallax — all reused across
 // level transitions — plus a `levelLayer` sub-container that's rebuilt
@@ -169,6 +184,10 @@ export class Game {
   // the camera — paired with the classic Graphics for art-mode to flip.
   private groundHd: GroundHd | null = null;
   private groundArt: ArtPair | null = null;
+  // A lit level's light (the potting shed's house), and the dark over the
+  // rooms in it the player has not been into yet. Null everywhere else.
+  private light: LightField | null = null;
+  private reveal: RoomReveal | null = null;
   // The world behind an open book or greeting, in HD: two steps down its ramp.
   private readonly rampDown = rampDownFilter();
   private veiled = false;
@@ -423,7 +442,10 @@ export class Game {
       // them, lever cooldowns, push-block physics). Doors have no update.
       for (const entity of this.currentEntities) {
         entity.update?.(dt);
+        // Doors keep their own light: the beacon over one is meant to be seen.
+        if (!(entity instanceof Door)) this.shade(entity.sprite);
       }
+      this.reveal?.update(this.playerCentre(), dt);
 
       // First-encounter checks. Each fires exactly ONCE per Game
       // instance — the corresponding WorldState flag short-circuits
@@ -645,7 +667,9 @@ export class Game {
     classicGround.addChild(this.waterSurface);
 
     // The ground in HD, in the same place in the layer; art-mode shows one.
-    this.groundHd = new GroundHd(level);
+    const lighting = level.spec.lighting;
+    this.light = lighting ? new LightField(tilemap, lighting) : null;
+    this.groundHd = new GroundHd(level, this.light);
     this.levelLayer.addChild(classicGround, this.groundHd.container);
     this.groundArt = registerArt({ classic: classicGround, hd: this.groundHd.container });
 
@@ -653,6 +677,7 @@ export class Game {
     // the flora book asks about the player's distance from, every frame.
     for (const spec of level.spec.decorations) {
       const decoration = new Decoration(spec);
+      this.shade(decoration.sprite);
       this.levelLayer.addChild(decoration.sprite);
       if (decoration.species !== undefined) {
         this.currentPlants.push(decoration);
@@ -670,6 +695,7 @@ export class Game {
       return landmark;
     });
     for (const landmark of this.currentLandmarks) {
+      this.shade(landmark.sprite, LANDMARK_SHADE);
       this.levelLayer.addChild(landmark.sprite);
     }
 
@@ -687,6 +713,27 @@ export class Game {
     for (const entity of this.currentEntities) {
       this.levelLayer.addChild(entity.sprite);
     }
+
+    // Over everything in the level but the player: the dark over the rooms
+    // of a lit level not yet entered.
+    if (lighting) {
+      const levelId = level.spec.id;
+      this.reveal = new RoomReveal(lighting.rooms, {
+        seen: (id) => this.worldState.get(`room-seen.${levelId}.${id}`),
+        see: (id) => this.worldState.set(`room-seen.${levelId}.${id}`, true),
+      });
+      this.levelLayer.addChild(this.reveal.container);
+    }
+  }
+
+  // In a lit level, shades a sprite's HD drawing by the light at its middle
+  // — not at its anchor, which is the floor (or the ceiling) seam, half in
+  // the dimmer boards — never more than `most` steps down.
+  private shade(sprite: Container, most = Number.POSITIVE_INFINITY): void {
+    if (!this.light) return;
+    const b = sprite.getLocalBounds();
+    const middle = { x: sprite.x, y: sprite.y + ((b.minY + b.maxY) / 2) * sprite.scale.y };
+    shadeArt(sprite, Math.min(most, this.light.stepsAt(middle)));
   }
 
   // Remove every child from levelLayer and reset the per-level arrays.
@@ -694,12 +741,18 @@ export class Game {
   // can race with pending draws on the same Graphics. They'll be collected
   // shortly. Acceptable at this content scale.
   private clearLevelLayer(): void {
+    // Their art pairs are forgotten with them, or every level visited would
+    // stay registered with art-mode for the rest of the session.
+    unregisterArtUnder(this.levelLayer);
     this.levelLayer.removeChildren();
     // The HD ground owns chunk textures that would otherwise outlive it.
     if (this.groundArt) unregisterArt(this.groundArt);
     this.groundHd?.destroy();
     this.groundHd = null;
     this.groundArt = null;
+    this.reveal?.destroy();
+    this.reveal = null;
+    this.light = null;
     this.currentLandmarks = [];
     this.currentEntities = [];
     this.currentPlants = [];
@@ -987,9 +1040,17 @@ export class Game {
 
   // Aimed at where the player is drawn, not where its body is, so the figure
   // and the world move together between physics steps.
+  // Follows the player, unless they are in a room that holds the camera
+  // still (the potting shed's shed, so it looks no bigger than outside).
   private aimCameraAtPlayer(): void {
+    const at = this.playerCentre();
+    const hold = this.reveal?.holdFor(at) ?? at;
+    this.camera.follow(hold.x, hold.y);
+  }
+
+  private playerCentre(): Vec2 {
     const at = this.player.renderPos;
-    this.camera.follow(at.x + this.player.size.x / 2, at.y + this.player.size.y / 2);
+    return { x: at.x + this.player.size.x / 2, y: at.y + this.player.size.y / 2 };
   }
 
   // SFX driven by the player's one-shot event flags, set during update().

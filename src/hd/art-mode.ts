@@ -57,6 +57,9 @@ export function artMode(): ArtMode {
 export function setArtMode(next: ArtMode): void {
   mode = next;
   writeStored(ART_KEY, next);
+  // A sprite drawn only once, in the art that was showing then, has nothing
+  // in the other: bring every drawing the new mode shows up to date first.
+  for (const pair of pairs) pair.refresh?.();
   showArt(next === ART_MODE.classic ? ART_KIND.classic : ART_KIND.hd);
 }
 
@@ -79,9 +82,13 @@ export function setFineMotion(on: boolean): void {
 }
 
 // A sprite's two drawings. The pair is what split view flips between.
+// `refresh` is for a sprite that draws only the art the mode asks for and
+// does not redraw every frame (a decoration, a landmark, a line of text): it
+// draws whatever the new mode shows that it has not drawn yet.
 export interface ArtPair {
   classic: Container;
   hd: Container;
+  refresh?: () => void;
 }
 
 const pairs = new Set<ArtPair>();
@@ -98,6 +105,18 @@ export function registerArt(pair: ArtPair): ArtPair {
 // Forgets a pair whose sprite is going away.
 export function unregisterArt(pair: ArtPair): void {
   pairs.delete(pair);
+}
+
+// Forgets every pair drawn inside `root`, which is being emptied: a level's
+// layer on a change of level, whose sprites are let go rather than
+// destroyed and would otherwise stay registered for the whole session.
+export function unregisterArtUnder(root: Container): void {
+  for (const pair of pairs) if (isUnder(pair.classic, root) || isUnder(pair.hd, root)) pairs.delete(pair);
+}
+
+function isUnder(node: Container, root: Container): boolean {
+  for (let at: Container | null = node; at; at = at.parent) if (at === root) return true;
+  return false;
 }
 
 // Shows one kind of drawing on every registered sprite.

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LOAMKEEP · The Potting Shed (inside)</title>
+<style>
+  html, body { margin: 0; background: #0a0a12; color: #cbdbfc; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  a { color: #eec39a; } a:hover { color: #ffffff; }
+  main { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 0 30px; }
+  canvas { width: 960px; height: 672px; image-rendering: pixelated; display: block; }
+  .bar { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; width: 960px; }
+  button { font: inherit; background: #222034; color: #cbdbfc; border: 1px solid #3f3f74; padding: 5px 10px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #eec39a; color: #222034; border-color: #eec39a; }
+  .keys { width: 960px; color: #9badb7; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  kbd { color: #eec39a; }
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <button data-page="1">1 Play</button><button data-page="2">2 Cutaway map</button><button data-page="3">3 Props</button><button data-page="4">4 Creatures &amp; landmarks</button><button data-page="5">5 Tiles &amp; light</button><button data-page="6">6 Sketchbook</button>
+  </div>
+  <div class="bar">
+    <button data-spawn="from-garden">Start: the shed door</button><button data-spawn="tunnels">Start: the tunnels</button>
+    <span style="width:16px"></span>
+    <button data-mode="classic">Classic</button><button data-mode="hd">HD</button><button data-mode="split">Split</button><button id="fog">Rooms light up on entry</button>
+  </div>
+  <canvas id="stage" width="960" height="672"></canvas>
+  <div class="keys"><span><kbd>← →</kbd> walk</span><span><kbd>Space / ↑</kbd> jump · climb</span><span><kbd>↓</kbd> down a ladder</span><span><kbd>E</kbd> door</span><span><kbd>C</kbd> classic/HD · <kbd>V</kbd> split · <kbd>F</kbd> room reveal</span><span><kbd>1-6</kbd> pages</span><span><a href="../RECIPES.md">recipes</a></span></div>
+</main>
+<script src="engine.js"></script>
+<script src="classic.js"></script>
+<script src="hd.js"></script>
+<script src="shed-art.js"></script>
+<script src="shed-map.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

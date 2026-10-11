@@ -148,8 +148,12 @@ export class WaterSurfaceHd {
   // Each pool's still texture, while it is still.
   private readonly still = new Map<number, Texture>();
   private live: { id: number; texture: LiveTexture } | null = null;
+  // What is done to a pool's raster after it is painted and before it is
+  // baked: a lit level's light.
+  private readonly finish: (canvas: FineCanvas) => void;
 
-  constructor(map: Tilemap) {
+  constructor(map: Tilemap, finish: (canvas: FineCanvas) => void = () => {}) {
+    this.finish = finish;
     for (let ty = 0; ty < map.height; ty++) {
       for (let tx = 0; tx < map.width; tx++) {
         if (!isWaterSurface(map, tx, ty)) continue;
@@ -181,6 +185,7 @@ export class WaterSurfaceHd {
     const pool = this.pools.get(activeId);
     if (!pool) return;
     paintSurface(pool.canvas, pool, motion);
+    this.finish(pool.canvas);
     if (this.live) {
       this.live.texture.update(pool.canvas);
       return;
@@ -208,6 +213,7 @@ export class WaterSurfaceHd {
 
   private rest(pool: Pool): void {
     paintSurface(pool.canvas, pool, STILL);
+    this.finish(pool.canvas);
     const texture = bake(pool.canvas).texture;
     this.still.set(pool.id, texture);
     this.show(pool, texture);

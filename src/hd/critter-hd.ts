@@ -1,7 +1,7 @@
 import { DB32 } from '@constants';
 import { type ClassicRecorder, up } from '@hd/classic-recorder';
 import { FINE, FineCanvas } from '@hd/fine-canvas';
-import { bayer, RAMP } from '@hd/palette';
+import { bayer, RAMP, type Ramp } from '@hd/palette';
 import { smoothScale, toLogical } from '@hd/smooth-scale';
 import type { Vec2 } from '@types';
 
@@ -183,6 +183,41 @@ export function plantHd(classic: ClassicRecorder): CritterLayers {
   });
   for (const [x, y] of lit) s.set(x, y, DB32.rope);
   return { body: s, halo: haloFromClassic(classic) };
+}
+
+// Tones a prop gives light with, or that are already its darkest: selout
+// leaves them as they are.
+const PROP_UNSHADED: readonly number[] = [DB32.goldenFizz, DB32.white, DB32.valhalla, DB32.black];
+
+// A piece of furniture or a prop (design_handoff_potting_shed/RECIPES.md §5,
+// `hdOf`): lifted, rounded, its staircases bridged, selout along `ramp`,
+// wood grain in its larger boards, leaves scalloped, and a translucent
+// 1-px highlight (the glass of a jar) drawn as a solid 1-fine line — no
+// alpha. The same derivation for every prop, and for any prop to come.
+export function propHd(classic: ClassicRecorder, ramp: Ramp = RAMP) {
+  const s = up(classic);
+  s.round().elbows().edges(PROP_UNSHADED, ramp);
+  woodGrain(s, ramp);
+  foliage(s, { base: DB32.dell, lit: DB32.eltGreen, dark: DB32.opal });
+  for (const r of classic.rects) {
+    if (r.alpha <= 0 || r.alpha >= 1 || r.w !== 1) continue;
+    s.rect({ x: r.x * FINE + 1, y: r.y * FINE, w: 1, h: r.h * FINE }, r.color);
+  }
+  return { body: s, halo: null };
+}
+
+// Grain in wood: inside a board of rope or oiled cedar (a pixel with its
+// own tone on all four sides), on every sixth fine row, short runs one step
+// darker.
+function woodGrain(s: FineCanvas, ramp: Ramp): void {
+  const changes: [number, number, number][] = [];
+  s.forInk((x, y, c) => {
+    if (c !== DB32.rope && c !== DB32.oiledCedar) return;
+    if (((y % 6) + 6) % 6 !== 3 || bayer(Math.floor(x / 5), y) >= 0.4) return;
+    if (s.get(x - 1, y) !== c || s.get(x + 1, y) !== c || s.get(x, y - 1) !== c || s.get(x, y + 1) !== c) return;
+    changes.push([x, y, ramp.get(c)?.[1] ?? c]);
+  });
+  for (const [x, y, c] of changes) s.set(x, y, c);
 }
 
 // A drawing shown large — a greeting's subject at ×3 to ×8, a book's sketch

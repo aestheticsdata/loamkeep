@@ -23,12 +23,13 @@ describe('every tile in HD keeps its classic footprint', () => {
         // where that tile's own fill covers it. HD keeps to its own tile.
         const right = (spot.tx + 1) * TILE_SIZE;
         classic.rects.splice(0, classic.rects.length, ...classic.rects.filter((r) => r.x < right));
-        // A margin of one tile above for whatever stands up off the top edge.
+        // A margin of one tile above for whatever stands up off the top
+        // edge, and one below for what hangs off the bottom (roots).
         const hd = new FineCanvas({
           x: spot.tx * TILE_FINE,
           y: (spot.ty - 1) * TILE_FINE,
           w: TILE_FINE,
-          h: 2 * TILE_FINE,
+          h: 3 * TILE_FINE,
         });
         drawTileHd(hd, tile, spot);
         expect(footprint(classic, hd), `${name} at ${spot.tx},${spot.ty}`).toBe(0);

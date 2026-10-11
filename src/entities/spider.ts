@@ -5,14 +5,17 @@ import type { GreetingSpec } from '@systems/greeting';
 import type { Vec2 } from '@types';
 import { Container, type Graphics } from 'pixi.js';
 
-// How far down its thread the spider lets itself, and how long a trip takes.
+// How far down its thread the spider lets itself, unless told otherwise, and
+// how long a trip takes.
 const DROP = 40;
 const PERIOD = 6;
 
-// Authored description of a spider: the point on a ceiling it hangs from.
+// Authored description of a spider: the point on a ceiling it hangs from,
+// and how far it lets itself down — less under a low ceiling.
 export interface SpiderSpec {
   x: number;
   y: number;
+  drop?: number;
 }
 
 // A small round spider on a thread from the ceiling, letting itself down and
@@ -46,7 +49,7 @@ export class Spider implements Critter {
     this.elapsed += dt;
     const t = (this.elapsed % PERIOD) / PERIOD;
     // Down slowly, a pause at the bottom, back up a little quicker.
-    this.drop = Math.round(DROP * Math.min(1, Math.sin(t * Math.PI) * 1.3));
+    this.drop = Math.round((this.spec.drop ?? DROP) * Math.min(1, Math.sin(t * Math.PI) * 1.3));
     const drop = this.drop;
     const wiggle = Math.floor(this.elapsed * 3) & 1;
     this.body.draw((g) => {
