@@ -8,6 +8,7 @@ import { drawGlowfishLarge } from '@entities/glowfish';
 import { drawHare } from '@entities/hare';
 import { drawHedgehog } from '@entities/hedgehog';
 import { drawMothLarge } from '@entities/moth';
+import { drawNewt } from '@entities/newt';
 import { drawOwl } from '@entities/owl';
 import { drawPumpkin } from '@entities/pumpkin';
 import { drawRabbit } from '@entities/rabbit';
@@ -39,7 +40,8 @@ export type CreatureId =
   | 'bat'
   | 'snail'
   | 'frog'
-  | 'fireflies';
+  | 'fireflies'
+  | 'newt';
 
 export interface CreaturePage {
   id: CreatureId;
@@ -184,6 +186,16 @@ export const CREATURE_PAGES: readonly CreaturePage[] = [
         'A loose knot of small lights, low over the heath, blinking out of time with one another. From the ' +
         'summit they are hard to tell from the stars, which may be the point.',
       drawSketch: scaledSketch(drawFirefliesLarge, 5, -9, 0),
+    },
+  },
+  {
+    id: 'newt',
+    page: {
+      name: 'Cave Newt',
+      description:
+        'Orange as a coal, with black spots, on the wet rock by the underground lake. It goes in little dashes ' +
+        'and stops dead in between, as if it had just remembered something, every single time.',
+      drawSketch: scaledSketch((g) => drawNewt(g, 0), 5, -4, 0),
     },
   },
 ];

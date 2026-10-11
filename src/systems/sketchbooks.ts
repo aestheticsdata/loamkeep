@@ -28,9 +28,10 @@ export interface SketchbookBook {
 // Every book, in menu order. Registering one here is the whole of adding one:
 // the menu row, its count, its gallery and its storage all follow.
 //
-// Four books is the comfortable ceiling — a fifth leaves 2 px under the menu
-// plate and a sixth runs into the key line, at which point MENU_PLATE_Y in
-// title-screen.ts moves up rather than the rows getting tighter.
+// Three books is the comfortable ceiling now the map takes a row of the menu
+// too — a fourth leaves 2 px under the menu plate and a fifth runs into the
+// key line, at which point MENU_PLATE_Y in title-screen.ts moves up rather
+// than the rows getting tighter.
 export const SKETCHBOOKS: readonly SketchbookBook[] = [
   {
     id: LANDMARKS_BOOK_ID,

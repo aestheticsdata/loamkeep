@@ -34,10 +34,10 @@ import {
 } from '@systems/title-art';
 import { Container, Graphics, Text, type TextStyleOptions } from 'pixi.js';
 
-// What the menu asked for. Game turns `go` into a fade + level load and
-// `open` into that book's gallery; the title itself never touches either, and
-// never learns what a book id means.
-export type TitleAction = { go: 'meadow'; spawn: 'default' } | { open: string };
+// What the menu asked for. Game turns `go` into a fade + level load, `open`
+// into that book's gallery and `map` into the world map; the title itself
+// never touches any of them, and never learns what a book id means.
+export type TitleAction = { go: 'meadow'; spawn: 'default' } | { open: string } | { map: true };
 
 // One book as the menu shows it: the id to hand back when it is chosen, the
 // label to draw, and how much of it is written. Game builds these from the
@@ -55,6 +55,7 @@ export interface SketchbookRow {
 const TAGLINE = 'An old keep, a meadow, all day to wander.';
 const KEY_LINE = '← → walk    ↑/space jump    E look closer';
 const ENTER_LABEL = 'ENTER THE MEADOW';
+const MAP_LABEL = 'MAP OF THE WORLD';
 
 // Menu column: rows on the 16-px rhythm, cursor triangle 8 px to the left.
 // The plate is sized from its contents — widest label plus MENU_PAD_X each
@@ -217,8 +218,12 @@ export class TitleScreen {
       selectable: true,
       action: { go: 'meadow', spawn: 'default' },
     };
+    // The map, always there: it is how a player finds the places the books
+    // count, and it has nothing in it that needs earning first.
+    const map: MenuEntry = { label: MAP_LABEL, color: U.active, selectable: true, action: { map: true } };
     this.entries = [
       meadow,
+      map,
       ...books.map((book): MenuEntry => {
         const empty = book.discovered === 0;
         return {
@@ -313,7 +318,7 @@ export class TitleScreen {
 
     if (input.isAnyPressed(KEYS_CONFIRM)) {
       const { action } = this.entries[this.cursorRow];
-      if ('open' in action) {
+      if ('open' in action || 'map' in action) {
         this.audio.openBook();
       } else {
         this.audio.discover();

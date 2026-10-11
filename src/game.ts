@@ -39,6 +39,7 @@ import {
 import { getBook, SKETCHBOOKS, type SketchbookBook } from '@systems/sketchbooks';
 import { TitleScreen } from '@systems/title-screen';
 import { TitleSketchbook } from '@systems/title-sketchbook';
+import { WorldMap } from '@systems/world-map';
 import { WorldState } from '@systems/world-state';
 import type { CreatureId } from '@world/creatures';
 import type { Level } from '@world/level';
@@ -46,6 +47,7 @@ import { LEVEL_SPECS, type LevelId, loadLevel, STARTING_LEVEL_ID } from '@world/
 import { ParallaxBackground } from '@world/parallax';
 import {
   renderCryptBackdrop,
+  renderGrottoBackdrop,
   renderIndoorBackdrop,
   renderRockBackground,
   renderTilemap,
@@ -135,6 +137,8 @@ export class Game {
   private readonly title: TitleScreen;
   // The sketchbook read from the title. Non-null only while it is open.
   private titleGallery: TitleSketchbook | null = null;
+  // The world map, opened from the title.
+  private readonly worldMap = new WorldMap();
   private readonly fade: ScreenFade;
   // True until the player has entered the world once. The constructor
   // mounts the starting level at its default spawn, which is exactly what
@@ -215,6 +219,7 @@ export class Game {
     // Sketchbook overlay on stage above the world so it stays fixed on
     // screen (not affected by the camera) and renders on top of everything.
     app.stage.addChild(this.sketchbook.container);
+    app.stage.addChild(this.worldMap.container);
 
     // Greeting overlay sits on top of the sketchbook in z-order.
     app.stage.addChild(this.greeting.container);
@@ -261,6 +266,17 @@ export class Game {
     // still coming out from under the veil.
     if (this.fade.running) return;
 
+    if (this.worldMap.isVisible()) {
+      const event = this.worldMap.update(this.input, dt);
+      if (event === 'moved') {
+        this.audio.pageTurn();
+      } else if (event === 'closed') {
+        this.audio.closeBook();
+        this.worldMap.hide();
+      }
+      return;
+    }
+
     if (this.titleGallery !== null) {
       const event = this.titleGallery.update(this.input);
       if (event === 'turned') {
@@ -277,6 +293,10 @@ export class Game {
     if (action === null) return;
     if ('open' in action) {
       this.openGallery(action.open);
+      return;
+    }
+    if ('map' in action) {
+      this.worldMap.show();
       return;
     }
     // Wipe the still-animating title under, swap on the fully covered frame,
@@ -407,6 +427,7 @@ export class Game {
     this.mode = 'title';
     this.sketchbook.hide();
     this.greeting.hide();
+    this.worldMap.hide();
     this.titleGallery = null;
     this.parallax.container.visible = false;
     this.world.visible = false;
@@ -531,6 +552,8 @@ export class Game {
         backdrop = renderRockBackground(width, top, bottom);
       } else if (level.spec.backdrop === 'crypt-black') {
         backdrop = renderCryptBackdrop(width, top, bottom);
+      } else if (level.spec.backdrop === 'grotto') {
+        backdrop = renderGrottoBackdrop(width, top, bottom);
       } else {
         backdrop = renderIndoorBackdrop(width, top, bottom);
       }

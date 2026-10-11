@@ -86,7 +86,8 @@ src/
     glowfish.ts     # The cistern's fish — carries its own pulsing light
     owl.ts          # Perched belfry wildlife — blinks, turns its head
     critter.ts      # The Critter contract: species, greeting, one loop greets them all
-    hare.ts / hedgehog.ts / bat.ts / snail.ts / frog.ts / fireflies.ts  # The hill's crowd
+    hare.ts / hedgehog.ts / bat.ts / snail.ts / frog.ts / fireflies.ts / newt.ts  # The newer crowd
+    spores.ts / kelp.ts  # Moving scenery: rising spores, swaying lake kelp
     moth.ts         # Grotto wildlife — circles a glowcap
     falling-leaf.ts # The kitchen garden's leaves, drifting down
     glow.ts         # Soft round light behind glowing things
@@ -107,18 +108,20 @@ src/
     title-screen.ts # Title screen: scene, wordmark, menu, cursor
     title-art.ts    # The painted dawn meadow + keep behind the title (mood table)
     title-sketchbook.ts  # One book's gallery, read from the title
+    world-map.ts    # The world map, read from the title: every place and its way in
   world/
     tilemap.ts      # Tile enum + Tilemap class + procedural per-tile renderer
     level.ts        # LevelSpec interface + materialised Level (ASCII → Tilemap)
     levels.ts       # Level registry + loadLevel() lookup
     creatures.ts    # The creatures sketchbook's pages, one per species
+    atlas.ts        # The world map's places: position, parent, and where the way in is
     levels/
       meadow.ts          # Outdoor starting area
       old-keep.ts        # Indoor castle interior
       old-keep-crypt.ts  # Underground crypt
       old-keep-belfry.ts # The bell tower, climbed to the roof at night
       flooded-cistern.ts # The swimming level under the crypt
-      glow-grotto.ts     # The mushroom-lit cave past the meadow maze
+      glow-grotto.ts     # 160×90 underground: mushroom forest, warrens, lake, echo chamber
       kitchen-garden.ts  # The walled autumn garden, the pumpkin's home
       old-keep-library.ts  # Behind the bookshelf: stacks and ladders
       cairn-observatory.ts # 192×100 hill at night: moor and warren, face, puffballs, bridge, tor, caves
@@ -155,7 +158,7 @@ src/
   adding a landmark anywhere updates its count and gallery order for free;
   `creatures` is authored in `world/creatures.ts`, one page per species —
   rabbit, fish, bird, pumpkin, owl, glowfish, moth, hare, hedgehog, bat, snail,
-  frog, fireflies — because a species is not registered on a level
+  frog, fireflies, newt — because a species is not registered on a level
   the way a landmark is. Registering a book is the whole of adding one; the
   title screen has no per-book code. Four books is the comfortable ceiling
   before the menu plate reaches the key line.
@@ -171,9 +174,9 @@ src/
   sessions, as `{ version: 2, books: { landmarks: ['meadow.old-cairn', …] } }`
   under the `loamkeep.sketchbook.v1` localStorage key (the key keeps its old
   name so no save is orphaned; a v1 blob migrates into the `landmarks` book on
-  read). A book's entry reads `LANDMARKS 3/21` and opens a gallery of them,
+  read). A book's entry reads `LANDMARKS 3/23` and opens a gallery of them,
   ending on a count of the pages still blank — never their names. The count is
-  there from the start: a book nothing has been found in reads `LANDMARKS 0/21`,
+  there from the start: a book nothing has been found in reads `LANDMARKS 0/23`,
   dimmed and skipped by the cursor, because the denominator is what tells a new
   player how much there is to find.
 - **Per-level visual flavor**: each level picks its own parallax flavor
@@ -183,7 +186,8 @@ src/
   `zenith` the observatory's dense stars with the spiral picked out in them)
   and backdrop kind (`cave`
   rock texture, `indoor-dark` flat near-black, `crypt-black` pure black for
-  candle-lit underground). The backdrop is normally one band from a given row
+  candle-lit underground, `grotto` deep blue rock with grain, strata and cyan
+  glints, so the glow grotto's halls have a back wall to see). The backdrop is normally one band from a given row
   down; a level can instead name `backdropRegions`, so the observatory's caves
   are black inside a hill with open sky either side of it.
 - **Expanded tile palette**: grass / dirt / stone / dark stone (outdoor),
@@ -204,6 +208,11 @@ src/
   ledge the ladder leans against.
 - **Puffballs**: giant mushroom caps on the observatory hill. Landing on one
   throws the player up about eight tiles; hold ↓ to land without the bounce.
+- **A map of the world**: MAP OF THE WORLD on the title opens a parchment sheet
+  with every place on it, the paths between them, and — for the one in hand —
+  where exactly its way in is ("From the keep: climb to the upper floor. The
+  bookshelf to the right of the stone throne is a door"). The places live in
+  `world/atlas.ts`; adding a level means adding its entry there.
 - **Doors between levels are marked**: every one, whatever it looks like — a
   keep door, a bookshelf, a crack in the rock, a stone gate — carries the same
   golden beacon bobbing over it, and its prompt names the level beyond

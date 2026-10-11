@@ -956,6 +956,40 @@ export function renderCryptBackdrop(width: number, startY: number, endY: number)
   return g;
 }
 
+// Grotto backdrop — the back wall of the glow grotto. Darker than its rock
+// tiles so the walls stand forward, but never empty: a fine grain sampled on
+// a 4-px grid (per-pixel would be millions of checks for a level this size),
+// strata that waver across the whole width, and one cell in sixty holding a
+// faint cyan glint, the glowcaps' light caught in the stone.
+const GROTTO_BACK = 0x0c1220;
+const GROTTO_BACK_GRAIN = 0x131b2d;
+const GROTTO_BACK_STRATA = 0x182236;
+const GROTTO_BACK_GLINT = 0x2a6b7a;
+
+export function renderGrottoBackdrop(width: number, startY: number, endY: number): Graphics {
+  const g = new Graphics();
+  g.rect(0, startY, width, endY - startY).fill(GROTTO_BACK);
+  for (let bandY = startY + 20; bandY < endY; bandY += 44) {
+    const phase = bandY * 0.07;
+    for (let x = 0; x < width; x += 2) {
+      const wobble = Math.round(Math.sin(x * 0.021 + phase) * 4 + Math.sin(x * 0.007 + phase * 2) * 6);
+      g.rect(x, bandY + wobble, 2, 1).fill(GROTTO_BACK_STRATA);
+    }
+  }
+  for (let y = startY; y < endY; y += 4) {
+    for (let x = 0; x < width; x += 4) {
+      const n = (x * 374761393 + y * 668265263) | 0;
+      const h = (((n ^ (n >>> 13)) * 1274126177) >>> 0) / 0xffffffff;
+      if (h < 0.016) {
+        g.rect(x, y, 1, 1).fill(GROTTO_BACK_GLINT);
+      } else if (h < 0.2) {
+        g.rect(x, y, h < 0.08 ? 2 : 1, 1).fill(GROTTO_BACK_GRAIN);
+      }
+    }
+  }
+  return g;
+}
+
 // Where the water surface sits inside the tile, at rest.
 //   `WATER_REST_DEPRESSION` pixels from the top of the tile = the recessed
 //   "bank above the water" zone (transparent, lets the underground void

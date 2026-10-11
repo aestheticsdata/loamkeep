@@ -33,7 +33,10 @@ export type ParallaxFlavor = 'meadow' | 'keep' | 'night' | 'autumn' | 'zenith';
 //   'crypt-black' - PURE black fill. The darkest backdrop available, for
 //                   spaces meant to feel "candle-lit hideout deep
 //                   underground" — you can't see the back of the room.
-export type BackdropKind = 'cave' | 'indoor-dark' | 'crypt-black';
+//   'grotto'      - deep blue-black rock with a fine grain, wavering strata
+//                   and the odd cyan glint: a cave you can see the back of
+//                   by the light of what grows in it, never a flat void.
+export type BackdropKind = 'cave' | 'indoor-dark' | 'crypt-black' | 'grotto';
 
 // A rectangle of the level in tiles: top-left (col, row) and its size.
 export interface TileRect {
