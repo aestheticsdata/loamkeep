@@ -51,6 +51,19 @@ export interface TileRect {
   rows: number;
 }
 
+// A rectangle of the level with a backdrop of its own, over the level's.
+export interface BackdropRegion extends TileRect {
+  backdrop?: BackdropKind;
+}
+
+// Water that flows: a swimmer anywhere in `area` is carried sideways at
+// `speed` px/s (positive east) on top of their own stroke — so swimming
+// against it is possible, and slow.
+export interface WaterCurrent {
+  area: TileRect;
+  speed: number;
+}
+
 // Whether a tile (column, row) lies inside a rectangle of tiles.
 export function holdsTile(r: TileRect, tile: Vec2): boolean {
   return tile.x >= r.col && tile.x < r.col + r.cols && tile.y >= r.row && tile.y < r.row + r.rows;
@@ -141,8 +154,12 @@ export interface LevelSpec {
   rockBgStartRow: number;
   // When present, the backdrop is drawn only behind these rectangles instead
   // of the full-width band from rockBgStartRow down: for caves inside a hill
-  // that has open sky on both sides of it.
-  backdropRegions?: readonly TileRect[];
+  // that has open sky on both sides of it. Each is drawn over the ones before
+  // it, in its own kind of backdrop if it names one: the meadow's cellars of
+  // castle brick and its cliff of granite, over the cave of the rest.
+  backdropRegions?: readonly BackdropRegion[];
+  // Water that flows (the meadow's underground river).
+  currents?: readonly WaterCurrent[];
   // True when sky lies above the top row, so the camera may follow a jump
   // above it. False under a ceiling: the camera stops at row 0.
   openSky: boolean;

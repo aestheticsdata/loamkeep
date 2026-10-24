@@ -47,7 +47,7 @@ export const ATLAS: readonly AtlasPlace[] = [
     y: 38,
     from: 'meadow',
     howTo:
-      'From the meadow: the stone gate at the right-hand end of the high platform on the right, just below the ' +
+      'From the meadow: the stone gate on the crag at the top of the cliff, at its far eastern end, past the ' +
       'Crystal Vein. The trail climbs the hill at night.',
     draw(g) {
       g.rect(-10, -9, 20, 16).fill(0x0c0b1a);
@@ -71,8 +71,8 @@ export const ATLAS: readonly AtlasPlace[] = [
     y: 126,
     from: 'meadow',
     howTo:
-      'From the meadow: swim up out of the deep lake into the tunnels and work west to the Spiral Fossil. ' +
-      'The crack in the rock is in the dip beside it.',
+      'From the meadow: down into the Roots under the forest, and through the Maze to its bottom gallery. ' +
+      'The crack in the rock is at its far western end.',
     draw(g) {
       g.rect(-10, -7, 20, 14).fill(0x1a2030);
       g.rect(-7, -4, 14, 10).fill(0x0c1220);
@@ -89,8 +89,8 @@ export const ATLAS: readonly AtlasPlace[] = [
     y: 82,
     from: 'meadow',
     howTo:
-      'From the meadow: walk off the right-hand cliff and fall straight down the shaft. The keep door is at ' +
-      'the bottom, underground.',
+      'From the meadow: the well in the wheat field. Climb down its ladder; the keep door is at the bottom, ' +
+      'underground.',
     draw(g) {
       g.rect(-8, -8, 16, 15).fill(DB32.dimGray);
       g.rect(-8, -11, 4, 3).fill(DB32.dimGray);

@@ -11,8 +11,18 @@
 // Phase 1 has no callers yet; Door uses Game.transitionTo directly. The class
 // exists now so phase 2's lever/gate plumbing slots in without touching the
 // Game wiring.
+// The last cairn the player passed: which level it is in, and where (top-
+// left of the player's box) they stand when sent back to it.
+export interface Checkpoint {
+  levelId: string;
+  x: number;
+  y: number;
+}
+
 export class WorldState {
   private flags = new Map<string, boolean>();
+  // Null until the first cairn is lit.
+  checkpoint: Checkpoint | null = null;
 
   // Read a flag. Unset flags read as false — every flag has an implicit
   // default-off, so we never have to seed the store before checking.

@@ -2,7 +2,7 @@ import { DB32, TILE_SIZE } from '@constants';
 import { ChunkLayer, type LogicalRect } from '@hd/chunk-layer';
 import type { FineCanvas } from '@hd/fine-canvas';
 import { paintBackdropHd } from '@world/backdrops-hd';
-import type { Level } from '@world/level';
+import type { BackdropRegion, Level } from '@world/level';
 import type { LightField } from '@world/lighting';
 import { roomBackdropAt } from '@world/room-backdrops-hd';
 import { Tile, type Tilemap, tileFaces } from '@world/tilemap';
@@ -23,14 +23,17 @@ export class GroundHd {
 
   constructor(level: Level, light: LightField | null = null) {
     const map = level.tilemap;
-    const regions = level.spec.backdropRegions ?? [
+    const regions: readonly BackdropRegion[] = level.spec.backdropRegions ?? [
       { col: 0, row: level.spec.rockBgStartRow, cols: map.width, rows: map.height - level.spec.rockBgStartRow },
     ];
     const backdrops = regions.map((r) => ({
-      left: r.col * TILE_SIZE,
-      width: r.cols * TILE_SIZE,
-      top: r.row * TILE_SIZE,
-      bottom: (r.row + r.rows) * TILE_SIZE,
+      kind: r.backdrop ?? level.spec.backdrop,
+      area: {
+        left: r.col * TILE_SIZE,
+        width: r.cols * TILE_SIZE,
+        top: r.row * TILE_SIZE,
+        bottom: (r.row + r.rows) * TILE_SIZE,
+      },
     }));
 
     // The classic order: backdrops, then the tiles row by row — the row just
@@ -38,7 +41,7 @@ export class GroundHd {
     // whose roots hang down into it — then the water.
     const paint = (canvas: FineCanvas) => {
       if (light) paintRoomWalls(canvas, { map, light });
-      else for (const area of backdrops) paintBackdropHd(canvas, level.spec.backdrop, area);
+      else for (const { kind, area } of backdrops) paintBackdropHd(canvas, kind, area);
       const walls = light ? canvas.pixels.slice() : null;
       const tx0 = Math.max(0, Math.floor(canvas.x0 / TILE_FINE));
       const tx1 = Math.min(map.width, Math.ceil((canvas.x0 + canvas.w) / TILE_FINE));

@@ -1,5 +1,6 @@
 import { DB32, PHYSICS_STEP, PHYSICS_STEP_SLACK, SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE } from '@constants';
 import { Bird, drawBird } from '@entities/bird';
+import { Cairn, cairnLitFlag } from '@entities/cairn';
 import { isCritter } from '@entities/critter';
 import { Decoration } from '@entities/decoration';
 import { Door } from '@entities/door';
@@ -63,6 +64,7 @@ import { LightField } from '@world/lighting';
 import { ParallaxBackground } from '@world/parallax';
 import { RoomReveal } from '@world/room-reveal';
 import {
+  isHazard,
   renderCryptBackdrop,
   renderGrottoBackdrop,
   renderIndoorBackdrop,
@@ -86,6 +88,14 @@ const WATER_BOB_FREQ = 4;
 // of a second at 60 Hz, long enough to watch the band cross the screen and
 // short enough to still be a cut rather than a transition.
 const WIPE_FRAMES = 20;
+
+// The same wave, each way, over a respawn after a bramble: the player goes
+// under on the thorns and comes out at the cairn.
+const RESPAWN_FRAMES = WIPE_FRAMES;
+
+// How far inside the player's box a hazard has to reach to count as touched,
+// px: brushing the tip of a thorn with a boot's corner is not touching it.
+const HAZARD_INSET = 2;
 
 // Which loop is running. 'title' ticks only the TitleScreen (and the
 // sketchbook gallery when it is open) — no player physics, no camera follow,
@@ -212,6 +222,12 @@ export class Game {
   // Time accumulated while the player is in water. Drives the surface bob.
   // Reset on level transition AND when the player exits water.
   private waterAnimTime = 0;
+  // Where the player came into the current level: where a hazard sends them
+  // back to until they pass a cairn in it.
+  private arrival: Vec2;
+  // True while the wave is over the screen for a respawn: the world stands
+  // still under it.
+  private respawning = false;
 
   constructor(app: Application) {
     this.app = app;
@@ -243,6 +259,7 @@ export class Game {
     // shared across transitions — its position is moved on each one.
     const spawn = this.currentLevel.spawn(this.currentLevel.spec.defaultSpawnId);
     this.player = new Player(spawn.x, spawn.y);
+    this.arrival = { x: spawn.x, y: spawn.y };
     this.world.addChild(this.player.sprite);
 
     // Camera bound to the starting level's dimensions. setBounds() updates
@@ -408,7 +425,7 @@ export class Game {
       // Esc: back to the title. The mode flips right away so the world
       // freezes on this frame while the wave crosses it; showTitle() runs on
       // the fully covered frame, and the title comes out from under it.
-      if (this.input.isAnyPressed(KEYS_BACK)) {
+      if (this.input.isAnyPressed(KEYS_BACK) && !this.respawning) {
         this.mode = 'title';
         this.fade.out(WIPE_FRAMES, () => {
           this.showTitle();
@@ -417,24 +434,28 @@ export class Game {
         return;
       }
 
-      // Respawn (R) — now goes to the CURRENT level's default spawn, not
-      // the meadow's. Still the temporary escape hatch from underground
-      // until ascent mechanics land.
-      if (this.input.isAnyPressed(KEYS_RESPAWN)) {
-        this.respawnAtDefault();
+      // Respawn (R): straight back to the last cairn passed in this level,
+      // or to where the player came into it. The escape hatch from anywhere
+      // the player has got themselves stuck.
+      if (this.input.isAnyPressed(KEYS_RESPAWN) && !this.respawning) {
+        this.respawnAtCheckpoint();
       }
 
       // The player on a fixed step: as many PHYSICS_STEPs as the frame's
       // time covers (none on some frames of a fast display, two on a slow
       // one), so the jump arc is the same at any frame rate. The SFX flags
       // are read after every step — one set per step, none lost.
+      // Entities that move with the physics (a mill wheel, a pushed bale)
+      // step first, the player after them, on the ground they leave. A
+      // hazard touched on a step ends the stepping until the respawn.
       this.stepInput.latch();
-      this.physicsClock += dt;
-      while (this.physicsClock >= PHYSICS_STEP - PHYSICS_STEP_SLACK) {
+      if (!this.respawning) this.physicsClock += dt;
+      while (!this.respawning && this.physicsClock >= PHYSICS_STEP - PHYSICS_STEP_SLACK) {
         this.physicsClock -= PHYSICS_STEP;
-        this.player.update(this.stepInput, PHYSICS_STEP, tilemap);
+        this.stepWorld(PHYSICS_STEP);
         this.stepInput.consume();
         this.playPlayerSounds();
+        if (this.touchesHazard()) this.respawnAfterHazard();
       }
       this.player.interpolate(Math.min(1, Math.max(0, this.physicsClock / PHYSICS_STEP)));
 
@@ -459,8 +480,9 @@ export class Game {
       this.checkMothEncounter();
       this.checkCritterEncounters();
       this.noticeNearbyPlants();
+      this.checkCairns();
 
-      this.runInteractionLoop();
+      if (!this.respawning) this.runInteractionLoop();
 
       this.aimCameraAtPlayer();
       this.camera.update(dt);
@@ -596,6 +618,7 @@ export class Game {
 
     // Reposition player at the spawn point.
     this.player.placeAt(nextSpawn.x, nextSpawn.y);
+    this.arrival = { x: nextSpawn.x, y: nextSpawn.y };
 
     // Camera + parallax for the new level. The setBounds reconfigures the
     // clamp; snap+apply puts the viewport on the player immediately so
@@ -637,16 +660,17 @@ export class Game {
       const top = region.row * TILE_SIZE;
       const bottom = (region.row + region.rows) * TILE_SIZE;
       const width = region.cols * TILE_SIZE;
+      const kind = region.backdrop ?? level.spec.backdrop;
       let backdrop: Graphics;
-      if (level.spec.backdrop === 'cave') {
+      if (kind === 'cave') {
         backdrop = renderRockBackground(width, top, bottom);
-      } else if (level.spec.backdrop === 'crypt-black') {
+      } else if (kind === 'crypt-black') {
         backdrop = renderCryptBackdrop(width, top, bottom);
-      } else if (level.spec.backdrop === 'grotto') {
+      } else if (kind === 'grotto') {
         backdrop = renderGrottoBackdrop(width, top, bottom);
-      } else if (level.spec.backdrop === 'library') {
+      } else if (kind === 'library') {
         backdrop = renderLibraryBackdrop(width, top, bottom);
-      } else if (level.spec.backdrop === 'masonry') {
+      } else if (kind === 'masonry') {
         backdrop = renderMasonryBackdrop(width, top, bottom);
       } else {
         backdrop = renderIndoorBackdrop(width, top, bottom);
@@ -1031,11 +1055,67 @@ export class Game {
     return this.worldState.get(flag) || this.sketchbookStore.has(CREATURES_BOOK_ID, id);
   }
 
-  private respawnAtDefault(): void {
-    const spawn = this.currentLevel.spawn(this.currentLevel.spec.defaultSpawnId);
-    this.player.placeAt(spawn.x, spawn.y);
+  // One fixed step of everything that moves with the physics: the entities
+  // that do, on the boxes every entity has, then the player.
+  private stepWorld(dt: number): void {
+    const tilemap = this.currentLevel.tilemap;
+    const boxes = this.currentEntities.flatMap((entity) => entity.solids?.() ?? []);
+    const ground = { tilemap, boxes };
+    for (const entity of this.currentEntities) entity.step?.(dt, { player: this.player, ground });
+    this.player.update(this.stepInput, dt, { ...ground, currents: this.currentLevel.spec.currents ?? [] });
+  }
+
+  // Whether the player's box, inset by HAZARD_INSET, is on a hazard tile.
+  private touchesHazard(): boolean {
+    const { pos, size } = this.player;
+    const map = this.currentLevel.tilemap;
+    const x0 = Math.floor((pos.x + HAZARD_INSET) / TILE_SIZE);
+    const x1 = Math.floor((pos.x + size.x - HAZARD_INSET) / TILE_SIZE);
+    const y0 = Math.floor((pos.y + HAZARD_INSET) / TILE_SIZE);
+    const y1 = Math.floor((pos.y + size.y - HAZARD_INSET) / TILE_SIZE);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) if (isHazard(map.at(tx, ty))) return true;
+    }
+    return false;
+  }
+
+  // Under the wave, back to the last cairn, and out again: the world stands
+  // still while the screen is covered, and moves again from the frame the
+  // player is put down, as the wave carries on and uncovers them.
+  private respawnAfterHazard(): void {
+    this.respawning = true;
+    this.fade.out(RESPAWN_FRAMES, () => {
+      this.respawnAtCheckpoint();
+      this.physicsClock = 0;
+      this.respawning = false;
+      this.fade.in(RESPAWN_FRAMES);
+    });
+  }
+
+  // Lights a cairn the player walks past, and makes it the checkpoint: the
+  // last one passed, wherever the one before it was.
+  private checkCairns(): void {
+    const levelId = this.currentLevel.spec.id;
+    for (const entity of this.currentEntities) {
+      if (!(entity instanceof Cairn) || !entity.isPlayerInRange(this.player.pos, this.player.size)) continue;
+      const at = entity.respawnAt;
+      this.worldState.checkpoint = { levelId, x: at.x, y: at.y };
+      if (entity.isLit) continue;
+      entity.light();
+      this.worldState.set(cairnLitFlag(levelId, entity.id), true);
+      this.audio.noteWritten();
+    }
+  }
+
+  // The last cairn passed in this level, or where the player came into it.
+  private respawnAtCheckpoint(): void {
+    const here = this.worldState.checkpoint;
+    const at = here && here.levelId === this.currentLevel.spec.id ? here : this.arrival;
+    this.player.placeAt(at.x, at.y);
     this.aimCameraAtPlayer();
     this.camera.snap();
+    this.camera.applyTo(this.world);
+    this.parallax.update(this.camera);
   }
 
   // Aimed at where the player is drawn, not where its body is, so the figure

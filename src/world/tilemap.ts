@@ -67,6 +67,9 @@ export const PUFFBALL_SHADE = 0xa98fb4;
 //              below), PlankWall (the mass between rooms), PackedEarth (the
 //              ground under the house) and RootEarth (the same over a
 //              tunnel, with roots hanging out of its underside).
+//   - Wild:    Vine (not solid — climbed exactly like a Ladder) and Bramble
+//              (not solid, but a hazard: touching it sends the player back
+//              to the last cairn they passed, see Game). The meadow's.
 // Water is shared (lakes happen in both biomes).
 export const Tile = {
   Empty: 0,
@@ -93,6 +96,8 @@ export const Tile = {
   PlankWall: 21,
   PackedEarth: 22,
   RootEarth: 23,
+  Vine: 24,
+  Bramble: 25,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -123,6 +128,8 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   j: Tile.PlankWall,
   e: Tile.PackedEarth,
   r: Tile.RootEarth,
+  V: Tile.Vine,
+  X: Tile.Bramble,
 };
 
 export const TILE_COLORS: Record<Tile, number> = {
@@ -180,6 +187,10 @@ export const TILE_COLORS: Record<Tile, number> = {
   // The earth under the house, darker than the garden's soil.
   [Tile.PackedEarth]: DB32.loulou,
   [Tile.RootEarth]: DB32.loulou,
+  // Neither is a fill: a stem and its leaves, or a tangle of thorns, over
+  // whatever is behind them.
+  [Tile.Vine]: DB32.eltGreen,
+  [Tile.Bramble]: DB32.clairvoyant,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -214,7 +225,19 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.PlankWall]: true,
   [Tile.PackedEarth]: true,
   [Tile.RootEarth]: true,
+  [Tile.Vine]: false,
+  [Tile.Bramble]: false,
 };
+
+// What the player can take hold of and climb (see Player).
+export function isClimbable(t: Tile): boolean {
+  return t === Tile.Ladder || t === Tile.Vine;
+}
+
+// What sends the player back to the last cairn on contact.
+export function isHazard(t: Tile): boolean {
+  return t === Tile.Bramble;
+}
 
 export class Tilemap {
   readonly width: number;
@@ -506,6 +529,15 @@ export function drawTile(
   // Nor does a puffball's rounded top.
   if (t === Tile.Puffball) {
     drawPuffball(g, x, y, tx);
+    return;
+  }
+  // Nor a vine, nor a bramble: the rock or the sky shows through both.
+  if (t === Tile.Vine) {
+    drawVine(g, x, y, ty);
+    return;
+  }
+  if (t === Tile.Bramble) {
+    drawBramble(g, x, y, tx);
     return;
   }
 
@@ -934,6 +966,49 @@ function drawLadder(g: Graphics, x: number, y: number): void {
     g.rect(x + 4, y + ry, 8, 1).fill(DB32.twine);
     g.rect(x + 4, y + ry + 1, 8, 1).fill(DB32.oiledCedar);
   }
+}
+
+// Vine: a stem 2 px wide down the middle of the column, swaying a pixel
+// either way every other tile so a run of them reads as one plant and not a
+// pipe, with a leaf off alternate sides every 4 px — lit christi on top,
+// eltGreen under, a dell rib where it joins the stem.
+function drawVine(g: Graphics, x: number, y: number, ty: number): void {
+  const sx = x + 7 + (ty & 1);
+  g.rect(sx, y, 2, TILE_SIZE).fill(DB32.dell);
+  g.rect(sx, y, 1, TILE_SIZE).fill(DB32.eltGreen);
+  for (let i = 0; i < 4; i++) {
+    const ly = y + 1 + i * 4;
+    const left = (i + ty) % 2 === 0;
+    const lx = left ? sx - 4 : sx + 2;
+    g.rect(lx, ly, 4, 2).fill(DB32.eltGreen);
+    g.rect(lx + (left ? 1 : 0), ly, 3, 1).fill(DB32.christi);
+    g.rect(left ? sx - 1 : sx + 2, ly + 1, 1, 1).fill(DB32.dell);
+  }
+}
+
+// Bramble: three thorny stems standing on the tile below, arching over at
+// the top, a thorn off each side every few pixels, and the odd red berry. The
+// stems are brown-red (clairvoyant) lit with brown, shadowed in loulou.
+function drawBramble(g: Graphics, x: number, y: number, tx: number): void {
+  const stems = [
+    { at: 2, top: 4 },
+    { at: 7, top: 1 },
+    { at: 12, top: 5 },
+  ];
+  for (const [i, stem] of stems.entries()) {
+    const sx = x + stem.at + ((tx + i) % 2);
+    g.rect(sx, y + stem.top, 2, TILE_SIZE - stem.top).fill(DB32.clairvoyant);
+    g.rect(sx, y + stem.top, 1, TILE_SIZE - stem.top).fill(DB32.brown);
+    g.rect(sx + 1, y + TILE_SIZE - 3, 1, 3).fill(DB32.loulou);
+    // The arch over the top, leaning away from the middle stem.
+    const lean = i === 0 ? -1 : 1;
+    g.rect(sx + lean, y + stem.top - 1, 2, 1).fill(DB32.clairvoyant);
+    for (let ty = stem.top + 2; ty < TILE_SIZE - 2; ty += 4) {
+      g.rect(sx - 1, y + ty, 1, 1).fill(DB32.loulou);
+      g.rect(sx + 2, y + ty + 2, 1, 1).fill(DB32.loulou);
+    }
+  }
+  if (tx % 3 === 0) g.rect(x + 9, y + 6, 2, 2).fill(DB32.brown);
 }
 
 // One tile of bookcase: a shelf board across the bottom and a row of spines

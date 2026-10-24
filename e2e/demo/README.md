@@ -50,23 +50,34 @@ which is why `settle()` here waits for a canvas instead of for `document.fonts.r
 
 ## The take
 
-Nine chapters, one per beat, filmed in HD, at the default `DEMO_SPEED=1`. The picture never cuts. The route only
-ever goes down, because that is how the meadow is built — there is no way back up a shaft and no
-death to end a wrong turn, so the storyboard walks off a ledge where a player would.
+Nine chapters, one per beat, filmed in HD, at the default `DEMO_SPEED=1`. The picture never cuts.
+The meadow is the 200 × 96 one (LOA-52), and the take crosses it the way a player walking it for
+the first time would, from the forest edge to the keep's door at the foot of the well.
 
 | | | |
 |---|---|---|
-| 0:00 | The title | the painted dawn — seven sky bands, the sun coming up behind the keep, the rabbit that also lives in the meadow — and the second entry reading LANDMARKS 0/31, because the browser is cold; then ENTER THE MEADOW and the twenty-frame wave wipe that carries the title under in 16-px squares |
-| 0:06 | The meadow | a few steps left to the ledge over the first shaft, the stone marker on its platform across it, and a jump on the spot: the whole platforming vocabulary, since holding the key goes higher than tapping it |
-| 0:10 | A first meeting | the rabbit paces this platform at 32 px/s and the player walks at 72, so walking right is enough; the parchment popup, its line of speech, and any movement key closing it |
-| 0:15 | Under the meadow | off the end of the grass, down the one-tile shaft onto the shelf at row 13, off that and into the cavern pool |
-| 0:21 | A page written | wading is slower than walking and the submerged half of the player is tinted blue under a rippling surface; the sunken stone on the pool floor, E, and the page it writes |
-| 0:27 | The deep water | out over the pool's one-tile shore, right along the cavern floor and down the three steps the right-hand side of the level is, then left off the last one into the deep lake: a dive, the fish, and the exit pop back onto the bank |
-| 0:42 | The old keep | the door on the bottom step; inside, cool grey brick, a polished floor, gold pillars and candles the length of the hall — walked end to end because the only way down is the hole at the far end, then back along the basement to the door under it |
-| 1:02 | The crypt | near-black masonry in two neutral greys mixed outside the palette on purpose, a chandelier and a candelabrum; the floor has a hole in it, and the inscription is across the hole |
-| 1:12 | The sketchbook | Esc fades back to a title that now counts pages, and the gallery reads the book back: both pages the take wrote, then the leaf that says how many are still blank — never which ones |
+| 0:00 | The title | the painted dawn — seven sky bands, the sun coming up behind the keep, the rabbit that also lives in the meadow — and the landmarks entry at zero, because the browser is cold; then ENTER THE MEADOW and the twenty-frame wave wipe that carries the title under in 16-px squares |
+| 0:06 | The meadow | a few steps left past the starting cairn, whose lantern lights as the player goes by, to the ledge over the first hole down, and a jump on the spot |
+| 0:10 | A first meeting | the rabbit paces this grass at 32 px/s and the player walks at 72, so walking right is enough; the parchment popup, its line of speech, and any movement key closing it |
+| 0:17 | The canopy | up the first vine onto the branch at its top, along it — a bird stops to talk — up the long vine to the top of the canopy, the Ruined Arch, E, its page; then down the way a player comes down, off the end of one branch onto the next and off that to the grass |
+| 0:40 | The mill | over the ravine and the mouth of the Root Shaft, past the stream's cairn, into the stream; the jump key held pops the player out at every surface, over both stepping stones, to under the wheel, and bobbing there until a paddle comes up under them; the ride over the top, the jump off onto the roof, the weathervane's page |
+| 1:04 | The field | the first hay bale pushed up to the loft's post and climbed, the owl on the loft; a jump off the loft's far end that lands in the brambles, the wave, and the player put back down at the field's cairn; back up, down the far end on foot, and the second bale pushed into the brambles as a stepping stone over them |
+| 1:32 | The old keep | onto the well's rim stone and down its shaft to the keep's door at its foot; inside, cool grey brick, a polished floor, gold pillars and candles the length of the hall — walked end to end because the only way down is the hole at the far end, then back along the basement to the door under it |
+| 1:57 | The crypt | near-black masonry in two neutral greys mixed outside the palette on purpose, a chandelier and a candelabrum; the floor has a hole in it, and the inscription is across the hole |
+| 2:07 | The sketchbook | Esc fades back to a title that now counts pages, and the gallery reads the book back: the three pages the take wrote, then the leaf that says how many are still blank — never which ones |
 
 ## What this run actually measured
+
+**The take across the rebuilt meadow** (LOA-52), filmed on 2026-10-24 at `DEMO_SPEED=1`, 1280×720
+at a device scale factor of 3, in HD:
+
+- 2:23 of film, 142.9 s, nine chapters. The screencast delivered 8428 frames at 59.0 fps.
+- The mp4 is 6.8 MB at CRF 26, 0.38 Mbit/s: longer than the take before it, and a little denser for
+  the canopy, the wheel and the field, which are busier pictures than a cavern pool.
+- Nine stills at 3840×2160, 52 KB–74 KB each.
+- Three takes went before it. The first stopped at the long vine (see the traps), the second on the
+  second hay bale; the third is this one.
+
 
 **The HD take** (LOA-41), filmed on 2026-10-11 at `DEMO_SPEED=1`, 1280×720 at a device scale factor
 of 3, in the art the game now opens in:
@@ -107,15 +118,15 @@ the film saved losslessly at twice its resolution.
 
 | | |
 |---|---|
-| `01-the-meadow.png` | the player on the spawn platform under the parallax hills — the landing page's card thumbnail |
+| `01-the-meadow.png` | the player at the ledge on the forest edge, the starting cairn lit, the canopy over them — the landing page's card thumbnail |
 | `02-a-first-meeting.png` | the rabbit's greeting, mid-sentence |
-| `03-the-lake.png` | waist-deep in the cavern pool, tinted blue under the surface |
-| `04-the-sketchbook.png` | the Sunken Stone's page, open over the world |
-| `05-the-deep-water.png` | the deep lake with its fish, the keep's door on the bank |
-| `06-the-old-keep.png` | the hall on arrival: three floors, gold pillars, candles, a pumpkin |
+| `03-the-sketchbook.png` | the Ruined Arch's page, open over the top of the canopy |
+| `04-the-mill-wheel.png` | the player riding a paddle up the mill wheel, the stream and its stepping stones below |
+| `05-the-field.png` | the owl's greeting, on the hay loft |
+| `06-the-old-keep.png` | the hall on arrival: three floors, gold pillars, candles |
 | `07-the-crypt.png` | the crypt by candlelight |
 | `08-the-title.png` | the title again, its entry now counting the pages the take wrote |
-| `09-the-gallery.png` | the gallery, page one of two |
+| `09-the-gallery.png` | the gallery, page one of three |
 
 ## Classic beside HD: `pnpm video:split`
 
@@ -145,7 +156,7 @@ DEMO_CURSOR=off DEMO_FPS=30 pnpm video:generate
 
 The take writes nothing outside `out/`. The game has no account and no server, and its one piece of
 persistence — `loamkeep.sketchbook.v1` in localStorage — belongs to Playwright's browser, which is
-cold on every run: that is what makes chapter one's LANDMARKS 0/31 and the last chapter's two
+cold on every run: that is what makes chapter one's empty landmarks book and the last chapter's
 pages both reliable. Your own tab on `localhost:5173` is not touched, and its sketchbook is yours.
 
 ## Loamkeep-specific traps
@@ -166,10 +177,28 @@ a fixed 2600 ms, which at `DEMO_SPEED=4` stopped short of the door and at 1 walk
 same storyboard, two different failures, neither of them visible until the E three lines later did
 nothing. `holdWhile` exists so that cannot happen.
 
-**Do not steer inside a one-tile shaft.** The first descent is the gap at cols 20-22, and the shaft
-under it is one tile wide with dirt on both shoulders. Holding Right through the fall lands the
-player on the shoulder at row 10, wedged against the wall, and the take dies there. The key is
-released the moment the player leaves the ledge.
+**A greeting moves the player.** The key that closes a parchment is a movement key, and it is held
+for a beat: the walk carries on a few pixels past wherever the creature stopped it. On the canopy's
+branch a bird stops the walk next to the long vine, and the tap that closes its greeting carried
+the player into the next column — off the vine, where Up is a jump, not a climb. The take died
+there, waiting to climb. The beat now walks back onto the vine's column, from whichever side,
+before it climbs.
+
+**`demo.hold` waits after letting go, and a held key carries on through the wait.** The hop onto a
+bale is Space for 130 ms with Right down; through `demo.hold`, Right stayed down for its settle
+too, and the hop onto the second bale — the one pushed into the brambles — sailed on over its far
+side into them. The hop presses the keys itself, and lets go of Right the moment the player is over
+the bale.
+
+**The wheel's turn is not on the snapshot.** No beat can wait for a paddle to be in a place, so the
+mill chapter waits for the ride instead: the player bobs at the stream's surface under the wheel,
+jump held, until a paddle comes up under them, which on any take is a few seconds. Over the top the
+rider is at x 1146 and a full arc from there lands short of the roof; the jump waits for the paddle
+to carry them on to x 1170, coming down the far side.
+
+**The well has a rim.** A stone of it stands over the mouth of the well at col 129 and stops a walk
+dead, which reads as the walk arriving. The beat hops onto the stone and steps off its far side, and
+the shaft beside the ladder drops the player to the door.
 
 **The keep's two doors are on different floors.** The meadow's door lands the player on the lower
 floor; the one down to the crypt is in the basement, under the hole at cols 36-37. Walking right

@@ -16,10 +16,10 @@ import {
 } from '@world/parallax-hd';
 import { Container, Graphics } from 'pixi.js';
 
-// Y position of the silhouette horizon line, in logical pixels.
-// Matched to the grass row top so hill peaks rise into the sky band that
+// Y position of the silhouette horizon line, in logical pixels: the top of
+// the meadow's grass row (20), so hill peaks rise into the sky band that
 // sits above the tilemap.
-const HORIZON_Y = 128;
+const HORIZON_Y = 20 * 16;
 
 interface ParallaxLayer {
   graphics: Graphics;
@@ -443,8 +443,9 @@ function makeSkyGradient(width: number, horizonY: number): Graphics {
   const g = new Graphics();
   // Top is far above any reachable camera position. The vertical scroll
   // factor is 1, so when the camera looks up the screen reveals more of
-  // this band — it has to extend well past any plausible camera Y.
-  const skyTop = horizonY - 320;
+  // this band — it has to extend well past any plausible camera Y, which
+  // over an open sky is a jump above the level's top edge.
+  const skyTop = Math.min(horizonY - 320, -2 * SCREEN_HEIGHT);
   g.rect(0, skyTop, width, horizonY - skyTop).fill(SKY_COLOR);
   return g;
 }

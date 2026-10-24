@@ -19,22 +19,23 @@ import type { Page } from "@playwright/test";
  * the next beat needs them (`walkRightTo`, `whenLanded`, `whenInWater`). A take timed in milliseconds
  * desynchronises by the third beat and every jump after it misses.
  *
- * THE ROUTE ONLY GOES DOWN. There is no death here and no way back up a shaft, so the take is
- * written the way the meadow is built: walk right off the grass, fall into the cavern, wade the
- * pool, drop down the right-hand steps to the keep's door. Every descent below is a fall the level
- * designed, not a jump that has to land. The two real jumps — out of the pool, across the crypt's
- * floor gap — are both one tile and are both followed by a wait that would fail loudly rather than
- * film a player stuck against a wall.
+ * THE ROUTE IS ONE A PLAYER WOULD TAKE. The meadow is ten times the size it was, and the take
+ * crosses its forest and its stream and its field on the way to the keep, as a player walking it
+ * for the first time would: up two vines into the canopy and back down the branches, over the
+ * ravine, through the stream, up the mill wheel, onto the loft off a pushed bale, into the
+ * brambles once — the cairn the player last passed puts them back — and over them on the other
+ * bale. Every jump in it is followed by a wait that fails loudly rather than film a player stuck
+ * against a wall.
  *
  * EVERY COORDINATE COMES FROM THE LEVEL DATA. The numbers below are the ones in
  * `src/world/levels/*.ts`, named here with the tile they come from, never measured off a
  * screenshot. A level edit that moves the pool moves this file, and that is the intended failure:
  * it fails at the wait, by name, instead of filming a wrong picture.
  *
- * IT WRITES TWO SKETCHBOOK PAGES, AND NOTHING ELSE LEAVES THE BROWSER. `loamkeep.sketchbook.v1`
+ * IT WRITES ITS OWN SKETCHBOOK PAGES, AND NOTHING ELSE LEAVES THE BROWSER. `loamkeep.sketchbook.v1`
  * in localStorage is the game's only persistence; Playwright's context is cold on every run, so
- * chapter one always opens on LANDMARKS 0/31 and the last chapter always finds exactly the
- * pages this take wrote.
+ * chapter one always opens on an empty landmarks book and the last chapter always finds exactly
+ * the pages this take wrote.
  */
 
 /** The dev-only snapshot `main.ts` hangs on the window. Absent in a production build — see `look`. */
@@ -57,31 +58,86 @@ const ARRIVE = 25_000;
 const TILE = 16;
 
 /**
- * The meadow, from `src/world/levels/meadow.ts`.
+ * The meadow, from `src/world/levels/meadow.ts` and its tilemap, `meadow-rows.ts`.
  *
  * `x` is the player's AABB top-left, which is what the snapshot reports and what a SpawnPoint
  * declares, so every number here is directly comparable to one. The player is 12 wide, so its
- * centre — the thing a landmark's interact range measures — is `x + 6`.
+ * centre — the thing a landmark's interact range measures — is `x + 6`. A `…Y` is the player's own
+ * y standing on that surface: the surface's top, less a tile.
  */
 const MEADOW = {
-  /** Spawn, centred on the first screen: the grass band at row 8 runs cols 8-19. */
-  spawn: 154,
-  /** A step short of the left ledge at col 8, close enough to see the gap and the cave under it. */
-  leftLedge: 138,
-  /** The shelf the first fall lands on, inside the shaft at col 20: row 13's top. */
-  shelfY: 13 * TILE - TILE,
-  /** The sunken stone, at the bottom of the cavern pool: col 23, row 18. Its centre. */
-  sunkenStone: 23 * TILE + 8,
-  /** The pool's right shore: water runs cols 14-31 at row 17, stone from col 32. */
-  poolExit: 31 * TILE,
-  /** Standing on the cavern floor, past the pool — row 17's top, the player's own y. */
-  cavernFloorY: 17 * TILE - TILE,
-  /** The deep lake's right edge at row 21: water runs cols 43-50, the bank is col 51. */
-  deepWater: 50 * TILE,
-  /** The keep's door: col 52, row 21. Its centre. */
-  keepDoor: 52 * TILE + 8,
-  /** The bottom step, where the door stands — row 21's top, the player's own y. */
-  doorFloorY: 21 * TILE - TILE,
+  /** The grass at row 20, the whole of the surface. */
+  grassY: 20 * TILE - TILE,
+  /** A step short of the hole at cols 5-7, on col 8 — past the starting cairn at col 9, which lights. */
+  leftLedge: 8 * TILE + 2,
+  /** The first vine, cols 16, rows 12-19: centred on its column, at its foot. */
+  firstVine: 16 * TILE + 2,
+  /** The branch the first vine climbs to: row 11, cols 17-25. */
+  lowBranch: 17 * TILE - 4,
+  lowBranchY: 11 * TILE - TILE,
+  /** The long vine, col 22, rows 4-10, standing on that branch. */
+  longVine: 22 * TILE + 2,
+  /** The top of the canopy: the row-3 branch, cols 23-30. */
+  topBranch: 23 * TILE - 4,
+  topBranchY: 3 * TILE - TILE,
+  /** The Ruined Arch on it, col 26. Its centre. */
+  ruinedArch: 26 * TILE + 8,
+  /** The last of the row-3 branch: walking off it drops onto the row-12 one, and off that to the grass. */
+  canopyEnd: 34 * TILE,
+  /** The ravine's west lip (col 38), and its far side (col 42). */
+  ravineEdge: 38 * TILE + 8,
+  ravineFar: 42 * TILE - 10,
+  /** The mouth of the Root Shaft, cols 51-52: its west lip (col 50), and its far side (col 53). */
+  shaftEdge: 50 * TILE + 4,
+  shaftFar: 53 * TILE - 10,
+  /** Under the mill wheel: its hub is at col 73, and its paddles come up past this column. */
+  wheel: 72 * TILE - 6,
+  /** The top of the wheel: a paddle's top at y 224 (the hub at 272, less its 48 px), the rider on it. */
+  wheelTopY: 14 * TILE - TILE,
+  /**
+   * Where the top paddle has carried the rider east enough to jump for the roof: over the top at
+   * x 1146 the full arc lands short of it; by here, coming down the far side, it lands on it.
+   */
+  wheelLeap: 73 * TILE + 2,
+  /** The mill roof, row 12, cols 76-84. */
+  roof: 76 * TILE - 8,
+  roofY: 12 * TILE - TILE,
+  /** The weathervane on its ridge, col 80. Its centre. */
+  weathervane: 80 * TILE + 8,
+  /** Off the roof's east end. */
+  roofEnd: 85 * TILE,
+  /** The raised ground at row 18, cols 89-96. */
+  rise: 89 * TILE - 8,
+  riseY: 18 * TILE - TILE,
+  /** The field's cairn, col 101: where the brambles send the player back to. */
+  fieldCairn: 101 * TILE + 8 + 4,
+  /** Against the first bale once it is pushed up to the loft's west post (col 110). */
+  firstBale: 108 * TILE + 4,
+  baleTopY: 19 * TILE - TILE,
+  /** The loft, row 16, cols 110-116. */
+  loft: 109 * TILE,
+  loftY: 16 * TILE - TILE,
+  /** Off the loft's east end, past its post. */
+  loftEnd: 117 * TILE - 1,
+  /**
+   * Behind the second bale, pushed into the brambles (cols 121-123) as far as is safe: the player's
+   * right edge two pixels short of col 121, which is all of a bramble the hazard check forgives.
+   */
+  secondBale: 121 * TILE - 14,
+  /** Along the pushed bale's top, short of its far end, to jump from. */
+  baleEnd: 121 * TILE + 4,
+  /** Past the brambles, on col 124. */
+  bramblesFar: 124 * TILE - 2,
+  /**
+   * The well: a stone of its rim stands over its mouth at col 129, row 19, and stops the walk.
+   * Hopped onto, and stepped off its far side, it drops the player down the shaft beside the
+   * ladder (col 130) to the cavern floor at its foot, row 30.
+   */
+  wellRim: 129 * TILE - 12,
+  wellRimY: 19 * TILE - TILE,
+  wellFloorY: 30 * TILE - TILE,
+  /** The keep's door at the foot of the well, col 134. Its centre. */
+  keepDoor: 134 * TILE + 8,
 } as const;
 
 /**
@@ -133,6 +189,7 @@ const KEY = {
   left: "ArrowLeft",
   right: "ArrowRight",
   jump: "Space",
+  climb: "ArrowUp",
   dive: "ArrowDown",
   interact: "KeyE",
   back: "Escape",
@@ -203,22 +260,53 @@ const whenLandedAbove = (page: Page, x: number, y: number) =>
     { timeout: ARRIVE },
   );
 
-const whenAirborne = (page: Page) =>
-  page.waitForFunction(() => window.__loamkeep?.().onGround === false, undefined, { timeout: ARRIVE });
+/** Feet higher than a line — up a vine, or carried up by the mill wheel. */
+const whenAbove = (page: Page, y: number) =>
+  page.waitForFunction((limit) => (window.__loamkeep?.().y ?? Infinity) <= limit, y, { timeout: ARRIVE });
 
-/** On the floor and out of the water — the pair that says a swim actually ended on a bank. */
-const whenOnDryGround = (page: Page) =>
+/** On the floor within a few pixels of a column: where a respawn puts the player down. */
+const whenAt = (page: Page, x: number) =>
   page.waitForFunction(
-    () => {
+    (at) => {
       const s = window.__loamkeep?.();
-      return !!s && s.onGround && !s.inWater;
+      return !!s && s.onGround && Math.abs(s.x - at) <= 4;
     },
-    undefined,
+    x,
     { timeout: ARRIVE },
   );
 
-const whenInWater = (page: Page, wet: boolean) =>
-  page.waitForFunction((want) => window.__loamkeep?.().inWater === want, wet, { timeout: ARRIVE });
+/**
+ * Standing on a paddle of the mill wheel: on something, out of the water, and above the grass the
+ * wheel turns over. Nothing else in the stream is that high but its stones, which stand at grass
+ * level.
+ */
+const whenRiding = (page: Page) =>
+  page.waitForFunction(
+    (grassY) => {
+      const s = window.__loamkeep?.();
+      return !!s && s.onGround && !s.inWater && s.y < grassY - 4;
+    },
+    MEADOW.grassY,
+    { timeout: ARRIVE },
+  );
+
+/** Arrived at a column, or caught by a paddle before getting there — one wait, as for a greeting. */
+const whenRightOfOrRiding = (page: Page, x: number) =>
+  page.waitForFunction(
+    (at) => {
+      const s = window.__loamkeep?.();
+      return !!s && (s.x >= at.x || (s.onGround && !s.inWater && s.y < at.grassY - 4));
+    },
+    { x, grassY: MEADOW.grassY },
+    { timeout: ARRIVE },
+  );
+
+/** The wave over the screen for a respawn, going up (true) or gone (false). */
+const whenFading = (page: Page, fading: boolean) =>
+  page.waitForFunction((want) => window.__loamkeep?.().fading === want, fading, { timeout: ARRIVE });
+
+const whenAirborne = (page: Page) =>
+  page.waitForFunction(() => window.__loamkeep?.().onGround === false, undefined, { timeout: ARRIVE });
 
 const whenSketchbook = (page: Page, open: boolean) =>
   page.waitForFunction((want) => window.__loamkeep?.().sketchbookOpen === want, open, { timeout: ARRIVE });
@@ -285,16 +373,16 @@ test("loamkeep, end to end", async ({ demo }) => {
   /**
    * A jump to the right, held through the landing.
    *
-   * Both jumps in the take clear one tile, so the jump key is held long enough to reach the full
-   * arc rather than tapped — a tap is a hop and this game lets you choose. The walk key stays down
-   * for the whole flight, which is what carries the player across; the wait is on landing, not on
-   * the key, so a jump that fell short fails here instead of filming a player in a hole.
+   * The jump key is held long enough to reach the full arc rather than tapped — a tap is a hop and
+   * this game lets you choose. The walk key stays down for the whole flight, which is what carries
+   * the player across; the wait is on landing, not on the key, so a jump that fell short fails here
+   * instead of filming a player in a hole.
    */
   const jumpRightTo = async (arrived: () => Promise<unknown>) => {
     await page.keyboard.down(KEY.right);
     await page.keyboard.down(KEY.jump);
     // The full arc: 64 px up, about 58 px across. Released early it is a hop — the game gives you
-    // the choice and both jumps in this take need the whole thing.
+    // the choice, and every jump in this take but the hops onto the bales needs the whole thing.
     await page.waitForTimeout(500);
     await page.keyboard.up(KEY.jump);
     try {
@@ -305,13 +393,68 @@ test("loamkeep, end to end", async ({ demo }) => {
     await demo.dwell(400);
   };
 
+  /** Walk either way to a column, to within a few pixels of it. */
+  const walkTo = async (x: number) => {
+    const at = (await look(page)).x;
+    if (at < x - 3) await walkRightTo(x);
+    else if (at > x + 3) await walkLeftTo(x);
+  };
+
+  /**
+   * Up a vine and off its top onto the branch beside it.
+   *
+   * Up is held on the vine, and Right only once the feet are over the branch: held from the start,
+   * it walks the player off the vine's column and lets go of it. Up stays down through the step
+   * across, which on the branch, off the vine, is no key at all — the jump fires on a press.
+   */
+  const climbRightOnto = async (topY: number, x: number) => {
+    await page.keyboard.down(KEY.climb);
+    try {
+      await whenAbove(page, topY - 2);
+      await demo.holdWhile(KEY.right, () => whenLandedAbove(page, x, topY));
+    } finally {
+      await page.keyboard.up(KEY.climb);
+    }
+  };
+
+  /**
+   * A short hop right, onto a bale. Right is let go of the moment the player is over the target —
+   * a hop carried on to its landing would take them off the bale's far side.
+   */
+  const hopRightOnto = async (x: number, y: number) => {
+    await page.keyboard.down(KEY.right);
+    try {
+      // Not `demo.hold`: it waits a beat after letting go, and Right, still down through that beat,
+      // carries the hop on past the target.
+      await page.keyboard.down(KEY.jump);
+      await page.waitForTimeout(130);
+      await page.keyboard.up(KEY.jump);
+      await whenRightOf(page, x);
+    } finally {
+      await page.keyboard.up(KEY.right);
+    }
+    await whenLandedAbove(page, 0, y);
+    await demo.dwell(400);
+  };
+
+  /**
+   * Onto the hay loft: the first bale pushed up against its west post (or walked up to, if that is
+   * where it already is), a hop onto it, and a jump up onto the loft.
+   */
+  const climbLoft = async () => {
+    await walkRightTo(MEADOW.firstBale);
+    await demo.dwell(500);
+    await hopRightOnto(MEADOW.firstBale + 4, MEADOW.baleTopY);
+    await jumpRightTo(() => whenLandedAbove(page, MEADOW.loft, MEADOW.loftY));
+  };
+
   await demo.open("/");
 
   // ---------------------------------------------------------------------------------------------
   await demo.chapter("The title");
   // The game boots on a painted dawn: seven sky bands, the sun coming up behind the keep, a rabbit
   // on the ground that is the same rabbit the meadow has. Nothing is pressed for a few seconds —
-  // the cursor blinks, the sun climbs, and the third entry reads LANDMARKS 0/31 because
+  // the cursor blinks, the sun climbs, and the landmarks entry reads zero because
   // Playwright's browser is cold and the book is the one thing this game keeps. The zero is the
   // take's, not the game's: your own tab has whatever you have found.
   await demo.dwell(4200);
@@ -321,9 +464,10 @@ test("loamkeep, end to end", async ({ demo }) => {
 
   // ---------------------------------------------------------------------------------------------
   await demo.chapter("The meadow");
-  // A few steps left to the ledge — the gap at cols 6-7, the stone marker on its platform across
-  // it — then a jump on the spot, which is the whole of the platforming vocabulary: a held key
-  // goes higher than a tap, the rise is lighter than the fall.
+  // A few steps left, past the starting cairn — its lantern lights as the player goes by, and it is
+  // where the brambles will send them back to until they pass another — to the ledge over the
+  // first hole down. Then a jump on the spot: a held key goes higher than a tap, the rise is
+  // lighter than the fall.
   await walkLeftTo(MEADOW.leftLedge);
   await demo.dwell(1100);
   await demo.hold(KEY.jump, 300);
@@ -332,8 +476,8 @@ test("loamkeep, end to end", async ({ demo }) => {
 
   // ---------------------------------------------------------------------------------------------
   await demo.chapter("A first meeting");
-  // The rabbit paces this platform at 32 px/s and the player walks at 72, so walking right is
-  // enough to meet it. The first time you touch one, the game stops and it says something.
+  // The rabbit paces this grass at 32 px/s and the player walks at 72, so walking right is enough
+  // to meet it. The first time you touch one, the game stops and it says something.
   await demo.holdWhile(KEY.right, () => whenGreeting(page, true));
   await demo.dwell(2600);
   await demo.still("a-first-meeting");
@@ -343,26 +487,23 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.dwell(700);
 
   // ---------------------------------------------------------------------------------------------
-  await demo.chapter("Under the meadow");
-  // The grass ends at col 19 and the shaft under it is one tile wide, walled with dirt on both
-  // sides. So the key is released the moment the player steps off: steering right inside a
-  // one-tile shaft lands them on the wall's shoulder at row 10, wedged, and the take dies there.
-  // Let go, fall straight, and the shelf at row 13 catches it.
-  await demo.holdWhile(KEY.right, () => whenAirborne(page));
-  await whenLanded(page, 0, MEADOW.shelfY);
-  await demo.dwell(1100);
-  // From the shelf the walk can be held again: the shaft opens at col 21 and everything below is
-  // the cavern, which is wide enough that a fall cannot miss the pool.
-  await demo.holdWhile(KEY.right, () => whenInWater(page, true));
-  await demo.dwell(1500);
-  await demo.still("the-lake");
-
-  // ---------------------------------------------------------------------------------------------
-  await demo.chapter("A page written");
-  // Wading is slower than walking, and the submerged half of the player is tinted blue while the
-  // surface ripples over it. The sunken stone sits on the pool's floor; E writes its page.
-  await walkRightTo(MEADOW.sunkenStone - 10);
-  await demo.dwell(900);
+  await demo.chapter("The canopy");
+  // Up the first vine, onto the branch at its top, along it to the long vine, and up that to the
+  // top of the canopy, where the Ruined Arch is. A bird crosses each branch, and the first it
+  // touches stops to talk.
+  await walkTo(MEADOW.firstVine);
+  await demo.dwell(500);
+  await climbRightOnto(MEADOW.lowBranchY, MEADOW.lowBranch);
+  await demo.dwell(600);
+  // A bird stopping the walk near the vine leaves the player wherever the key that closes its
+  // greeting carried them — past the vine's column, as often as not. Back onto it, from either side.
+  await walkRightMeeting(MEADOW.longVine);
+  await walkTo(MEADOW.longVine);
+  await demo.dwell(400);
+  await climbRightOnto(MEADOW.topBranchY, MEADOW.topBranch);
+  await demo.dwell(800);
+  await walkRightMeeting(MEADOW.ruinedArch - 6 - 4);
+  await demo.dwell(700);
   await demo.press(KEY.interact);
   await whenSketchbook(page, true);
   await demo.dwell(3200);
@@ -370,43 +511,92 @@ test("loamkeep, end to end", async ({ demo }) => {
   await demo.press(KEY.interact);
   await whenSketchbook(page, false);
   await demo.dwell(600);
+  // Down the way a player comes down: off the end of the branch onto the one below it, and off
+  // that to the grass.
+  await demo.holdWhile(KEY.right, () => whenLanded(page, MEADOW.canopyEnd, MEADOW.grassY));
+  await demo.dwell(800);
 
   // ---------------------------------------------------------------------------------------------
-  await demo.chapter("The deep water");
-  // Out of the pool over its one-tile shore, right along the cavern floor, then down the three
-  // steps the right-hand side of the level is: each one a fall the walk takes on its own. The deep
-  // lake is the last of them, and the fish live in it.
-  await walkRightTo(MEADOW.poolExit);
-  await jumpRightTo(() => whenLanded(page, MEADOW.poolExit + TILE, MEADOW.cavernFloorY));
-  await whenInWater(page, false);
-  await demo.holdWhile(KEY.right, () => whenLanded(page, MEADOW.keepDoor - 4, MEADOW.doorFloorY));
-  await demo.dwell(800);
-  // Left off the step into the water: hold down to dive, and the slow sink is the game's, not
-  // gravity's.
-  await demo.holdWhile(KEY.left, () => whenInWater(page, true));
-  await demo.hold(KEY.dive, 1600);
-  await demo.dwell(1800);
-  await demo.still("the-deep-water");
-  // Up and out: the swim is slow on purpose, and leaving the surface with upward momentum pops the
-  // player onto the bank a tile above it. Both keys go down together and both come up the frame the
-  // bank is underfoot — held for a length of time instead, the walk continues after the landing,
-  // and since that length is scaled by DEMO_SPEED the take would walk past the door at 1 and stop
-  // short of it at 4. This is the bug the whole file is written to avoid, found the hard way.
-  await page.keyboard.down(KEY.right);
+  await demo.chapter("The mill");
+  // Over the ravine and over the mouth of the Root Shaft, past the stream's cairn, into the stream.
+  await walkRightTo(MEADOW.ravineEdge);
+  await jumpRightTo(() => whenLandedAbove(page, MEADOW.ravineFar, MEADOW.grassY));
+  await walkRightTo(MEADOW.shaftEdge);
+  await jumpRightTo(() => whenLandedAbove(page, MEADOW.shaftFar, MEADOW.grassY));
+  // Swimming with the jump key down pops the player out of the water at every surface, over both
+  // stepping stones, until they are under the wheel; there they keep bobbing until a paddle comes
+  // up under them on its way round. Its turn is not on the snapshot, so the wait is for the ride.
   await page.keyboard.down(KEY.jump);
   try {
-    await whenOnDryGround(page);
+    await demo.holdWhile(KEY.right, () => whenRightOfOrRiding(page, MEADOW.wheel));
+    await whenRiding(page);
   } finally {
     await page.keyboard.up(KEY.jump);
-    await page.keyboard.up(KEY.right);
   }
   await demo.dwell(900);
+  await demo.still("the-mill-wheel");
+  // Over the top, a short jump off onto the mill roof, and the weathervane on its ridge.
+  await whenAbove(page, MEADOW.wheelTopY + 1);
+  await whenRightOf(page, MEADOW.wheelLeap);
+  await jumpRightTo(() => whenLandedAbove(page, MEADOW.roof, MEADOW.roofY));
+  await walkRightTo(MEADOW.weathervane - 6 - 4);
+  await demo.dwell(700);
+  await demo.press(KEY.interact);
+  await whenSketchbook(page, true);
+  await demo.dwell(2600);
+  await demo.press(KEY.interact);
+  await whenSketchbook(page, false);
+  await demo.dwell(500);
+  await demo.holdWhile(KEY.right, () => whenLanded(page, MEADOW.roofEnd, MEADOW.grassY));
+  await demo.dwell(600);
+
+  // ---------------------------------------------------------------------------------------------
+  await demo.chapter("The field");
+  // Up onto the raised ground, down past the field's cairn, and the first hay bale pushed up to the
+  // loft's post: the step the loft is too high to reach without.
+  await walkRightTo(MEADOW.rise - TILE + 4);
+  await jumpRightTo(() => whenLandedAbove(page, MEADOW.rise, MEADOW.riseY));
+  await climbLoft();
+  await demo.still("the-field");
+  // The owl on the loft, then a jump off its east end, too long: into the brambles. The wave goes
+  // over, and the player comes out of it at the field's cairn, the last one they passed.
+  await walkRightMeeting(MEADOW.loftEnd - TILE);
+  await demo.dwell(600);
+  await page.keyboard.down(KEY.right);
+  try {
+    await demo.hold(KEY.jump, 500);
+    await whenFading(page, true);
+  } finally {
+    await page.keyboard.up(KEY.right);
+  }
+  await whenFading(page, false);
+  await whenAt(page, MEADOW.fieldCairn);
+  await demo.dwell(1400);
+  // Back up the loft — the bale is still where it was pushed — and down its far end on foot.
+  await climbLoft();
+  await demo.holdWhile(KEY.right, () => whenRightOf(page, MEADOW.loftEnd));
+  await whenLanded(page, 0, MEADOW.grassY);
+  await demo.dwell(500);
+  // The second bale, pushed into the brambles as far as the player can follow it without touching
+  // one, is a stepping stone over them.
+  await walkRightTo(MEADOW.secondBale);
+  await demo.dwell(500);
+  await hopRightOnto(MEADOW.secondBale + 4, MEADOW.baleTopY);
+  await walkRightTo(MEADOW.baleEnd);
+  await jumpRightTo(() => whenLandedAbove(page, MEADOW.bramblesFar, MEADOW.grassY));
+  await demo.dwell(600);
 
   // ---------------------------------------------------------------------------------------------
   await demo.chapter("The old keep");
-  // The door is on the bottom step. E tears the level layer down and builds the keep around the
-  // same player, at the spawn its door names.
-  await walkRightTo(MEADOW.keepDoor - 4);
+  // Down the well, and the keep's door at its foot. E tears the level layer down and builds the
+  // keep around the same player, at the spawn its door names.
+  await walkRightTo(MEADOW.wellRim);
+  await demo.dwell(400);
+  await hopRightOnto(MEADOW.wellRim + 6, MEADOW.wellRimY);
+  await demo.holdWhile(KEY.right, () => whenAirborne(page));
+  await whenLanded(page, 0, MEADOW.wellFloorY);
+  await demo.dwell(800);
+  await walkRightTo(MEADOW.keepDoor - 6 - 4);
   await demo.dwell(700);
   await demo.press(KEY.interact);
   await whenLevel(page, "old-keep");
@@ -462,18 +652,19 @@ test("loamkeep, end to end", async ({ demo }) => {
   await whenSketchbook(page, true);
   await demo.dwell(2000);
   await demo.still("the-gallery");
-  // Through the pages the take wrote, and onto the leaf that ends the book: how many are still
-  // blank, never which ones.
-  await demo.press(KEY.right);
-  await demo.dwell(2200);
-  await demo.press(KEY.right);
-  await demo.dwell(3000);
+  // Through the three pages the take wrote, and onto the leaf that ends the book: how many are
+  // still blank, never which ones.
+  for (const dwell of [2200, 2200, 3000]) {
+    await demo.press(KEY.right);
+    await demo.dwell(dwell);
+  }
 
   // The take's own closing assertion: the books hold what the run put in them, and the title behind
-  // the gallery is counting the same pages. Three, across two books — the Sunken Stone and the
-  // Crystal Vein in the landmarks, and the rabbit whose greeting chapter two waits on.
+  // the gallery is counting the same pages. Five at least, across two books — the Ruined Arch, the
+  // Weathervane and the crypt's inscription in the landmarks, the rabbit and the owl in the
+  // creatures; a bird adds one more if it crossed a branch while the player stood on it.
   const end = await look(page);
-  if (end.pagesWritten < 3) {
-    throw new Error(`demo: the take wrote ${end.pagesWritten} of ${end.pagesTotal} pages — it should have written 3`);
+  if (end.pagesWritten < 5) {
+    throw new Error(`demo: the take wrote ${end.pagesWritten} of ${end.pagesTotal} pages — it should have written 5`);
   }
 });

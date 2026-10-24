@@ -1,3 +1,4 @@
+import type { Ground, SolidBox, Walker } from '@systems/physics';
 import type { WorldState } from '@systems/world-state';
 import type { Vec2 } from '@types';
 import type { Container } from 'pixi.js';
@@ -27,13 +28,26 @@ export interface InteractContext {
   readonly worldState: WorldState;
 }
 
+// What an entity that takes part in the physics step sees of the world: the
+// player, and the ground everything stands on (the boxes of every entity
+// included, its own among them).
+export interface StepWorld {
+  player: Walker;
+  ground: Ground;
+}
+
 // Base shape every world entity satisfies. Entities live in the active
 // level's `levelLayer` container, scroll with the camera, and (for the
 // interactable subset) participate in the proximity-prompt loop.
 //
 // Optional members are how we express capabilities without a class hierarchy:
 //   - update?           → entity ticks each frame (lever cooldowns, plate
-//                         depress animation, push-block physics, …)
+//                         depress animation, …)
+//   - step?             → entity moves with the fixed physics step, before
+//                         the player does (a mill wheel that carries them, a
+//                         bale they push)
+//   - solids?           → boxes the player collides with; the same objects
+//                         every call, moved in place
 //   - isPlayerInRange?  → entity is interactable; Game's prompt loop should
 //                         consider it
 //   - interact?         → called when player presses E while in range
@@ -45,6 +59,8 @@ export interface InteractContext {
 export interface Entity {
   readonly sprite: Container;
   update?(dt: number): void;
+  step?(dt: number, world: StepWorld): void;
+  solids?(): readonly SolidBox[];
   isPlayerInRange?(playerPos: Vec2, playerSize: Vec2): boolean;
   interact?(ctx: InteractContext): void;
   setPromptMode?(mode: PromptMode): void;

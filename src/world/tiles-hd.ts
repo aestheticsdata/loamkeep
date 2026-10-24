@@ -32,6 +32,7 @@ import {
 
 // A tile is 16 logical px, 48 fine.
 export const TILE_FINE = 48;
+const TILE_SIZE_LOGICAL = TILE_FINE / FINE;
 
 // A tile's place in the map. Its fine origin is (tx, ty) × 48 in world fine
 // px, and every recipe draws there, so Bayer is anchored to the world and a
@@ -96,6 +97,8 @@ const RECIPES: Partial<Record<Tile, Recipe>> = {
   [Tile.PlankWall]: plankWall,
   [Tile.PackedEarth]: packedEarth,
   [Tile.RootEarth]: rootEarth,
+  [Tile.Vine]: vine,
+  [Tile.Bramble]: bramble,
 };
 
 const T = TILE_FINE;
@@ -375,6 +378,65 @@ function ladder(s: FineCanvas, o: Origin): void {
   for (const ry of [9, 33]) {
     s.rect(box(x + 12, y + ry, 24, 2), DB32.twine).rect(box(x + 12, y + ry + 2, 24, 2), DB32.rope);
     s.rect(box(x + 12, y + ry + 4, 24, 2), DB32.oiledCedar).set(x + 12, y + ry + 4, DB32.loulou);
+  }
+}
+
+// ---------------------------------------------------------------- the meadow's wild growth
+
+// Vine: the classic stem ×3, lit down its left third with a christi glint at
+// each leaf joint, and the leaves on a canvas of their own so they can be
+// rounded at the tip without notching the stem where one tile meets the next.
+function vine(s: FineCanvas, o: Origin): void {
+  const { x, y, ty } = o;
+  const sx = x + FINE * (7 + (ty & 1));
+  s.rect(box(sx, y, 6, T), DB32.dell).rect(box(sx, y, 3, T), DB32.eltGreen);
+  const leaves = new FineCanvas({ x, y, w: T, h: T });
+  for (let i = 0; i < 4; i++) {
+    const ly = y + FINE * (1 + i * 4);
+    const left = (i + ty) % 2 === 0;
+    const lx = left ? sx - 12 : sx + 6;
+    leaves.rect(box(lx, ly, 12, 6), DB32.eltGreen);
+    leaves.rect(box(lx + (left ? 3 : 0), ly, 9, 2), DB32.christi);
+    leaves.dither(box(lx + (left ? 3 : 0), ly + 2, 9, 1), half(DB32.christi));
+    // The rib where the leaf meets the stem, in shade under the leaf.
+    leaves.rect(box(left ? sx - 3 : sx + 6, ly + 3, 3, 3), DB32.dell);
+  }
+  leaves.round();
+  s.blit(leaves);
+  for (let i = 0; i < 4; i++) s.rect(box(sx, y + FINE * (1 + i * 4), 2, 1), DB32.christi);
+}
+
+// Bramble: the classic stems ×3, each lit down its left third in brown with
+// its shadowed foot in loulou; the thorns cut to points (5 of their 9 fine
+// px, L1's least); the berry a disc with a pancho glint.
+function bramble(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  const stems = [
+    { at: 2, top: 4 },
+    { at: 7, top: 1 },
+    { at: 12, top: 5 },
+  ];
+  for (const [i, stem] of stems.entries()) {
+    const sx = x + FINE * (stem.at + ((tx + i) % 2));
+    const top = y + FINE * stem.top;
+    s.rect(box(sx, top, 6, y + T - top), DB32.clairvoyant).rect(box(sx, top, 2, y + T - top), DB32.brown);
+    s.rect(box(sx + 3, y + T - 9, 3, 9), DB32.loulou);
+    const lean = i === 0 ? -1 : 1;
+    s.rect(box(sx + FINE * lean, top - 3, 6, 3), DB32.clairvoyant);
+    s.rect(box(sx + FINE * lean + (lean < 0 ? 0 : 3), top - 3, 3, 1), DB32.brown);
+    for (let ty = stem.top + 2; ty < TILE_SIZE_LOGICAL - 2; ty += 4) {
+      // A thorn pointing out and down, off each side.
+      const ly = y + FINE * ty;
+      s.rect(box(sx - 3, ly, 3, 1), DB32.loulou).rect(box(sx - 2, ly + 1, 2, 1), DB32.loulou);
+      s.set(sx - 1, ly + 2, DB32.loulou);
+      const ry = ly + FINE * 2;
+      s.rect(box(sx + 6, ry, 3, 1), DB32.loulou).rect(box(sx + 6, ry + 1, 2, 1), DB32.loulou);
+      s.set(sx + 6, ry + 2, DB32.loulou);
+    }
+  }
+  if (tx % 3 === 0) {
+    s.disc({ cx: x + 30, cy: y + 21, r: 3.2 }, DB32.brown);
+    s.set(x + 28, y + 19, DB32.pancho);
   }
 }
 

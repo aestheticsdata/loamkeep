@@ -26,9 +26,10 @@ import { drawFigureHd, figureHdFinePose, figureHdKey, figureHdPose } from '@enti
 import { ART_KIND, draws, fineMotion, registerArt } from '@hd/art-mode';
 import { BakeCache, FineSprite } from '@hd/bake';
 import { KEYS_DOWN, KEYS_JUMP, KEYS_LEFT, KEYS_RIGHT, type KeyReader } from '@systems/input';
-import { type Body, stepPhysics } from '@systems/physics';
+import { type Ground, type SolidBox, stepPhysics, type Walker } from '@systems/physics';
 import type { Vec2 } from '@types';
-import { Tile, type Tilemap } from '@world/tilemap';
+import { holdsTile, type WaterCurrent } from '@world/level';
+import { isClimbable, Tile, type Tilemap } from '@world/tilemap';
 import { Container, Graphics } from 'pixi.js';
 
 // Every pose the figure has been seen in, baked once.
@@ -54,7 +55,13 @@ const FOOTSTEP_DISTANCE = 20;
 // at negative y. That puts the natural anchor at the AABB body's bottom-center
 // (`pos.x + size.x/2`, `pos.y + size.y`), so no pivot offset is needed.
 
-export class Player implements Body {
+// What the player moves through each step: the tiles and boxes it collides
+// with, and the currents in the level's water.
+export interface PlayerWorld extends Ground {
+  currents: readonly WaterCurrent[];
+}
+
+export class Player implements Walker {
   pos: Vec2;
   vel: Vec2 = { x: 0, y: 0 };
   // Where the body was before the last physics step, and where it is drawn:
@@ -65,6 +72,10 @@ export class Player implements Body {
   readonly renderPos: Vec2;
   readonly size: Vec2 = { x: 12, y: 16 };
   onGround = false;
+  standingOn: SolidBox | null = null;
+  // Which way the walking keys point this step (-1, 0 or 1): a pushed bale
+  // reads it, since a body blocked by the bale has no velocity left to read.
+  move = 0;
   // The figure in both arts: the classic drawing rebuilt every frame, and the
   // HD one as a baked pose. art-mode shows one of them, or both in split.
   readonly sprite = new Container();
@@ -157,7 +168,8 @@ export class Player implements Body {
   }
 
   // One fixed physics step (dt is always PHYSICS_STEP — see Game).
-  update(input: KeyReader, dt: number, tilemap: Tilemap): void {
+  update(input: KeyReader, dt: number, world: PlayerWorld): void {
+    const { tilemap } = world;
     this.prevPos.x = this.pos.x;
     this.prevPos.y = this.pos.y;
     this.elapsedTime += dt;
@@ -208,7 +220,7 @@ export class Player implements Body {
       if (this.vel.y > WATER_ENTRY_VEL_CAP) this.vel.y = WATER_ENTRY_VEL_CAP;
     }
     this.inWater = nowInWater;
-    const onLadder = !nowInWater && tilemap.at(tx, midY) === Tile.Ladder;
+    const onLadder = !nowInWater && isClimbable(tilemap.at(tx, midY));
     const wasClimbing = this.climbing;
     // `swimming` is purely a visual + physics-bypass flag: in water AND
     // not standing on solid ground. Used by drawFigure to switch to the
@@ -222,6 +234,7 @@ export class Player implements Body {
     if (input.isAnyDown(KEYS_RIGHT)) move += 1;
     if (move > 0) this.facing = 1;
     else if (move < 0) this.facing = -1;
+    this.move = move;
 
     const upHeld = input.isAnyDown(KEYS_JUMP);
     const downHeld = input.isAnyDown(KEYS_DOWN);
@@ -272,6 +285,7 @@ export class Player implements Body {
         if (this.vel.y > WATER_TERMINAL_VEL) this.vel.y = WATER_TERMINAL_VEL;
       }
       this.vel.x = move * (this.onGround ? WADE_SPEED : SWIM_HORIZONTAL_SPEED);
+      this.vel.x += currentAt(world.currents, { x: tx, y: midY });
 
       // Swim stroke SFX while actually swimming (off ground) and moving.
       if (this.swimming && (move !== 0 || jumpDown || diveDown)) {
@@ -303,7 +317,7 @@ export class Player implements Body {
       this.vel.x = move * WALK_SPEED;
 
       // On a puffball: thrown up, unless down is held to stand on it.
-      if (this.onGround && !downHeld && standingOn(this, tilemap) === Tile.Puffball) {
+      if (this.onGround && !downHeld && tileUnder(this, tilemap) === Tile.Puffball) {
         this.vel.y = -PUFFBALL_VELOCITY;
         this.coyoteTimer = 0;
         this.jumpBufferTimer = 0;
@@ -347,7 +361,7 @@ export class Player implements Body {
 
     // Gravity + position + tile collision. body.swimming = true makes
     // stepPhysics skip its own gravity — we own vel.y in water mode.
-    stepPhysics(this, tilemap, dt);
+    stepPhysics(this, world, dt);
 
     // Landing detection — went from airborne to grounded this frame.
     if (!wasGrounded && this.onGround) {
@@ -535,8 +549,13 @@ export function drawFigure(g: Graphics, pose: FigurePose): void {
   }
 }
 
+// The push of whatever current the tile is in, px/s east.
+function currentAt(currents: readonly WaterCurrent[], tile: Vec2): number {
+  return currents.find((c) => holdsTile(c.area, tile))?.speed ?? 0;
+}
+
 // The tile under the middle of the body's feet.
-function standingOn(body: Body, tilemap: Tilemap): Tile {
+function tileUnder(body: Walker, tilemap: Tilemap): Tile {
   const tx = Math.floor((body.pos.x + body.size.x / 2) / TILE_SIZE);
   const ty = Math.floor((body.pos.y + body.size.y) / TILE_SIZE);
   return tilemap.at(tx, ty);
