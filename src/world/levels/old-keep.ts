@@ -552,11 +552,12 @@ const OLD_KEEP_DECORATIONS: DecorationSpec[] = [
   hangFromCeiling(17, 5, drawBanner),
   hangFromCeiling(33, 5, drawBanner),
 
-  // Banner in the LOWER room — hangs from the underside of the upper
-  // floor (which is the lower room's "ceiling" at row 9). Bottom tip at
-  // row 13 — clears the lower-room columns.
-  hangFromCeiling(10, 13, drawBanner),
-  hangFromCeiling(36, 13, drawBanner),
+  // Banner in the LOWER room — hangs from its ceiling, the underside of the
+  // hidden passage's floor (row 14). Bottom tip at row 17, between the
+  // lower-room columns. (They hung from row 9 until the passage was cut
+  // through rows 12-13, and ended up inside it, through its floor.)
+  hangFromCeiling(10, 17, drawBanner),
+  hangFromCeiling(36, 17, drawBanner),
 ];
 
 export const oldKeepLevel: LevelSpec = {
