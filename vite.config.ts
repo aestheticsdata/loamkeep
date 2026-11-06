@@ -24,4 +24,9 @@ export default defineConfig({
   build: {
     target: 'es2022',
   },
+  test: {
+    // Session worktrees under .claude/ carry a full copy of src/ at an older
+    // commit; without this, `vitest run` runs their stale tests too and fails.
+    exclude: ['**/node_modules/**', '**/dist/**', '.claude/**', 'e2e/**'],
+  },
 });

@@ -55,6 +55,9 @@ declare global {
  */
 const ARRIVE = 25_000;
 
+/** One turn of the meadow's mill wheel (`PERIOD` in `src/entities/mill-wheel.ts`), and a margin. */
+const WHEEL_TURN = 9_000;
+
 const TILE = 16;
 
 /**
@@ -282,14 +285,14 @@ const whenAt = (page: Page, x: number) =>
  * wheel turns over. Nothing else in the stream is that high but its stones, which stand at grass
  * level.
  */
-const whenRiding = (page: Page) =>
+const whenRiding = (page: Page, timeout: number = ARRIVE) =>
   page.waitForFunction(
     (grassY) => {
       const s = window.__loamkeep?.();
       return !!s && s.onGround && !s.inWater && s.y < grassY - 4;
     },
     MEADOW.grassY,
-    { timeout: ARRIVE },
+    { timeout },
   );
 
 /** Arrived at a column, or caught by a paddle before getting there — one wait, as for a greeting. */
@@ -362,12 +365,19 @@ test("loamkeep, end to end", async ({ demo }) => {
     // A creature greets once and the flag that says so outlives the level, so two parchments on one
     // walk is already surprising. Bounded rather than trusted: the fall-through is the plain walk,
     // which fails with the timeout that names the column instead of looping here for ever.
-    for (let met = 0; met < 2; met++) {
+    //
+    // A greeting can also be open before the walk starts — a creature at the door the player just
+    // came through. Then the walk's own key-down is the press that closes it, so neither "a
+    // greeting is open" nor "no greeting is open" says whether the walk happened: only the column
+    // does. Each pass reads it, and a parchment still up is read and closed before the next.
+    for (let met = 0; met < 3; met++) {
+      if ((await look(page)).greetingOpen) {
+        await demo.dwell(2600);
+        await demo.hold(KEY.right, 120);
+        await whenGreeting(page, false);
+      }
       await demo.holdWhile(KEY.right, () => whenRightOfOrGreeted(page, x));
-      if (!(await look(page)).greetingOpen) return;
-      await demo.dwell(2600);
-      await demo.hold(KEY.right, 120);
-      await whenGreeting(page, false);
+      if ((await look(page)).x >= x) return;
     }
     await walkRightTo(x);
   };
@@ -528,10 +538,24 @@ test("loamkeep, end to end", async ({ demo }) => {
   // Swimming with the jump key down pops the player out of the water at every surface, over both
   // stepping stones, until they are under the wheel; there they keep bobbing until a paddle comes
   // up under them on its way round. Its turn is not on the snapshot, so the wait is for the ride.
+  //
+  // Whether a paddle scoops them depends on where the wheel is in its turn when they arrive, and
+  // that depends on how long every beat before this one took. A take that got there out of phase
+  // ended up east of the hub, under paddles on their way down, and waited there for ever. So the
+  // wait is one turn of the wheel, and a miss walks back to the wheel's column and waits again.
   await page.keyboard.down(KEY.jump);
   try {
-    await demo.holdWhile(KEY.right, () => whenRightOfOrRiding(page, MEADOW.wheel));
-    await whenRiding(page);
+    let riding = false;
+    for (let tries = 0; tries < 4 && !riding; tries++) {
+      const at = (await look(page)).x;
+      if (at > MEADOW.wheel + 3) await walkLeftTo(MEADOW.wheel);
+      else await demo.holdWhile(KEY.right, () => whenRightOfOrRiding(page, MEADOW.wheel));
+      riding = await whenRiding(page, WHEEL_TURN).then(
+        () => true,
+        () => false,
+      );
+    }
+    if (!riding) await whenRiding(page);
   } finally {
     await page.keyboard.up(KEY.jump);
   }
@@ -541,7 +565,9 @@ test("loamkeep, end to end", async ({ demo }) => {
   await whenAbove(page, MEADOW.wheelTopY + 1);
   await whenRightOf(page, MEADOW.wheelLeap);
   await jumpRightTo(() => whenLandedAbove(page, MEADOW.roof, MEADOW.roofY));
-  await walkRightTo(MEADOW.weathervane - 6 - 4);
+  // The leap off the paddle can carry the player past the vane's column before landing, so the
+  // walk to it goes whichever way it has to — a walk only rightwards would end at once, out of reach.
+  await walkTo(MEADOW.weathervane - 6 - 4);
   await demo.dwell(700);
   await demo.press(KEY.interact);
   await whenSketchbook(page, true);

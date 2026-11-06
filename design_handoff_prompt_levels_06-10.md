@@ -1,12 +1,11 @@
-# Prompt for Claude Design — LOAMKEEP Levels 05 to 10
+# Prompt for Claude Design — LOAMKEEP Levels 06 to 10
 
 Paste everything below the line into Claude Design.
 
 ---
 
-I need the last six design handoffs for LOAMKEEP, in the same format as the ones you already made (Level 02 Glow Grotto v2, Level 03 Old Keep v2, Level 04 Kitchen Garden v2). Deliver them as six folders, in this order — one at a time as each is ready is fine:
+I need the last five design handoffs for LOAMKEEP, in the same format as the ones you already made (Level 02 Glow Grotto v2, Level 03 Old Keep v2, Level 04 Kitchen Garden v2, Level 05 Potting Shed v2). Deliver them as five folders, in this order — one at a time as each is ready is fine:
 
-- `design_handoff_level_05_potting_shed_v2/`
 - `design_handoff_level_06_library_v2/`
 - `design_handoff_level_07_belfry_v2/`
 - `design_handoff_level_08_crypt_v2/`
@@ -15,7 +14,7 @@ I need the last six design handoffs for LOAMKEEP, in the same format as the ones
 
 ## The game
 
-LOAMKEEP is a 16-bit-style exploration platformer in TypeScript + PixiJS v8. Tiles are 16 px, the palette is DB32 (`src/constants.ts`), and every sprite and tile has a classic drawing and an HD drawing on a ×3 fine grid. Each level is an ASCII tilemap (one char per tile), with `LandmarkSpec` landmarks (name, short description in the game's gentle voice, position), decorations, and entities created in `createEntities()`. Every level is being rebuilt at roughly ten times its playable area. Levels 01–04 are built.
+LOAMKEEP is a 16-bit-style exploration platformer in TypeScript + PixiJS v8. Tiles are 16 px, the palette is DB32 (`src/constants.ts`), and every sprite and tile has a classic drawing and an HD drawing on a ×3 fine grid. Each level is an ASCII tilemap (one char per tile), with `LandmarkSpec` landmarks (name, short description in the game's gentle voice, position), decorations, and entities created in `createEntities()`. Every level is being rebuilt at roughly ten times its playable area. Levels 01–05 are built.
 
 ## Each folder holds
 
@@ -52,7 +51,7 @@ Mistakes we had to fix in Levels 03–04, please avoid them:
 
 ## Tiles
 
-Chars already taken; do not reuse them for anything new: `.` `G` `D` `S` `K` `W` `B` `F` `P` `c` `v` `T` `R` `L` `H` `h` `p` `g` `U` `a` `f` `j` `e` `r` `V` `X` `C` `Z` `^` `O` `Q` `Y`. If a level needs a new tile, pick a free char and specify its art (classic + HD), whether it is solid, and what it does.
+Chars already taken; do not reuse them for anything new: `.` `G` `D` `S` `K` `W` `B` `F` `P` `c` `v` `T` `R` `L` `H` `h` `p` `g` `U` `a` `f` `j` `e` `r` `V` `X` `C` `Z` `^` `O` `Q` `Y` `N` (roof slate). If a level needs a new tile, pick a free char and specify its art (classic + HD), whether it is solid, and what it does.
 
 ## Systems already in the game — reuse them freely
 
@@ -70,14 +69,7 @@ Chars already taken; do not reuse them for anything new: `.` `G` `D` `S` `K` `W`
 - **Puffballs** (`U`).
 - Per-region backdrops, and doors between levels.
 
-## The six levels
-
-### 05 · The Potting Shed (today 120 × 88, `src/world/levels/potting-shed.ts`)
-A shed in the kitchen garden that opens onto a house far bigger inside than out.
-- Door: `shed-return-door` (col 7, floor row 50) → `kitchen-garden` `from-shed`.
-- Spawn others target: `from-garden`.
-- Landmarks: Grandfather Clock, Seed Catalogue, Wrong-Size Window, Dumbwaiter, Root Map.
-- Tiles in use: `f` floorboards, `j` plank wall, `e` packed earth, `r` root earth, `H`, `T`, `L` bookcase, `K`, `W`.
+## The five levels
 
 ### 06 · The Library (today 120 × 100, `old-keep-library.ts`)
 Behind the keep's bookshelf door: a hall of stacks, floors above it, a dome, an archive below.
