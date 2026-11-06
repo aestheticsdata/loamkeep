@@ -40,7 +40,7 @@ export class RoomReveal {
       const veil = new Veil(areas[i]);
       classic.addChild(veil.classic);
       hd.addChild(veil.hd);
-      veil.show(memory.seen(room.id) ? 0 : STEPS);
+      veil.show(memory.seen(room.id) || room.outdoors ? 0 : STEPS);
       return veil;
     });
     this.container.addChild(classic, hd);

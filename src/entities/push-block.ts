@@ -19,6 +19,8 @@ const TOUCH = 0.5;
 export const BLOCK_LOOK = {
   hay: 'hay',
   barrel: 'barrel',
+  crate: 'crate',
+  ice: 'ice',
 } as const;
 export type BlockLook = (typeof BLOCK_LOOK)[keyof typeof BLOCK_LOOK];
 
@@ -28,6 +30,9 @@ export interface PushBlockSpec {
   col: number;
   row: number;
   look: BlockLook;
+  // Tiles it slides on after a push stops (the ice house's blocks): 0
+  // unless given.
+  slide?: number;
 }
 
 // A block one tile big that the player can push but never pull: a hay bale
@@ -43,12 +48,18 @@ export class PushBlock implements Entity, Body {
   readonly size: Vec2 = { x: TILE_SIZE, y: TILE_SIZE };
   onGround = false;
   private readonly box: SolidBox;
+  private readonly slide: number;
+  // Which way it was last pushed, and how far it has still to slide, px.
+  private dir = 0;
+  private sliding = 0;
 
   constructor(spec: PushBlockSpec) {
+    this.slide = (spec.slide ?? 0) * TILE_SIZE;
     this.pos = { x: spec.col * TILE_SIZE, y: (spec.row - 1) * TILE_SIZE };
     this.box = { x: this.pos.x, y: this.pos.y, w: TILE_SIZE, h: TILE_SIZE };
-    const body = new ArtBody(spec.look === BLOCK_LOOK.hay ? 'hay-bale' : 'barrel');
-    body.draw(spec.look === BLOCK_LOOK.hay ? drawHayBale : drawBarrel);
+    const look = BLOCKS[spec.look];
+    const body = new ArtBody(look.species);
+    body.draw(look.draw);
     this.sprite.addChild(body);
     this.place();
   }
@@ -58,9 +69,17 @@ export class PushBlock implements Entity, Body {
   }
 
   step(dt: number, world: StepWorld): void {
-    this.vel.x = pushedBy(world.player, this.box) * PUSH_SPEED;
+    const push = pushedBy(world.player, this.box);
+    if (push !== 0) {
+      this.dir = push;
+      this.sliding = this.slide;
+    }
+    const moving = push !== 0 ? push : this.sliding > 0 ? this.dir : 0;
+    this.vel.x = moving * PUSH_SPEED;
+    const from = this.pos.x;
     const others = world.ground.boxes.filter((b) => b !== this.box);
     stepPhysics(this, { tilemap: world.ground.tilemap, boxes: others }, dt);
+    if (push === 0) this.sliding = this.vel.x === 0 ? 0 : Math.max(0, this.sliding - Math.abs(this.pos.x - from));
     this.box.x = this.pos.x;
     this.box.y = this.pos.y;
     this.place();
@@ -120,3 +139,52 @@ export function drawBarrel(g: Graphics): void {
   }
   g.rect(-5, -16, 10, 1).fill(DB32.rope);
 }
+
+// A crate from the keep's larder: planks of oiled cedar, rope-lit, a cross
+// brace from corner to corner and dimGray corner irons.
+export function drawCrate(g: Graphics): void {
+  g.rect(-8, -16, 16, 16).fill(DB32.oiledCedar);
+  g.rect(-8, -16, 16, 1).fill(DB32.rope);
+  for (const py of [-11, -6]) g.rect(-7, py, 14, 1).fill(DB32.loulou);
+  for (let i = 0; i < 12; i++) g.rect(-6 + i, -14 + i, 2, 1).fill(DB32.rope);
+  g.rect(-8, -16, 1, 16).fill(DB32.loulou);
+  g.rect(7, -16, 1, 16).fill(DB32.loulou);
+  for (const [x, y] of [
+    [-8, -16],
+    [5, -16],
+    [-8, -3],
+    [5, -3],
+  ] as const) {
+    g.rect(x, y, 3, 3).fill(DB32.dimGray);
+    g.rect(x, y, 3, 1).fill(DB32.heather);
+  }
+}
+
+// A block of ice cut from the ice house's pond, 16 × 16 around its foot:
+// lightSteel, frosted white along its top and down its lit side, its faces
+// cut in cornflower and venice, a crack of white through it.
+export function drawIceBlock(g: Graphics): void {
+  g.rect(-8, -16, 16, 16).fill(DB32.lightSteel);
+  g.rect(-8, -16, 16, 2).fill(DB32.white);
+  g.rect(-8, -16, 2, 16).fill(DB32.white);
+  g.rect(3, -14, 5, 14).fill(DB32.cornflower);
+  g.rect(6, -14, 2, 14).fill(DB32.venice);
+  g.rect(-8, -2, 16, 2).fill(DB32.cornflower);
+  for (const [x, y] of [
+    [-4, -12],
+    [-3, -11],
+    [-2, -9],
+    [-2, -8],
+    [-1, -6],
+  ] as const) {
+    g.rect(x, y, 1, 1).fill(DB32.white);
+  }
+}
+
+// Each look's drawing, and the name its bakes are kept under.
+const BLOCKS: Record<BlockLook, { species: string; draw: (g: Graphics) => void }> = {
+  [BLOCK_LOOK.hay]: { species: 'hay-bale', draw: drawHayBale },
+  [BLOCK_LOOK.barrel]: { species: 'barrel', draw: drawBarrel },
+  [BLOCK_LOOK.crate]: { species: 'crate', draw: drawCrate },
+  [BLOCK_LOOK.ice]: { species: 'ice-block', draw: drawIceBlock },
+};

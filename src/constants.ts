@@ -149,6 +149,14 @@ export const CLIMB_STEP_DISTANCE = 14;
 // jump's four. Holding down lands without the bounce, to stand on one.
 export const PUFFBALL_VELOCITY = 420;
 
+// Updrafts — the grotto's Wind Shaft. While the player's box overlaps one
+// they are pushed up at UPDRAFT_LIFT px/s², harder than gravity pulls them
+// down whichever way they are going (the fall multiplier included), until
+// they rise at UPDRAFT_RISE: a lift they ride to the top of the column and
+// hover over it. A jump through one is never slowed to that.
+export const UPDRAFT_LIFT = 900;
+export const UPDRAFT_RISE = 120;
+
 // Camera smoothing: higher = snappier follow. Time-based so it's framerate-independent.
 // f = 1 - exp(-RATE * dt). At 60fps with RATE=10, f ≈ 0.155 per frame.
 export const CAMERA_SMOOTHING_RATE = 10;

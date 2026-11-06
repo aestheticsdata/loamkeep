@@ -1,4 +1,5 @@
 import { DB32, TILE_SIZE } from '@constants';
+import type { TileRect } from '@world/level';
 import { Graphics } from 'pixi.js';
 
 // True-neutral dark greys for the crypt — outside the DB32 palette on
@@ -70,6 +71,18 @@ export const PUFFBALL_SHADE = 0xa98fb4;
 //   - Wild:    Vine (not solid — climbed exactly like a Ladder) and Bramble
 //              (not solid, but a hazard: touching it sends the player back
 //              to the last cairn they passed, see Game). The meadow's.
+//   - Crystal: the grotto's caverns. Crystal (solid, a platform; a few
+//              are switches, see CrystalSwitch), CrystalGate (drawn and
+//              made solid by its CrystalGate entity, which can open, so
+//              the tile itself is neither) and Updraft (not solid, not
+//              drawn: the cave behind it, with the specks an Updraft
+//              entity sends up it; it lifts the player, see Player).
+//   - YewHedge: the kitchen garden's topiary maze. Solid, clipped flat along
+//              its top where air is above it, shadowed under it where air
+//              is below.
+//   - Root:    the Great Oak's taproot and side roots in the grotto. Solid
+//              like timber, but grown, not sawn: bark furrows that wander
+//              and run on from tile to tile, no plank joints, no nails.
 // Water is shared (lakes happen in both biomes).
 export const Tile = {
   Empty: 0,
@@ -98,6 +111,12 @@ export const Tile = {
   RootEarth: 23,
   Vine: 24,
   Bramble: 25,
+  Crystal: 26,
+  CrystalGate: 27,
+  Updraft: 28,
+  Root: 29,
+  YewHedge: 30,
+  RoofSlate: 31,
 } as const;
 
 export type Tile = (typeof Tile)[keyof typeof Tile];
@@ -130,6 +149,12 @@ const CHAR_TO_TILE: Record<string, Tile> = {
   r: Tile.RootEarth,
   V: Tile.Vine,
   X: Tile.Bramble,
+  C: Tile.Crystal,
+  Z: Tile.CrystalGate,
+  '^': Tile.Updraft,
+  O: Tile.Root,
+  Q: Tile.YewHedge,
+  N: Tile.RoofSlate,
 };
 
 export const TILE_COLORS: Record<Tile, number> = {
@@ -191,6 +216,18 @@ export const TILE_COLORS: Record<Tile, number> = {
   // whatever is behind them.
   [Tile.Vine]: DB32.eltGreen,
   [Tile.Bramble]: DB32.clairvoyant,
+  [Tile.Crystal]: DB32.viking,
+  // Neither is a fill: the gate is its entity's to draw, and the updraft is
+  // the cave behind it.
+  [Tile.CrystalGate]: DB32.viking,
+  [Tile.Updraft]: DB32.cornflower,
+  // Living wood: the cedar of the timber, so a root and a scaffold read as
+  // one material, but drawn as bark.
+  [Tile.Root]: DB32.oiledCedar,
+  // The garden's yew maze: clipped dark green.
+  [Tile.YewHedge]: DB32.dell,
+  // The potting shed's roof: slates, blue-grey in the night.
+  [Tile.RoofSlate]: DB32.deepKoamaru,
 };
 
 // Solid tiles block movement. A few are intentionally NOT solid:
@@ -227,6 +264,14 @@ const TILE_SOLID: Record<Tile, boolean> = {
   [Tile.RootEarth]: true,
   [Tile.Vine]: false,
   [Tile.Bramble]: false,
+  [Tile.Crystal]: true,
+  // Solid while closed, but that is the CrystalGate entity's box: a tile
+  // cannot stop being solid.
+  [Tile.CrystalGate]: false,
+  [Tile.Updraft]: false,
+  [Tile.Root]: true,
+  [Tile.YewHedge]: true,
+  [Tile.RoofSlate]: true,
 };
 
 // What the player can take hold of and climb (see Player).
@@ -234,9 +279,61 @@ export function isClimbable(t: Tile): boolean {
   return t === Tile.Ladder || t === Tile.Vine;
 }
 
+// What lifts the player while their box overlaps it (see Player).
+export function isUpdraft(t: Tile): boolean {
+  return t === Tile.Updraft;
+}
+
 // What sends the player back to the last cairn on contact.
 export function isHazard(t: Tile): boolean {
   return t === Tile.Bramble;
+}
+
+// What a hazard tile is drawn as. The contact rule is the same for all of
+// them (see isHazard); only the art changes with where it is: the meadow's
+// brambles, the keep's iron spikes and the embers of its kitchen hearth, and
+// the potting shed's toys, traps and furnace.
+export const HAZARD_LOOK = {
+  bramble: 'bramble',
+  spikes: 'spikes',
+  embers: 'embers',
+  cactus: 'cactus',
+  hotPipes: 'hot-pipes',
+  thornyRoots: 'thorny-roots',
+  jacks: 'jacks',
+  mousetraps: 'mousetraps',
+  furnaceGrate: 'furnace-grate',
+} as const;
+
+export type HazardLook = (typeof HAZARD_LOOK)[keyof typeof HAZARD_LOOK];
+
+// A rectangle of a level whose hazard tiles are drawn in one look.
+export interface HazardRegion {
+  area: TileRect;
+  look: HazardLook;
+}
+
+// The char of a portcullis in a level's rows (see Tilemap.fromAscii).
+export const PORTCULLIS_CHAR = 'Y';
+
+// How many rows a portcullis runs down from its top tile.
+export function portcullisRows(rows: readonly string[], top: { col: number; row: number }): number {
+  let n = 0;
+  while (rows[top.row + n]?.[top.col] === PORTCULLIS_CHAR) n++;
+  return n;
+}
+
+// Whether a tile (column, row) lies inside a rectangle of tiles.
+function holds(r: TileRect, tx: number, ty: number): boolean {
+  return tx >= r.col && tx < r.col + r.cols && ty >= r.row && ty < r.row + r.rows;
+}
+
+// What a Tilemap is built from.
+interface TilemapSpec {
+  width: number;
+  height: number;
+  tiles: readonly Tile[];
+  looks?: readonly HazardRegion[];
 }
 
 export class Tilemap {
@@ -249,11 +346,15 @@ export class Tilemap {
   // standing in, leaving every other lake in the level still.
   readonly waterBodyId: readonly number[];
 
-  constructor(width: number, height: number, tiles: readonly Tile[]) {
-    this.width = width;
-    this.height = height;
-    this.tiles = tiles;
-    this.waterBodyId = computeWaterBodies(width, height, tiles);
+  // Where hazard tiles are drawn as something other than a bramble.
+  private readonly looks: readonly HazardRegion[];
+
+  constructor(spec: TilemapSpec) {
+    this.width = spec.width;
+    this.height = spec.height;
+    this.tiles = spec.tiles;
+    this.looks = spec.looks ?? [];
+    this.waterBodyId = computeWaterBodies(spec.width, spec.height, spec.tiles);
   }
 
   // Water body id at (tx, ty), or -1 if that tile isn't water.
@@ -264,7 +365,10 @@ export class Tilemap {
 
   // Build a tilemap from human-readable ASCII rows (see CHAR_TO_TILE legend).
   // Throws if rows are ragged or contain unknown characters — fail-fast at boot.
-  static fromAscii(rows: readonly string[]): Tilemap {
+  // A portcullis (PORTCULLIS_CHAR) is not a tile: it is the tile it stands
+  // in — water where water is either side of it, air elsewhere — and its
+  // Portcullis entity is the gate.
+  static fromAscii(rows: readonly string[], looks: readonly HazardRegion[] = []): Tilemap {
     const height = rows.length;
     const width = rows[0]?.length ?? 0;
     const tiles: Tile[] = [];
@@ -275,6 +379,10 @@ export class Tilemap {
       }
       for (let x = 0; x < width; x++) {
         const ch = row[x];
+        if (ch === PORTCULLIS_CHAR) {
+          tiles.push(row[x - 1] === 'W' || row[x + 1] === 'W' ? Tile.Water : Tile.Empty);
+          continue;
+        }
         const t = CHAR_TO_TILE[ch];
         if (t === undefined) {
           throw new Error(`Unknown tile char '${ch}' at (${x}, ${y})`);
@@ -282,7 +390,15 @@ export class Tilemap {
         tiles.push(t);
       }
     }
-    return new Tilemap(width, height, tiles);
+    return new Tilemap({ width, height, tiles, looks });
+  }
+
+  // What a hazard tile at (tx, ty) is drawn as: the look of the last region
+  // that holds it, or a bramble.
+  hazardLookAt(tx: number, ty: number): HazardLook {
+    let look: HazardLook = HAZARD_LOOK.bramble;
+    for (const region of this.looks) if (holds(region.area, tx, ty)) look = region.look;
+    return look;
   }
 
   at(tx: number, ty: number): Tile {
@@ -373,6 +489,8 @@ export function renderTilemap(map: Tilemap): Graphics {
 export interface TileFaces {
   up: boolean;
   down: boolean;
+  // What a hazard tile here is drawn as (a bramble unless given).
+  hazard?: HazardLook;
 }
 
 // Both faces open: how a tile is drawn when there is no map around it.
@@ -380,7 +498,7 @@ export const OPEN_FACES: TileFaces = { up: true, down: true };
 
 export function tileFaces(map: Tilemap, tx: number, ty: number): TileFaces {
   const open = (y: number) => !map.isSolid(tx, y) && map.at(tx, y) !== Tile.Water;
-  return { up: open(ty - 1), down: open(ty + 1) };
+  return { up: open(ty - 1), down: open(ty + 1), hazard: map.hazardLookAt(tx, ty) };
 }
 
 // True for a water tile whose neighbor directly above is EMPTY (air) — only
@@ -537,9 +655,20 @@ export function drawTile(
     return;
   }
   if (t === Tile.Bramble) {
-    drawBramble(g, x, y, tx);
+    const look = faces.hazard ?? HAZARD_LOOK.bramble;
+    if (look === HAZARD_LOOK.spikes) drawSpikes(g, { x, y, tx, ty, faces });
+    else if (look === HAZARD_LOOK.embers) drawEmbers(g, { x, y, tx, ty, faces });
+    else if (look === HAZARD_LOOK.cactus) drawCactus(g, { x, y, tx, ty, faces });
+    else if (look === HAZARD_LOOK.hotPipes) drawHotPipes(g, { x, y, tx, ty, faces });
+    else if (look === HAZARD_LOOK.thornyRoots) drawThornyRoots(g, { x, y, tx, ty, faces });
+    else if (look === HAZARD_LOOK.jacks) drawJacks(g, { x, y, tx, ty, faces });
+    else if (look === HAZARD_LOOK.mousetraps) drawMousetrap(g, { x, y, tx, ty, faces });
+    else if (look === HAZARD_LOOK.furnaceGrate) drawFurnaceGrate(g, { x, y, tx, ty, faces });
+    else drawBramble(g, x, y, tx);
     return;
   }
+  // A gate is drawn by its entity, an updraft not at all.
+  if (t === Tile.CrystalGate || t === Tile.Updraft) return;
 
   // Base fill — every non-empty tile starts with this. (Water is excluded by
   // the caller in renderTilemap; it has its own renderer.)
@@ -606,6 +735,18 @@ export function drawTile(
     case Tile.RootEarth:
       drawPackedEarth(g, x, y, tx, ty);
       drawRoots(g, x, y, tx, ty);
+      break;
+    case Tile.Crystal:
+      drawCrystal(g, { x, y, tx, ty, faces });
+      break;
+    case Tile.YewHedge:
+      drawYewHedge(g, { x, y, tx, ty, faces });
+      break;
+    case Tile.Root:
+      drawRoot(g, { x, y, tx, ty, faces });
+      break;
+    case Tile.RoofSlate:
+      drawRoofSlate(g, { x, y, tx, ty, faces });
       break;
   }
 }
@@ -1009,6 +1150,280 @@ function drawBramble(g: Graphics, x: number, y: number, tx: number): void {
     }
   }
   if (tx % 3 === 0) g.rect(x + 9, y + 6, 2, 2).fill(DB32.brown);
+}
+
+// Where a tile is drawn, and which of its faces are open: what a drawing
+// that changes with its neighbours needs.
+interface TilePlace {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  faces: TileFaces;
+}
+
+// Crystal: every tile a prism standing on end, so a tower of them reads as
+// one column of crystal and a ledge as a row: a dark seam either side, a lit
+// lightSteel bevel, the viking face, a lightSteel ridge down the middle and
+// the royalBlue face turned from the light, with a white glint on the lit
+// face of some. A white top edge where it is open to the air, a venice one
+// along the bottom where it is a ceiling.
+function drawCrystal(g: Graphics, at: TilePlace): void {
+  const { x, y, tx, ty, faces } = at;
+  for (const [fx, w, color] of CRYSTAL_FACES) g.rect(x + fx, y, w, TILE_SIZE).fill(color);
+  if (tileHash(tx, ty, 200) < 0.4) {
+    const gy = y + 3 + Math.floor(tileHash(tx, ty, 201) * 9);
+    g.rect(x + 4, gy, 1, 2).fill(DB32.white);
+  }
+  if (faces.up) {
+    g.rect(x, y, TILE_SIZE, 1).fill(DB32.white);
+    g.rect(x + 1, y + 1, TILE_SIZE - 2, 1).fill(DB32.lightSteel);
+  }
+  if (faces.down) g.rect(x, y + TILE_SIZE - 1, TILE_SIZE, 1).fill(DB32.venice);
+}
+
+// A crystal tile's faces across it, left to right: [x, width, colour].
+export const CRYSTAL_FACES: readonly (readonly [number, number, number])[] = [
+  [0, 1, DB32.deepKoamaru],
+  [1, 2, DB32.lightSteel],
+  [3, 5, DB32.viking],
+  [8, 1, DB32.lightSteel],
+  [9, 5, DB32.royalBlue],
+  [14, 1, DB32.venice],
+  [15, 1, DB32.deepKoamaru],
+];
+
+// Where a bark furrow runs, px across the grain from its line: a slow wobble
+// along the root, taken from the world position so a furrow runs on unbroken
+// from one tile into the next. `along` is the world px along the root, `line`
+// which furrow.
+export function furrowAt(along: number, line: number): number {
+  return Math.round(Math.sin(along / 7 + line * 2.3) * 1.2 + Math.sin(along / 17 + line) * 0.8);
+}
+
+// Where the furrows of a root tile lie across it, px.
+export const ROOT_FURROWS: readonly number[] = [3, 8, 13];
+
+// Whether a root tile is a side root — open above and below, so it runs
+// across — rather than part of the taproot, which runs down.
+export function isSideRoot(faces: TileFaces): boolean {
+  return faces.up && faces.down;
+}
+
+// Root: bark on oiled cedar. Three loulou furrows down the tile (across it in
+// a side root), each with a rope ridge lit beside it, wandering as they go; a
+// knot in about one tile in twelve. A side root is lit along its top and
+// shadowed under; the taproot only where it ends.
+function drawRoot(g: Graphics, at: TilePlace): void {
+  const { x, y, tx, ty, faces } = at;
+  const side = isSideRoot(faces);
+  for (const [line, base] of ROOT_FURROWS.entries()) {
+    for (let i = 0; i < TILE_SIZE; i++) {
+      const along = side ? tx * TILE_SIZE + i : ty * TILE_SIZE + i;
+      const across = Math.min(TILE_SIZE - 2, Math.max(1, base + furrowAt(along, line + (side ? ty : tx))));
+      if (side) {
+        g.rect(x + i, y + across, 1, 1).fill(DB32.loulou);
+        g.rect(x + i, y + across - 1, 1, 1).fill(DB32.rope);
+      } else {
+        g.rect(x + across, y + i, 1, 1).fill(DB32.loulou);
+        g.rect(x + across + 1, y + i, 1, 1).fill(DB32.rope);
+      }
+    }
+  }
+  if (tileHash(tx, ty, 210) < 0.08) {
+    g.rect(x + 6, y + 6, 4, 4).fill(DB32.loulou);
+    g.rect(x + 7, y + 7, 2, 2).fill(DB32.rope);
+  }
+  if (faces.up) {
+    g.rect(x, y, TILE_SIZE, 1).fill(DB32.rope);
+    g.rect(x + 2, y, TILE_SIZE - 4, 1).fill(DB32.twine);
+  }
+  if (faces.down) g.rect(x, y + TILE_SIZE - 2, TILE_SIZE, 2).fill(DB32.valhalla);
+}
+
+// Iron spikes: four shafts standing on the tile below, dimGray lit down
+// their left edge, each ending in a heather tip two pixels wide then one, on
+// a valhalla base plate — every other tile the shafts a pixel taller.
+function drawSpikes(g: Graphics, at: TilePlace): void {
+  const { x, y, tx } = at;
+  g.rect(x, y + TILE_SIZE - 2, TILE_SIZE, 2).fill(DB32.valhalla);
+  for (const [i, sx] of SPIKE_XS.entries()) {
+    const top = 5 - ((tx + i) % 2);
+    g.rect(x + sx, y + top + 2, 2, TILE_SIZE - top - 4).fill(DB32.dimGray);
+    g.rect(x + sx, y + top + 2, 1, TILE_SIZE - top - 4).fill(DB32.topaz);
+    g.rect(x + sx, y + top, 2, 2).fill(DB32.heather);
+    g.rect(x + sx, y + top - 1, 1, 1).fill(DB32.heather);
+  }
+}
+
+// Yew hedge: dell, christi leaf flecks placed by hash, a rainforest band
+// two pixels deep along a clipped top where air is above it, and a valhalla
+// line of shadow under it where air is below.
+function drawYewHedge(g: Graphics, at: TilePlace): void {
+  const { x, y, tx, ty, faces } = at;
+  for (let i = 0; i < 6; i++) {
+    const fx = Math.floor(tileHash(tx, ty, 240 + i) * 14);
+    const fy = 2 + Math.floor(tileHash(tx, ty, 250 + i) * 12);
+    g.rect(x + fx, y + fy, 2, 1).fill(i < 4 ? DB32.christi : DB32.eltGreen);
+  }
+  if (faces.up) g.rect(x, y, TILE_SIZE, 2).fill(DB32.rainforest);
+  if (faces.down) g.rect(x, y + TILE_SIZE - 1, TILE_SIZE, 1).fill(DB32.valhalla);
+}
+
+// A cactus standing on the tile below: a dell column with eltGreen ribs, an
+// arm off one side (which, by hash), and white spines.
+function drawCactus(g: Graphics, at: TilePlace): void {
+  const { x, y, tx } = at;
+  const right = tileHash(tx, 0, 260) < 0.5;
+  g.rect(x + 5, y + 3, 6, 13).fill(DB32.dell);
+  g.rect(x + 6, y + 2, 4, 1).fill(DB32.dell);
+  const ax = right ? x + 11 : x + 2;
+  g.rect(ax, y + 8, 3, 2).fill(DB32.dell);
+  g.rect(right ? ax + 1 : ax, y + 5, 2, 3).fill(DB32.dell);
+  for (const rx of [6, 9]) g.rect(x + rx, y + 3, 1, 13).fill(DB32.eltGreen);
+  for (const [sx, sy] of CACTUS_SPINES) g.rect(x + sx, y + sy, 1, 1).fill(DB32.white);
+}
+
+// Where a cactus's spines stick out, px into its tile.
+export const CACTUS_SPINES: readonly (readonly [number, number])[] = [
+  [4, 5],
+  [11, 7],
+  [4, 11],
+  [11, 13],
+  [8, 1],
+];
+
+// Hot pipes: two dimGray pipes laid along the floor, lit heather on top,
+// with the heat in them showing brown and tahitiGold along their seams. An
+// Embers entity over them shimmers.
+function drawHotPipes(g: Graphics, at: TilePlace): void {
+  const { x, y, tx } = at;
+  for (const py of [6, 11]) {
+    g.rect(x, y + py, TILE_SIZE, 4).fill(DB32.dimGray);
+    g.rect(x, y + py, TILE_SIZE, 1).fill(DB32.heather);
+    g.rect(x, y + py + 2, TILE_SIZE, 1).fill(DB32.brown);
+  }
+  g.rect(x + 2 + (tx % 3) * 4, y + 8, 3, 1).fill(DB32.tahitiGold);
+  if (tx % 2 === 0) g.rect(x + 7, y + 6, 2, 9).fill(DB32.valhalla);
+}
+
+// Thorny roots: the bramble's three stems in oiledCedar, lit rope, with rope
+// thorns and no berries — roots grown out of the earth, not a briar.
+function drawThornyRoots(g: Graphics, at: TilePlace): void {
+  const { x, y, tx } = at;
+  for (const [i, stem] of ROOT_STEMS.entries()) {
+    const sx = x + stem.at + ((tx + i) % 2);
+    g.rect(sx, y + stem.top, 2, TILE_SIZE - stem.top).fill(DB32.oiledCedar);
+    g.rect(sx, y + stem.top, 1, TILE_SIZE - stem.top).fill(DB32.loulou);
+    for (let ty = stem.top + 2; ty < TILE_SIZE - 2; ty += 4) {
+      g.rect(sx - 1, y + ty, 1, 1).fill(DB32.rope);
+      g.rect(sx + 2, y + ty + 2, 1, 1).fill(DB32.rope);
+    }
+  }
+}
+
+// The thorny roots' stems: where each stands, and how high it reaches.
+export const ROOT_STEMS: readonly { at: number; top: number }[] = [
+  { at: 2, top: 3 },
+  { at: 7, top: 1 },
+  { at: 12, top: 4 },
+];
+
+// Jacks: the nursery's toy jacks strewn on the floor, three to a tile, each
+// a heather 4-point star with a lightSteel heart — every other tile shifted
+// a pixel, so a run of them is not a pattern.
+function drawJacks(g: Graphics, at: TilePlace): void {
+  const { x, y, tx } = at;
+  for (const [jx, jy] of JACKS) {
+    const cx = x + jx + (tx % 2);
+    const cy = y + jy;
+    g.rect(cx - 2, cy, 5, 1).fill(DB32.heather);
+    g.rect(cx, cy - 2, 1, 5).fill(DB32.heather);
+    g.rect(cx, cy, 1, 1).fill(DB32.lightSteel);
+  }
+}
+
+// Where the jacks of a tile lie, the heart of each, px into its tile.
+export const JACKS: readonly (readonly [number, number])[] = [
+  [3, 13],
+  [8, 10],
+  [12, 13],
+];
+
+// A mousetrap set on the floor: a rope board lit twine along its top and
+// shaded oiledCedar under, the lightSteel bar held back on two posts, a
+// dimGray spring between them, and in every other trap a pancho crumb of
+// cheese on the catch.
+function drawMousetrap(g: Graphics, at: TilePlace): void {
+  const { x, y, tx } = at;
+  g.rect(x + 1, y + 12, 14, 4).fill(DB32.rope);
+  g.rect(x + 1, y + 12, 14, 1).fill(DB32.twine);
+  g.rect(x + 1, y + 15, 14, 1).fill(DB32.oiledCedar);
+  g.rect(x + 3, y + 8, 10, 1).fill(DB32.lightSteel);
+  g.rect(x + 3, y + 9, 1, 3).fill(DB32.lightSteel);
+  g.rect(x + 12, y + 9, 1, 3).fill(DB32.lightSteel);
+  g.rect(x + 6, y + 10, 3, 2).fill(DB32.dimGray);
+  if (tx % 2 === 0) g.rect(x + 10, y + 10, 2, 2).fill(DB32.pancho);
+}
+
+// A furnace grate: a bed of coals burning brown behind it, tahitiGold at
+// its heart, and four dimGray bars over it on a cross-bar lit heather.
+function drawFurnaceGrate(g: Graphics, at: TilePlace): void {
+  const { x, y, tx } = at;
+  g.rect(x, y + 6, TILE_SIZE, 10).fill(DB32.brown);
+  g.rect(x, y + 10, TILE_SIZE, 3).fill(DB32.tahitiGold);
+  g.rect(x + 2 + (tx % 3) * 4, y + 11, 2, 1).fill(DB32.goldenFizz);
+  for (const bx of GRATE_BARS) g.rect(x + bx, y + 6, 2, 10).fill(DB32.dimGray);
+  g.rect(x, y + 6, TILE_SIZE, 2).fill(DB32.dimGray);
+  g.rect(x, y + 6, TILE_SIZE, 1).fill(DB32.heather);
+}
+
+// Where the bars of a furnace grate stand, px from its tile's left edge.
+export const GRATE_BARS: readonly number[] = [1, 5, 9, 13];
+
+// Roof slate: deepKoamaru slates in rows 4 px deep, each 8 px wide and
+// laid over the joints of the row above (the joints run on from tile to
+// tile, from the world row), the lower edge of each row and each joint a
+// heather line; a lightSteel ridge along the top where air is above.
+function drawRoofSlate(g: Graphics, at: TilePlace): void {
+  const { x, y, ty, faces } = at;
+  for (let r = 0; r < SLATE_ROWS; r++) {
+    const top = y + r * SLATE_H;
+    g.rect(x, top + SLATE_H - 1, TILE_SIZE, 1).fill(DB32.heather);
+    for (let jx = slateJoint(ty * SLATE_ROWS + r); jx < TILE_SIZE; jx += SLATE_W) {
+      g.rect(x + jx, top, 1, SLATE_H - 1).fill(DB32.heather);
+    }
+  }
+  if (faces.up) g.rect(x, y, TILE_SIZE, 1).fill(DB32.lightSteel);
+}
+
+// A slate's size, px, and how many rows of them a tile holds.
+export const SLATE_W = 8;
+export const SLATE_H = 4;
+const SLATE_ROWS = TILE_SIZE / SLATE_H;
+
+// Where the first joint of a row of slates falls in its tile, px: every
+// other row (counted down the world) half a slate along.
+export function slateJoint(worldRow: number): number {
+  return worldRow % 2 === 0 ? 0 : SLATE_W / 2;
+}
+
+// Where the spikes of a tile stand, px from its left edge.
+export const SPIKE_XS: readonly number[] = [1, 5, 9, 13];
+
+// Embers: a bed of coals on the tile below, loulou and clairvoyant, lit
+// brown and tahitiGold where they burn, goldenFizz at the hottest — still
+// here; an Embers entity over them flickers.
+function drawEmbers(g: Graphics, at: TilePlace): void {
+  const { x, y, tx, ty } = at;
+  g.rect(x, y + 10, TILE_SIZE, 6).fill(DB32.loulou);
+  for (let i = 0; i < 6; i++) {
+    const cx = x + Math.floor(tileHash(tx, ty, 220 + i) * 13);
+    const cy = y + 9 + Math.floor(tileHash(tx, ty, 230 + i) * 5);
+    g.rect(cx, cy, 3, 2).fill(i < 3 ? DB32.clairvoyant : DB32.brown);
+  }
+  g.rect(x + 3 + (tx % 3) * 3, y + 11, 2, 1).fill(DB32.tahitiGold);
+  g.rect(x + 9 - (ty % 2) * 4, y + 13, 1, 1).fill(DB32.goldenFizz);
 }
 
 // One tile of bookcase: a shelf board across the bottom and a row of spines

@@ -26,7 +26,7 @@ import { Spider } from '@entities/spider';
 import { Spores } from '@entities/spores';
 import type { LevelSpec, SpawnPoint } from '@world/level';
 import { drawTrailGate } from '@world/levels/cairn-observatory';
-import { drawGrottoCrack } from '@world/levels/glow-grotto';
+import { drawGrottoCrack, drawOakHollow } from '@world/levels/glow-grotto';
 import {
   bones,
   brazier,
@@ -470,6 +470,11 @@ const KEEP_DOOR_Y = 30 * T;
 const GROTTO_CRACK_X = 9 * T;
 const GROTTO_CRACK_Y = 88 * T;
 
+// The hollow at the foot of the forest's tall oak (col 19): the way down its
+// taproot to the grotto's daylight crack, the far end of the grotto's Roots.
+const OAK_HOLLOW_X = 19 * T + 8;
+const OAK_HOLLOW_Y = GRASS_ROW * T;
+
 // The trail head up to the observatory, on the crag east of the secret
 // chimney's mouth (col 191).
 const TRAIL_GATE_X = 196 * T + 8;
@@ -514,6 +519,7 @@ const MEADOW_SPAWNS: SpawnPoint[] = [
   // `pressed` at endFrame), so landing in its range just shows the prompt.
   { id: 'from-keep', x: KEEP_DOOR_X + 10, y: KEEP_DOOR_Y - T },
   { id: 'from-grotto', ...standing(11, 88) },
+  { id: 'from-grotto-oak', ...standing(21, GRASS_ROW) },
   { id: 'from-observatory', ...standing(194, 4) },
 ];
 
@@ -574,6 +580,15 @@ export const meadowLevel: LevelSpec = {
         targetSpawnId: 'from-meadow',
         promptLabel: 'squeeze through',
         drawBody: drawGrottoCrack,
+      }),
+      new Door({
+        id: 'meadow-oak-hollow',
+        x: OAK_HOLLOW_X,
+        y: OAK_HOLLOW_Y,
+        targetLevelId: 'glow-grotto',
+        targetSpawnId: 'from-meadow-oak',
+        promptLabel: 'climb down',
+        drawBody: drawOakHollow,
       }),
       new Door({
         id: 'meadow-trail-gate',

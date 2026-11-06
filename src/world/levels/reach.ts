@@ -1,4 +1,4 @@
-import { isClimbable, isHazard, Tile, type Tilemap } from '@world/tilemap';
+import { isClimbable, isHazard, isUpdraft, Tile, type Tilemap } from '@world/tilemap';
 
 // A tile-level port of the player's movement rules, for the levels' reach
 // tests, kept on the cautious side of the real ones: walk a column and fall;
@@ -6,8 +6,9 @@ import { isClimbable, isHazard, Tile, type Tilemap } from '@world/tilemap';
 // it, or up to `rise` rows with two; jump across up to `across`
 // columns; climb ladders and vines, and step off the top of one onto the
 // ledge beside it; swim, and pop out of the water onto a bank a row up; and
-// on a puffball, be thrown up to `bounce` rows. A cell is where the figure's
-// feet are: its own tile, one tall.
+// on a puffball, be thrown up to `bounce` rows; and in an updraft, rise up
+// the column to hover just over its top, stepping off it to either side on
+// the way. A cell is where the figure's feet are: its own tile, one tall.
 //
 // A hazard (a bramble) is never walked into, fallen through or landed in:
 // touching one sends the player back to the last cairn.
@@ -22,6 +23,13 @@ export interface ReachRules {
   across: number;
   // Rows a puffball throws the player, straight up.
   bounce: number;
+  // Columns over a jump can land, rising one or two rows (3 unless given),
+  // and rising `rise` (2 unless given). The keep's handoff counts the empty
+  // columns crossed, one fewer, so its rules give 4 and 3: a 2-row jump is
+  // in the air ~0.67 s, ~48 px of drift at walking speed, and the 4th column
+  // over needs 37 of them; today's hall has always asked for it.
+  drift?: number;
+  topDrift?: number;
 }
 
 export const SHED_RULES: ReachRules = { rise: 2, across: 3, bounce: 0 };
@@ -44,6 +52,10 @@ export class Moves {
     return this.map.at(x, y) === Tile.Water;
   }
 
+  updraft(x: number, y: number): boolean {
+    return isUpdraft(this.map.at(x, y));
+  }
+
   // A cell the figure can be in without falling.
   stands(x: number, y: number): boolean {
     if (!this.free(x, y)) return false;
@@ -52,7 +64,9 @@ export class Moves {
       this.climbable(x, y) ||
       this.climbable(x, y + 1) ||
       this.water(x, y) ||
-      this.water(x, y + 1)
+      this.water(x, y + 1) ||
+      this.updraft(x, y) ||
+      this.updraft(x, y + 1)
     );
   }
 
@@ -74,6 +88,13 @@ export class Moves {
       if (this.free(x, y + 1)) add(this.fall(x, y + 1));
     }
     if (this.climbable(x, y + 1)) out.push([x, y + 1]);
+    // Up an updraft: it lifts, and never lets down. Stepped out of, still
+    // rising, it carries the player a column further than a walk off a
+    // ledge would before they come down.
+    if (this.updraft(x, y)) {
+      if (this.free(x, y - 1)) out.push([x, y - 1]);
+      for (const d of [-1, 1]) if (this.free(x + d, y) && this.free(x + 2 * d, y)) add(this.fall(x + 2 * d, y));
+    }
     // Into the water below: it holds nobody up.
     if (this.water(x, y + 1)) out.push([x, y + 1]);
     if (this.climbable(x, y) && this.free(x, y - 1) && !this.climbable(x, y - 1)) {
@@ -104,7 +125,7 @@ export class Moves {
       let headroom = true;
       for (let k = 1; k <= up; k++) if (!this.free(x, y - k)) headroom = false;
       if (!headroom) break;
-      const drift = up <= 2 ? 3 : 2;
+      const drift = up <= 2 ? (this.rules.drift ?? 3) : (this.rules.topDrift ?? 2);
       for (const d of [-1, 1]) {
         for (let dx = 1; dx <= drift; dx++) {
           let clear = true;
@@ -112,6 +133,14 @@ export class Moves {
           if (!clear) break;
           if (this.stands(x + d * dx, y - up)) out.push([x + d * dx, y - up]);
         }
+      }
+    }
+    // Into an updraft overhead: the box only has to touch it, so one row
+    // higher than a jump lands.
+    for (let up = 1; up <= this.rules.rise + 1 && this.free(x, y - up); up++) {
+      if (this.updraft(x, y - up)) {
+        out.push([x, y - up]);
+        break;
       }
     }
     if (this.free(x, y - 1)) {
@@ -135,12 +164,15 @@ export class Moves {
   }
 
   // Thrown straight up off a puffball: anywhere up the clear column, and a
-  // step or two to either side of it, on the way.
+  // step or two to either side of it, on the way — three over the last two
+  // rows, where the arc hangs longest (0.6 s to its top, at walking speed
+  // nearer 3 tiles than 2).
   private bounces(x: number, y: number, out: Cell[]): void {
     for (let up = 1; up <= this.rules.bounce; up++) {
       if (!this.free(x, y - up)) break;
+      const drift = up >= this.rules.bounce - 1 ? 3 : 2;
       for (const d of [-1, 1]) {
-        for (let dx = 1; dx <= 2; dx++) {
+        for (let dx = 1; dx <= drift; dx++) {
           if (!this.free(x + d * dx, y - up)) break;
           if (this.stands(x + d * dx, y - up)) out.push([x + d * dx, y - up]);
         }

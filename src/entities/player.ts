@@ -4,6 +4,8 @@ import {
   CLIMB_STEP_DISTANCE,
   COYOTE_TIME,
   DB32,
+  GRAVITY,
+  GRAVITY_FALL_MULT,
   JUMP_BUFFER,
   JUMP_RELEASE_MULT,
   JUMP_VELOCITY,
@@ -15,6 +17,8 @@ import {
   SWIM_STROKE_INTERVAL,
   SWIM_UP_SPEED,
   TILE_SIZE,
+  UPDRAFT_LIFT,
+  UPDRAFT_RISE,
   WADE_SPEED,
   WALK_SPEED,
   WATER_ENTRY_VEL_CAP,
@@ -22,14 +26,15 @@ import {
   WATER_GRAVITY,
   WATER_TERMINAL_VEL,
 } from '@constants';
+import type { Grip } from '@entities/entity';
 import { drawFigureHd, figureHdFinePose, figureHdKey, figureHdPose } from '@entities/figure-hd';
 import { ART_KIND, draws, fineMotion, registerArt } from '@hd/art-mode';
 import { BakeCache, FineSprite } from '@hd/bake';
 import { KEYS_DOWN, KEYS_JUMP, KEYS_LEFT, KEYS_RIGHT, type KeyReader } from '@systems/input';
 import { type Ground, type SolidBox, stepPhysics, type Walker } from '@systems/physics';
-import type { Vec2 } from '@types';
-import { holdsTile, type WaterCurrent } from '@world/level';
-import { isClimbable, Tile, type Tilemap } from '@world/tilemap';
+import type { AABB, Vec2 } from '@types';
+import { holdsTile, type TileRect, type WaterCurrent } from '@world/level';
+import { isClimbable, isUpdraft, Tile, type Tilemap } from '@world/tilemap';
 import { Container, Graphics } from 'pixi.js';
 
 // Every pose the figure has been seen in, baked once.
@@ -59,7 +64,19 @@ const FOOTSTEP_DISTANCE = 20;
 // with, and the currents in the level's water.
 export interface PlayerWorld extends Ground {
   currents: readonly WaterCurrent[];
+  // What can be caught hold of in the air.
+  grips: readonly Grip[];
+  // Water that is not tiles, px, and updraft tiles that are still.
+  waters: readonly AABB[];
+  calm: readonly TileRect[];
 }
+
+// After letting go of a grip, s before any can be caught again — or the
+// player would catch the one they just let go of.
+const REGRAB = 0.35;
+// A fling off a grip carries on sideways on top of the walk, fading by this
+// much a second (exponentially), and stops at the first landing.
+const FLING_FADE = 1.2;
 
 export class Player implements Walker {
   pos: Vec2;
@@ -110,6 +127,11 @@ export class Player implements Walker {
   // up or down there, and has not since stepped or climbed off. Like
   // `swimming`, it tells stepPhysics to leave vel.y to us.
   climbing = false;
+  // What the player is hanging from, if anything (see Grip).
+  private holding: Grip | null = null;
+  private regrab = 0;
+  // The sideways speed a let-go flung the player off with, px/s, fading.
+  private flingX = 0;
 
   // Jump-feel timers (count DOWN; > 0 means active).
   private coyoteTimer = 0;
@@ -142,6 +164,11 @@ export class Player implements Walker {
     this.interpolate(1);
   }
 
+  // What the player is hanging from, if anything.
+  get grip(): Grip | null {
+    return this.holding;
+  }
+
   // Put the body somewhere outright — a spawn, a door, a respawn — at rest,
   // with nothing to interpolate from.
   placeAt(x: number, y: number): void {
@@ -151,6 +178,8 @@ export class Player implements Walker {
     this.prevPos.y = y;
     this.vel.x = 0;
     this.vel.y = 0;
+    this.holding = null;
+    this.flingX = 0;
     this.interpolate(1);
   }
 
@@ -185,6 +214,12 @@ export class Player implements Walker {
     this.didEnterWaterThisFrame = false;
     this.didSwimStrokeThisFrame = false;
 
+    // Hanging from a grip: carried by it until jump lets go.
+    if (this.hang(input, world.grips, dt)) {
+      this.syncSprite();
+      return;
+    }
+
     // Water detection.
     //   `inWater`          = body midpoint sits in a Water tile. Drives the
     //                        SFX / swim-mode physics / water-surface anim.
@@ -197,7 +232,8 @@ export class Player implements Walker {
     //                        trivial to predict.
     const tx = Math.floor((this.pos.x + this.size.x / 2) / TILE_SIZE);
     const midY = Math.floor((this.pos.y + this.size.y / 2) / TILE_SIZE);
-    const nowInWater = tilemap.at(tx, midY) === Tile.Water;
+    const mid = { x: this.pos.x + this.size.x / 2, y: this.pos.y + this.size.y / 2 };
+    const nowInWater = tilemap.at(tx, midY) === Tile.Water || world.waters.some((w) => holds(w, mid));
     const leftCol = Math.floor(this.pos.x / TILE_SIZE);
     const rightCol = Math.floor((this.pos.x + this.size.x - 1) / TILE_SIZE);
     const topRowAABB = Math.floor(this.pos.y / TILE_SIZE);
@@ -211,7 +247,7 @@ export class Player implements Walker {
         }
       }
     }
-    this.bodyTouchesWater = touches;
+    this.bodyTouchesWater = touches || world.waters.some((w) => overlaps(w, this));
     if (nowInWater && !wasInWater) {
       this.didEnterWaterThisFrame = true;
       // Crush most of the falling momentum the instant we enter water —
@@ -314,7 +350,8 @@ export class Player implements Walker {
         this.jumpBufferTimer = JUMP_BUFFER;
       }
 
-      this.vel.x = move * WALK_SPEED;
+      this.vel.x = move * WALK_SPEED + this.flingX;
+      this.flingX *= Math.exp(-FLING_FADE * dt);
 
       // On a puffball: thrown up, unless down is held to stand on it.
       if (this.onGround && !downHeld && tileUnder(this, tilemap) === Tile.Puffball) {
@@ -342,6 +379,8 @@ export class Player implements Walker {
       if (this.vel.y < 0 && input.isAnyReleased(KEYS_JUMP)) {
         this.vel.y *= JUMP_RELEASE_MULT;
       }
+
+      if (inUpdraft(this, world)) this.vel.y = lifted(this.vel.y, dt);
     }
 
     // Exit boost — the frame the midpoint crosses out of water while still
@@ -367,6 +406,7 @@ export class Player implements Walker {
     if (!wasGrounded && this.onGround) {
       this.didLandThisFrame = true;
     }
+    if (this.onGround || this.inWater || this.climbing) this.flingX = 0;
 
     // Walk-cycle stepOffset (visual stride). Drives both normal walking
     // and wading (on ground in water) — same pose, same sine phase.
@@ -391,6 +431,39 @@ export class Player implements Walker {
     this.syncSprite();
   }
 
+  // Takes hold of a grip the body is in reach of while in the air, and holds
+  // on — moved wherever it goes — until jump lets go, flung off with its
+  // speed and a jump's. Whether the player is hanging at the end of it.
+  private hang(input: KeyReader, grips: readonly Grip[], dt: number): boolean {
+    this.regrab = Math.max(0, this.regrab - dt);
+    const jumped = input.isAnyPressed(KEYS_JUMP);
+    if (this.holding && (jumped || this.holding.releases?.())) {
+      const v = this.holding.velocity();
+      this.holding = null;
+      this.regrab = REGRAB;
+      this.vel.x = v.x;
+      this.vel.y = jumped ? Math.min(v.y, 0) - JUMP_VELOCITY : v.y;
+      this.flingX = v.x;
+      this.didJumpThisFrame = jumped;
+      return false;
+    }
+    if (!this.holding && this.regrab === 0 && !this.onGround && !this.climbing && !this.inWater) {
+      this.holding = grips.find((g) => g.catches(this.pos, this.size)) ?? null;
+    }
+    if (!this.holding) return false;
+    const at = this.holding.holdAt(this.size);
+    const v = this.holding.velocity();
+    this.pos.x = at.x;
+    this.pos.y = at.y;
+    this.vel.x = v.x;
+    this.vel.y = v.y;
+    this.onGround = false;
+    this.standingOn = null;
+    this.coyoteTimer = 0;
+    this.jumpBufferTimer = 0;
+    return true;
+  }
+
   // Rebuild the figure each frame so feet, arm, and body-bob can swing as
   // 1-pixel integer offsets. Stays pixel-perfect — no scale-based animation.
   // Cost is ~20 rect() calls/frame. The drawing itself is the module-level
@@ -401,9 +474,10 @@ export class Player implements Walker {
   private paintFigure(): void {
     const walking = this.onGround && this.vel.x !== 0;
     const pose: FigurePose = {
-      airborne: !this.onGround && !this.climbing,
+      airborne: !this.onGround && !this.climbing && !this.holding,
       swimming: this.swimming,
-      climbing: this.climbing,
+      // Hanging from a grip, the climbing pose: hands up, holding on.
+      climbing: this.climbing || this.holding !== null,
       climbPhase: Math.floor(this.climbDistance / (CLIMB_STEP_DISTANCE / 2)) & 1,
       stepOffset: this.stepOffset,
       bodyBob: walking ? -Math.abs(this.stepOffset) : 0,
@@ -552,6 +626,46 @@ export function drawFigure(g: Graphics, pose: FigurePose): void {
 // The push of whatever current the tile is in, px/s east.
 function currentAt(currents: readonly WaterCurrent[], tile: Vec2): number {
   return currents.find((c) => holdsTile(c.area, tile))?.speed ?? 0;
+}
+
+// Whether any tile the body overlaps is an updraft where the air is moving.
+function inUpdraft(body: Walker, world: PlayerWorld): boolean {
+  const { tilemap, calm } = world;
+  const x0 = Math.floor(body.pos.x / TILE_SIZE);
+  const x1 = Math.floor((body.pos.x + body.size.x - 1) / TILE_SIZE);
+  const y0 = Math.floor(body.pos.y / TILE_SIZE);
+  const y1 = Math.floor((body.pos.y + body.size.y - 1) / TILE_SIZE);
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      if (isUpdraft(tilemap.at(tx, ty)) && !calm.some((r) => holdsTile(r, { x: tx, y: ty }))) return true;
+    }
+  }
+  return false;
+}
+
+// Whether a point is inside a box.
+function holds(box: AABB, at: Vec2): boolean {
+  return at.x >= box.x && at.x < box.x + box.width && at.y >= box.y && at.y < box.y + box.height;
+}
+
+// Whether a box and the body overlap.
+function overlaps(box: AABB, body: Walker): boolean {
+  return (
+    body.pos.x < box.x + box.width &&
+    body.pos.x + body.size.x > box.x &&
+    body.pos.y < box.y + box.height &&
+    body.pos.y + body.size.y > box.y
+  );
+}
+
+// A vertical speed after a step in an updraft. Falling, stepPhysics pulls at
+// GRAVITY_FALL_MULT times gravity, so the lift outdoes that too; it never
+// pushes past UPDRAFT_RISE, and never slows what is already rising faster.
+function lifted(vy: number, dt: number): number {
+  if (vy <= -UPDRAFT_RISE) return vy;
+  let v = vy - UPDRAFT_LIFT * dt;
+  if (v > 0) v -= GRAVITY * (GRAVITY_FALL_MULT - 1) * dt;
+  return Math.max(v, -UPDRAFT_RISE);
 }
 
 // The tile under the middle of the body's feet.

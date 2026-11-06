@@ -63,7 +63,8 @@ export class TallCandle implements Entity {
 }
 
 // Iron base, dark stem, pale candle. Static — never changes after construction.
-function drawCandleBody(g: Graphics): void {
+// Exported for the keep's candle checkpoints (see Cairn).
+export function drawCandleBody(g: Graphics): void {
   const iron = DB32.dimGray;
   const ironHi = DB32.heather;
   const ironShadow = DB32.valhalla;
@@ -94,7 +95,7 @@ function drawCandleBody(g: Graphics): void {
 // differently, so the eye sees motion without the candle "growing/
 // shrinking." Frame 0: tall thin tongue (more vertical). Frame 1:
 // wider rounded teardrop (more horizontal).
-function drawFlame(g: Graphics, frame: number): void {
+export function drawFlame(g: Graphics, frame: number): void {
   const core = DB32.white;
   const body = DB32.goldenFizz;
   const halo = DB32.tahitiGold;

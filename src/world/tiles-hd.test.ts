@@ -2,7 +2,7 @@ import { TILE_SIZE } from '@constants';
 import { record } from '@hd/classic-recorder';
 import { FineCanvas } from '@hd/fine-canvas';
 import { footprint } from '@hd/footprint';
-import { drawTile, Tile } from '@world/tilemap';
+import { drawTile, HAZARD_LOOK, Tile } from '@world/tilemap';
 import { drawTileHd, TILE_FINE } from '@world/tiles-hd';
 import { describe, expect, it } from 'vitest';
 
@@ -12,6 +12,26 @@ const KINDS = Object.entries(Tile).filter(([, t]) => t !== Tile.Empty && t !== T
 // Enough tiles that every hashed variant shows up: tufts and flowers on
 // grass, pebbles in dirt, rivets, cracks in both directions, spines.
 const SPOTS = Array.from({ length: 40 }, (_, i) => ({ tx: 3 + i * 7, ty: 2 + ((i * 5) % 11) }));
+
+describe('every hazard look in HD keeps its classic footprint', () => {
+  for (const look of Object.values(HAZARD_LOOK)) {
+    it(look, () => {
+      for (const spot of SPOTS) {
+        const faces = { up: true, down: true, hazard: look };
+        const x = spot.tx * TILE_SIZE;
+        const classic = record((g) => drawTile(g, Tile.Bramble, x, spot.ty * TILE_SIZE, spot.tx, spot.ty, faces));
+        const hd = new FineCanvas({
+          x: spot.tx * TILE_FINE,
+          y: (spot.ty - 1) * TILE_FINE,
+          w: TILE_FINE,
+          h: 3 * TILE_FINE,
+        });
+        drawTileHd(hd, Tile.Bramble, { ...spot, faces });
+        expect(footprint(classic, hd), `${look} at ${spot.tx},${spot.ty}`).toBe(0);
+      }
+    });
+  }
+});
 
 describe('every tile in HD keeps its classic footprint', () => {
   for (const [name, tile] of KINDS) {
@@ -32,6 +52,26 @@ describe('every tile in HD keeps its classic footprint', () => {
           h: 3 * TILE_FINE,
         });
         drawTileHd(hd, tile, spot);
+        expect(footprint(classic, hd), `${name} at ${spot.tx},${spot.ty}`).toBe(0);
+      }
+    });
+  }
+});
+
+// The kinds that draw their open faces (a lit top, a ceiling under), drawn
+// shut in on both sides as they are inside a wall or a roof.
+const FACED: readonly Tile[] = [Tile.Floorboards, Tile.Crystal, Tile.Root, Tile.YewHedge, Tile.RoofSlate];
+
+describe('every faced tile in HD keeps its classic footprint when shut in', () => {
+  for (const [name, tile] of KINDS.filter(([, t]) => FACED.includes(t))) {
+    it(name, () => {
+      for (const spot of SPOTS) {
+        const faces = { up: false, down: false };
+        const classic = record((g) =>
+          drawTile(g, tile, spot.tx * TILE_SIZE, spot.ty * TILE_SIZE, spot.tx, spot.ty, faces),
+        );
+        const hd = new FineCanvas({ x: spot.tx * TILE_FINE, y: spot.ty * TILE_FINE, w: TILE_FINE, h: TILE_FINE });
+        drawTileHd(hd, tile, { ...spot, faces });
         expect(footprint(classic, hd), `${name} at ${spot.tx},${spot.ty}`).toBe(0);
       }
     });

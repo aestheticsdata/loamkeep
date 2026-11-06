@@ -10,11 +10,12 @@ import { TILE_FINE } from '@world/tiles-hd';
 // down, so anything that can be stood on reads in front of it.
 //
 // design_handoff_potting_shed/RECIPES.md §3, verbatim (`BD.*`).
-export function roomBackdropAt(x: number, y: number, room: LitRoom): number {
+// The sky is no wall: null, and what is behind the level shows.
+export function roomBackdropAt(x: number, y: number, room: LitRoom): number | null {
   return PATTERNS[room.backdrop](x, y, room);
 }
 
-type Pattern = (x: number, y: number, room: LitRoom) => number;
+type Pattern = (x: number, y: number, room: LitRoom) => number | null;
 
 // x mod n, never negative.
 const mod = (x: number, n: number) => ((x % n) + n) % n;
@@ -141,4 +142,5 @@ const PATTERNS: Record<RoomBackdrop, Pattern> = {
   [ROOM_BACKDROP.brick]: brick,
   [ROOM_BACKDROP.earth]: earth,
   [ROOM_BACKDROP.pool]: pool,
+  [ROOM_BACKDROP.sky]: () => null,
 };

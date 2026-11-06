@@ -202,6 +202,43 @@ export class Audio {
     this.blip({ freq: 880, freqEnd: 1174.66, duration: 0.07, volume: 0.05, type: 'triangle', delay: 0.02 });
   }
 
+  // A switch crystal lighting: a struck glassy note at `pitch`, a fifth over
+  // it a moment later, both triangles left to ring out. A room's three
+  // crystals ring three notes of one chord.
+  chime(pitch: number): void {
+    this.blip({ freq: pitch, duration: 0.9, volume: 0.12, type: 'triangle' });
+    this.blip({ freq: pitch * 1.5, duration: 0.7, volume: 0.06, type: 'triangle', delay: 0.06 });
+    this.blip({ freq: pitch * 4, duration: 0.12, volume: 0.03, type: 'sine' });
+  }
+
+  // A lever pulled down: a low square clunk, and the knock of it stopping.
+  clunk(): void {
+    this.blip({ freq: 110, freqEnd: 70, duration: 0.12, volume: 0.18 });
+    this.noise({ duration: 0.04, volume: 0.06, delay: 0.1 });
+  }
+
+  // A portcullis going up: a run of short noise bursts, the links of its
+  // chain over the drum, each pitch-swept down under it, for as long as the
+  // gate takes to rise.
+  chainRattle(): void {
+    for (let i = 0; i < 10; i++) {
+      this.noise({ duration: 0.04, volume: 0.07 - i * 0.004, delay: i * 0.08 });
+      this.blip({ freq: 260 - i * 14, duration: 0.03, volume: 0.03, type: 'square', delay: i * 0.08 });
+    }
+  }
+
+  // Grit trickling from a stone about to drop: a dry tick, quiet.
+  dustTick(): void {
+    this.noise({ duration: 0.03, volume: 0.05 });
+    this.blip({ freq: 1600, duration: 0.02, volume: 0.02, type: 'triangle' });
+  }
+
+  // A falling stone breaking on the floor.
+  shatter(): void {
+    this.noise({ duration: 0.18, volume: 0.12 });
+    this.blip({ freq: 160, freqEnd: 60, duration: 0.15, volume: 0.12, type: 'triangle' });
+  }
+
   // "Floc" — short low blip with a noise tail. Played when the player wades
   // into a water tile. Two layers: a low triangle thump for the splash body,
   // a brief noise burst for the spray.

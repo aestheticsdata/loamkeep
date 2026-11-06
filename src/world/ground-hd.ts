@@ -70,6 +70,11 @@ export class GroundHd {
     this.surface.update(water.activeId, water.motion);
   }
 
+  // Bakes the area again the next time it is shown: a lamp has come on.
+  repaint(area: LogicalRect): void {
+    this.chunks.repaint(area);
+  }
+
   destroy(): void {
     this.chunks.destroy();
     this.surface.destroy();

@@ -2,7 +2,7 @@ import { FLORA_NOTICE_RANGE_X, FLORA_NOTICE_RANGE_Y } from '@constants';
 import type { FloraId } from '@entities/plants';
 import { ArtBody } from '@hd/art-body';
 import type { ClassicRecorder } from '@hd/classic-recorder';
-import { type CritterLayers, plantHd } from '@hd/critter-hd';
+import { type CritterLayers, critterBodyHd, plantHd } from '@hd/critter-hd';
 import type { Vec2 } from '@types';
 import type { Graphics } from 'pixi.js';
 
@@ -24,20 +24,27 @@ export interface DecorationSpec {
   // Its own HD recipe (the potting shed's props take propHd); absent, a
   // plant takes the plant recipe and the rest of the scenery the common one.
   hd?: (recorded: ClassicRecorder) => CritterLayers;
+  // Its translucent rects are glass (the kitchen garden's greenhouse and
+  // orangery): HD keeps them as classic draws them, under the baked glazing,
+  // instead of dithering them into opaque dots that grey out what is behind.
+  translucent?: boolean;
 }
 
 export class Decoration {
-  // Plants take the plant recipe, the rest of the scenery the common one;
-  // identical drawings share their bake.
+  // Plants take the plant recipe, glass the common one without its dither,
+  // the rest of the scenery the common one; identical drawings share their
+  // bake.
   readonly sprite: ArtBody;
   readonly species: FloraId | undefined;
 
   constructor(spec: DecorationSpec) {
-    this.sprite = new ArtBody(spec.species ? 'plants' : spec.hd ? 'props' : 'scenery');
+    this.sprite = new ArtBody(spec.species ? 'plants' : spec.hd ? 'props' : spec.translucent ? 'glass' : 'scenery', {
+      softLight: spec.translucent,
+    });
     this.sprite.x = spec.x;
     this.sprite.y = spec.y;
     this.species = spec.species;
-    this.sprite.draw(spec.draw, spec.species ? plantHd : spec.hd);
+    this.sprite.draw(spec.draw, spec.species ? plantHd : (spec.hd ?? (spec.translucent ? glassHd : undefined)));
   }
 
   // True if the player is close enough for the flora book to write this
@@ -51,4 +58,10 @@ export class Decoration {
     const py = playerPos.y + playerSize.y / 2;
     return Math.abs(px - this.sprite.x) <= FLORA_NOTICE_RANGE_X && Math.abs(py - this.sprite.y) <= FLORA_NOTICE_RANGE_Y;
   }
+}
+
+// Glass: the glazing baked by the common recipe, and no halo — its panes
+// are laid translucent under the sprite (softLight, art-body.ts showGlows).
+function glassHd(recorded: ClassicRecorder): CritterLayers {
+  return { body: critterBodyHd(recorded), halo: null };
 }

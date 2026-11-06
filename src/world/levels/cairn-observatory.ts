@@ -473,7 +473,7 @@ export const cairnObservatoryLevel: LevelSpec = {
         x: RETURN_DOOR_X,
         y: MOOR_Y,
         targetLevelId: 'meadow',
-        targetSpawnId: 'from-meadow',
+        targetSpawnId: 'from-observatory',
         promptLabel: 'go down',
         drawBody: drawTrailGate,
       }),

@@ -2,25 +2,38 @@ import { DB32 } from '@constants';
 import { FINE, type FineBox, FineCanvas } from '@hd/fine-canvas';
 import { bayer, hiOf, loOf } from '@hd/palette';
 import {
+  CACTUS_SPINES,
   CRYPT_FLOOR,
   CRYPT_HI,
   CRYPT_LO,
   CRYPT_WALL,
+  CRYSTAL_FACES,
+  furrowAt,
   GRANITE,
   GRANITE_CRACK,
   GRANITE_HI,
+  GRATE_BARS,
   GROTTO_GRAIN,
   GROTTO_ROCK,
+  HAZARD_LOOK,
   HEATH_FROST,
   HEATH_MOSS,
   HEATHER,
   HEATHER_HI,
+  isSideRoot,
+  JACKS,
   LICHEN,
   PEAT,
   PEAT_ROOT,
   PUFFBALL,
   PUFFBALL_SHADE,
+  ROOT_FURROWS,
+  ROOT_STEMS,
   rootAt,
+  SLATE_H,
+  SLATE_W,
+  SPIKE_XS,
+  slateJoint,
   TILE_COLORS,
   Tile,
   type TileFaces,
@@ -99,6 +112,10 @@ const RECIPES: Partial<Record<Tile, Recipe>> = {
   [Tile.RootEarth]: rootEarth,
   [Tile.Vine]: vine,
   [Tile.Bramble]: bramble,
+  [Tile.Crystal]: crystal,
+  [Tile.Root]: root,
+  [Tile.YewHedge]: yewHedge,
+  [Tile.RoofSlate]: roofSlate,
 };
 
 const T = TILE_FINE;
@@ -410,6 +427,38 @@ function vine(s: FineCanvas, o: Origin): void {
 // its shadowed foot in loulou; the thorns cut to points (5 of their 9 fine
 // px, L1's least); the berry a disc with a pancho glint.
 function bramble(s: FineCanvas, o: Origin): void {
+  if (o.faces.hazard === HAZARD_LOOK.spikes) {
+    spikes(s, o);
+    return;
+  }
+  if (o.faces.hazard === HAZARD_LOOK.embers) {
+    embers(s, o);
+    return;
+  }
+  if (o.faces.hazard === HAZARD_LOOK.cactus) {
+    cactus(s, o);
+    return;
+  }
+  if (o.faces.hazard === HAZARD_LOOK.hotPipes) {
+    hotPipes(s, o);
+    return;
+  }
+  if (o.faces.hazard === HAZARD_LOOK.thornyRoots) {
+    thornyRoots(s, o);
+    return;
+  }
+  if (o.faces.hazard === HAZARD_LOOK.jacks) {
+    jacks(s, o);
+    return;
+  }
+  if (o.faces.hazard === HAZARD_LOOK.mousetraps) {
+    mousetrap(s, o);
+    return;
+  }
+  if (o.faces.hazard === HAZARD_LOOK.furnaceGrate) {
+    furnaceGrate(s, o);
+    return;
+  }
   const { x, y, tx } = o;
   const stems = [
     { at: 2, top: 4 },
@@ -440,6 +489,241 @@ function bramble(s: FineCanvas, o: Origin): void {
   }
 }
 
+// Spikes: the classic shafts on the fine grid, each a topaz highlight, a
+// dimGray face and a valhalla edge; the heather tip lit down its left side
+// and shaded on its right, with the point a lightSteel glint; the base plate
+// lit along its top.
+function spikes(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  s.rect(box(x, y + T - 6, T, 6), DB32.valhalla).rect(box(x, y + T - 6, T, 1), DB32.dimGray);
+  for (const [i, sx] of SPIKE_XS.entries()) {
+    const top = y + FINE * (5 - ((tx + i) % 2));
+    const fx = x + FINE * sx;
+    s.rect(box(fx, top + 6, 6, y + T - 6 - top - 6), DB32.dimGray)
+      .rect(box(fx, top + 6, 1, y + T - 12 - top), DB32.topaz)
+      .rect(box(fx + 5, top + 6, 1, y + T - 12 - top), DB32.valhalla);
+    s.rect(box(fx, top, 6, 6), DB32.heather)
+      .rect(box(fx, top, 1, 6), DB32.lightSteel)
+      .rect(box(fx + 5, top + 2, 1, 4), DB32.dimGray);
+    s.rect(box(fx, top - 3, 3, 3), DB32.heather).set(fx + 1, top - 3, DB32.lightSteel);
+  }
+}
+
+// Embers: the classic coals on the fine grid, each a rounded lump with a lit
+// heart, over a bed of loulou dithered with clairvoyant where it glows.
+function embers(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty } = o;
+  s.rect(box(x, y + 30, T, 18), DB32.loulou).dither(box(x, y + 30, T, 6), half(DB32.clairvoyant));
+  for (let i = 0; i < 6; i++) {
+    const cx = x + FINE * Math.floor(h(tx, ty, 220 + i) * 13);
+    const cy = y + FINE * (9 + Math.floor(h(tx, ty, 230 + i) * 5));
+    s.rect(box(cx + 1, cy, 7, 6), i < 3 ? DB32.clairvoyant : DB32.brown).rect(
+      box(cx, cy + 1, 9, 4),
+      i < 3 ? DB32.clairvoyant : DB32.brown,
+    );
+    s.rect(box(cx + 3, cy + 2, 3, 2), i < 3 ? DB32.brown : DB32.tahitiGold);
+  }
+  s.rect(box(x + FINE * (3 + (tx % 3) * 3), y + 33, 6, 3), DB32.tahitiGold);
+  s.rect(box(x + FINE * (9 - (ty % 2) * 4), y + 39, 3, 3), DB32.goldenFizz);
+}
+
+// Yew hedge: dell with a quarter dither of eltGreen for depth, the leaf
+// flecks as little christi sprays with a lit tip, the clipped top a
+// rainforest band lit along its edge, the shadow under it valhalla.
+function yewHedge(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty } = o;
+  fill(s, o, DB32.dell);
+  s.dither(box(x, y + 6, T, T - 6), quarter(DB32.eltGreen));
+  for (let i = 0; i < 6; i++) {
+    const fx = x + FINE * Math.floor(h(tx, ty, 240 + i) * 14);
+    const fy = y + FINE * (2 + Math.floor(h(tx, ty, 250 + i) * 12));
+    const leaf = i < 4 ? DB32.christi : DB32.eltGreen;
+    s.rect(box(fx, fy, 6, 2), leaf)
+      .rect(box(fx + 1, fy + 2, 4, 1), leaf)
+      .set(fx + 4, fy, DB32.pancho);
+  }
+  if (o.faces.up)
+    s.rect(box(x, y, T, 6), DB32.rainforest)
+      .rect(box(x, y, T, 1), DB32.pancho)
+      .dither(box(x, y + 6, T, 2), half(DB32.rainforest));
+  if (o.faces.down) s.rect(box(x, y + T - 3, T, 3), DB32.valhalla);
+}
+
+// Cactus: the classic shape on the fine grid, its body rounded at the top,
+// the ribs lit down one side, the spines white with a lightSteel root.
+function cactus(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  const right = h(tx, 0, 260) < 0.5;
+  s.rect(box(x + 15, y + 9, 18, 39), DB32.dell).rect(box(x + 18, y + 6, 12, 3), DB32.dell);
+  const ax = right ? x + 33 : x + 6;
+  s.rect(box(ax, y + 24, 9, 6), DB32.dell).rect(box(right ? ax + 3 : ax, y + 15, 6, 9), DB32.dell);
+  for (const rx of [6, 9])
+    s.rect(box(x + FINE * rx, y + 9, 3, 39), DB32.eltGreen).rect(box(x + FINE * rx, y + 9, 1, 39), DB32.christi);
+  for (const [sx, sy] of CACTUS_SPINES) {
+    s.rect(box(x + FINE * sx, y + FINE * sy, 3, 3), DB32.white).set(
+      x + FINE * sx + 1,
+      y + FINE * sy + 2,
+      DB32.lightSteel,
+    );
+  }
+}
+
+// Hot pipes: the classic pipes on the fine grid, rounded with a lit top and
+// a shaded underside, the seam glowing brown dithered into tahitiGold.
+function hotPipes(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  for (const py of [6, 11]) {
+    const top = y + FINE * py;
+    s.rect(box(x, top, T, 12), DB32.dimGray)
+      .rect(box(x, top, T, 2), DB32.heather)
+      .rect(box(x, top + 1, T, 1), DB32.lightSteel)
+      .rect(box(x, top + 6, T, 3), DB32.brown)
+      .dither(box(x, top + 6, T, 3), half(DB32.tahitiGold))
+      .rect(box(x, top + 10, T, 2), DB32.valhalla);
+  }
+  s.rect(box(x + FINE * (2 + (tx % 3) * 4), y + 24, 9, 3), DB32.tahitiGold);
+  if (tx % 2 === 0) s.rect(box(x + 21, y + 18, 6, 27), DB32.valhalla).rect(box(x + 21, y + 18, 1, 27), DB32.dimGray);
+}
+
+// Thorny roots: the classic stems on the fine grid, lit down their left in
+// loulou and edged rope, each thorn a rope hook pointing out and down.
+function thornyRoots(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  for (const [i, stem] of ROOT_STEMS.entries()) {
+    const sx = x + FINE * (stem.at + ((tx + i) % 2));
+    const top = y + FINE * stem.top;
+    s.rect(box(sx, top, 6, y + T - top), DB32.oiledCedar).rect(box(sx, top, 2, y + T - top), DB32.loulou);
+    s.rect(box(sx + 5, top, 1, y + T - top), DB32.rope);
+    for (let ty = stem.top + 2; ty < TILE_SIZE_LOGICAL - 2; ty += 4) {
+      const ly = y + FINE * ty;
+      s.rect(box(sx - 3, ly, 3, 2), DB32.rope).set(sx - 3, ly + 2, DB32.rope);
+      const ry = ly + FINE * 2;
+      s.rect(box(sx + 6, ry, 3, 2), DB32.rope).set(sx + 8, ry + 2, DB32.rope);
+    }
+  }
+}
+
+// Jacks: the classic stars on the fine grid, each arm lit lightSteel on its
+// upper or left side and shaded topaz on the other, cut to a point at its tip
+// (7 of the tip's 9 fine px), the heart lightSteel with a white glint.
+function jacks(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  for (const [jx, jy] of JACKS) {
+    const cx = x + FINE * (jx + (tx % 2));
+    const cy = y + FINE * jy;
+    s.rect(box(cx - 6, cy, 15, 3), DB32.heather)
+      .rect(box(cx - 6, cy, 15, 1), DB32.lightSteel)
+      .rect(box(cx - 6, cy + 2, 15, 1), DB32.topaz);
+    s.rect(box(cx, cy - 6, 3, 15), DB32.heather)
+      .rect(box(cx, cy - 6, 1, 15), DB32.lightSteel)
+      .rect(box(cx + 2, cy - 6, 1, 15), DB32.topaz);
+    s.rect(box(cx, cy, 3, 3), DB32.lightSteel).set(cx, cy, DB32.white);
+    s.clear([
+      [cx - 6, cy],
+      [cx - 6, cy + 2],
+      [cx + 8, cy],
+      [cx + 8, cy + 2],
+      [cx, cy - 6],
+      [cx + 2, cy - 6],
+      [cx, cy + 8],
+      [cx + 2, cy + 8],
+    ]);
+  }
+}
+
+// Mousetrap: the classic trap on the fine grid — the board lit twine along
+// its rounded top edge with a line of grain, shaded oiledCedar into loulou
+// under; the bar a white glint over lightSteel shading to heather, its
+// corners bent round; the spring dimGray coiled in heather; the cheese
+// pancho, shaded twine, with a hole.
+function mousetrap(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  s.rect(box(x + 3, y + 36, 42, 12), DB32.rope)
+    .rect(box(x + 3, y + 36, 42, 2), DB32.twine)
+    .dither(box(x + 3, y + 38, 42, 2), half(DB32.twine))
+    .rect(box(x + 9, y + 41, 14, 1), DB32.oiledCedar)
+    .rect(box(x + 3, y + 45, 42, 2), DB32.oiledCedar)
+    .rect(box(x + 3, y + 47, 42, 1), DB32.loulou);
+  s.clear([
+    [x + 3, y + 36],
+    [x + 44, y + 36],
+  ]);
+  s.rect(box(x + 9, y + 24, 30, 3), DB32.lightSteel)
+    .rect(box(x + 12, y + 24, 24, 1), DB32.white)
+    .rect(box(x + 12, y + 26, 24, 1), DB32.heather);
+  for (const px of [9, 36])
+    s.rect(box(x + px, y + 27, 3, 9), DB32.lightSteel).rect(box(x + px + 2, y + 27, 1, 9), DB32.heather);
+  s.clear([
+    [x + 9, y + 24],
+    [x + 38, y + 24],
+  ]);
+  s.rect(box(x + 18, y + 30, 9, 6), DB32.dimGray)
+    .rect(box(x + 18, y + 30, 9, 1), DB32.heather)
+    .rect(box(x + 18, y + 33, 9, 1), DB32.heather);
+  if (tx % 2 === 0) {
+    s.rect(box(x + 30, y + 30, 6, 6), DB32.pancho)
+      .rect(box(x + 30, y + 35, 6, 1), DB32.twine)
+      .rect(box(x + 35, y + 30, 1, 6), DB32.twine)
+      .rect(box(x + 32, y + 32, 2, 1), DB32.twine);
+  }
+}
+
+// Furnace grate: the classic coals on the fine grid, brown eased into the
+// tahitiGold heart by half dithers and cooling to clairvoyant at the bottom,
+// the spark goldenFizz with a white glint; the bars dimGray lit heather down
+// their left and shaded valhalla down their right, the cross-bar lit
+// lightSteel along its top and shaded under.
+function furnaceGrate(s: FineCanvas, o: Origin): void {
+  const { x, y, tx } = o;
+  s.rect(box(x, y + 18, T, 30), DB32.brown)
+    .rect(box(x, y + 30, T, 9), DB32.tahitiGold)
+    .dither(box(x, y + 27, T, 3), half(DB32.tahitiGold))
+    .dither(box(x, y + 39, T, 3), half(DB32.tahitiGold))
+    .rect(box(x, y + 45, T, 3), DB32.clairvoyant);
+  const sx = x + FINE * (2 + (tx % 3) * 4);
+  s.rect(box(sx, y + 33, 6, 3), DB32.goldenFizz).set(sx + 1, y + 33, DB32.white);
+  for (const bx of GRATE_BARS) {
+    const fx = x + FINE * bx;
+    s.rect(box(fx, y + 18, 6, 30), DB32.dimGray)
+      .rect(box(fx, y + 18, 1, 30), DB32.heather)
+      .rect(box(fx + 5, y + 18, 1, 30), DB32.valhalla);
+  }
+  s.rect(box(x, y + 18, T, 6), DB32.dimGray)
+    .rect(box(x, y + 18, T, 1), DB32.lightSteel)
+    .rect(box(x, y + 19, T, 2), DB32.heather)
+    .rect(box(x, y + 23, T, 1), DB32.valhalla);
+}
+
+// ---------------------------------------------------------------- the potting shed's roof
+
+// Roof slate: the classic slates on the fine grid. Each slate deepKoamaru,
+// a quarter of venice over its lower half where it catches the light, its
+// lower edge heather with a 1-fine valhalla gap under it, and at each joint
+// a valhalla gap then the next slate's lit heather edge. Moss on some: a
+// dell speck with its eltGreen partner above it (L6), by tileHash. The ridge
+// lightSteel shading to heather where air is above.
+function roofSlate(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty } = o;
+  const row = FINE * SLATE_H;
+  fill(s, o, DB32.deepKoamaru);
+  for (let r = 0; r < T / row; r++) {
+    const top = y + r * row;
+    s.dither(box(x, top + 5, T, 4), quarter(DB32.venice));
+    s.rect(box(x, top + 9, T, 2), DB32.heather).rect(box(x, top + 11, T, 1), DB32.valhalla);
+    for (let jx = slateJoint(ty * (T / row) + r); jx < 16; jx += SLATE_W) {
+      const fx = x + FINE * jx;
+      s.rect(box(fx, top, 1, 9), DB32.valhalla).rect(box(fx + 1, top, 2, 9), DB32.heather);
+    }
+  }
+  for (let i = 0; i < 4; i++) {
+    if (h(tx, ty, 790 + i) >= 0.45) continue;
+    const mx = x + Math.floor(h(tx, ty, 794 + i) * 44);
+    const my = y + row * Math.floor(h(tx, ty, 798 + i) * 4) + 7;
+    s.rect(box(mx, my, 2, 1), DB32.dell).rect(box(mx, my - 1, 2, 1), DB32.eltGreen);
+  }
+  if (o.faces.up) s.rect(box(x, y, T, 2), DB32.lightSteel).rect(box(x, y + 2, T, 1), DB32.heather);
+}
+
 // ---------------------------------------------------------------- stone of the hills
 
 function grottoRock(s: FineCanvas, o: Origin): void {
@@ -468,6 +752,57 @@ function grottoRock(s: FineCanvas, o: Origin): void {
       .set(cx + 1, cy + 2, DB32.viking);
     s.set(cx + 1, cy + 1, DB32.lightSteel);
   }
+}
+
+// Crystal: the classic prism on the fine grid, each face eased into the next
+// with a half dither (L5) — the bevel into the lit face, the shaded face into
+// its dark edge — so the column reads as rounded glass, not stripes; the
+// glint a white fleck with a lightSteel tail, and the white top edge with a
+// dithered lightSteel band under it.
+function crystal(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty } = o;
+  for (const [fx, w, color] of CRYSTAL_FACES) s.rect(box(x + FINE * fx, y, FINE * w, T), color);
+  s.dither(box(x + 9, y, 3, T), half(DB32.lightSteel))
+    .dither(box(x + 39, y, 3, T), half(DB32.venice))
+    .dither(box(x + 27, y, 3, T), half(DB32.lightSteel));
+  if (h(tx, ty, 200) < 0.4) {
+    const gy = y + FINE * (3 + Math.floor(h(tx, ty, 201) * 9));
+    s.rect(box(x + 12, gy, 2, 4), DB32.white).rect(box(x + 12, gy + 4, 2, 2), DB32.lightSteel);
+  }
+  if (o.faces.up) {
+    s.rect(box(x, y, T, 2), DB32.white)
+      .rect(box(x + 3, y + 2, T - 6, 2), DB32.lightSteel)
+      .dither(box(x + 3, y + 4, T - 6, 2), half(DB32.lightSteel));
+  }
+  if (o.faces.down) s.rect(box(x, y + T - 3, T, 3), DB32.venice);
+}
+
+// Root: the classic furrows on the fine grid, sampled three times as finely
+// so they wander smoothly — a 2-fine loulou groove with a 1-fine rope ridge
+// lit beside it. The knot a ring with a lit heart; a side root's top lit with a
+// dithered twine band, its underside eased into valhalla.
+function root(s: FineCanvas, o: Origin): void {
+  const { x, y, tx, ty, faces } = o;
+  const side = isSideRoot(faces);
+  fill(s, o, DB32.oiledCedar);
+  for (const [line, base] of ROOT_FURROWS.entries()) {
+    for (let i = 0; i < T; i++) {
+      const along = (side ? tx : ty) * 16 + i / FINE;
+      const across = Math.min(14, Math.max(1, base + furrowAt(along, line + (side ? ty : tx))));
+      const at = FINE * across;
+      if (side) s.rect(box(x + i, y + at, 1, 2), DB32.loulou).set(x + i, y + at - 1, DB32.rope);
+      else s.rect(box(x + at, y + i, 2, 1), DB32.loulou).set(x + at + 3, y + i, DB32.rope);
+    }
+  }
+  if (h(tx, ty, 210) < 0.08) {
+    s.disc({ cx: x + 24, cy: y + 24, r: 6 }, DB32.loulou).disc({ cx: x + 24, cy: y + 24, r: 3 }, DB32.rope);
+    s.set(x + 23, y + 23, DB32.twine);
+  }
+  if (faces.up)
+    s.rect(box(x, y, T, 2), DB32.rope)
+      .rect(box(x + 6, y, T - 12, 1), DB32.twine)
+      .dither(box(x, y + 2, T, 2), half(DB32.rope));
+  if (faces.down) s.dither(box(x, y + 40, T, 2), half(DB32.valhalla)).rect(box(x, y + 42, T, 6), DB32.valhalla);
 }
 
 // Heath: frost along the top, moss, peat underneath reached through two

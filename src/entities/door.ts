@@ -169,7 +169,7 @@ export class Door implements Entity {
   // with the key and the name of the level beyond. A landmark's "!" is not
   // enough here — the question at a door is not whether, but where to.
   private makeSimplePrompt(): Container {
-    return this.makeLabel(this.destination ? `E  ${this.destination}` : 'E');
+    return makePromptLabel(this.destination ? `E  ${this.destination}` : 'E');
   }
 
   // Full tutorial tooltip — "press E to enter" by default; doors can pass a
@@ -177,31 +177,33 @@ export class Door implements Entity {
   // "press E to climb" for a future ladder).
   private makeTutorialPrompt(): Container {
     const action = `press E to ${this.spec.promptLabel ?? 'enter'}`;
-    return this.makeLabel(this.destination ? `${action}: ${this.destination}` : action);
+    return makePromptLabel(this.destination ? `${action}: ${this.destination}` : action);
   }
+}
 
-  private makeLabel(label: string): Container {
-    const c = new Container();
-    const text = new ArtText({
-      text: label,
-      style: { fontFamily: 'monospace', fontSize: 7, fill: DB32.valhalla },
-    });
-    const pad = 3;
-    const w = Math.ceil(text.classic.width);
-    const h = Math.ceil(text.classic.height);
-    const boxBottom = -25;
-    const boxTop = boxBottom - h - pad * 2;
+// A prompt over an interactable: the label in a small parchment box, its
+// bottom 25 px above the thing's base. Shared by doors and levers.
+export function makePromptLabel(label: string): Container {
+  const c = new Container();
+  const text = new ArtText({
+    text: label,
+    style: { fontFamily: 'monospace', fontSize: 7, fill: DB32.valhalla },
+  });
+  const pad = 3;
+  const w = Math.ceil(text.classic.width);
+  const h = Math.ceil(text.classic.height);
+  const boxBottom = -25;
+  const boxTop = boxBottom - h - pad * 2;
 
-    const bg = new Graphics()
-      .rect(-w / 2 - pad, boxTop, w + pad * 2, boxBottom - boxTop)
-      .fill(DB32.pancho)
-      .stroke({ color: DB32.oiledCedar, width: 1 });
-    text.position.set(-w / 2, boxTop + pad);
+  const bg = new Graphics()
+    .rect(-w / 2 - pad, boxTop, w + pad * 2, boxBottom - boxTop)
+    .fill(DB32.pancho)
+    .stroke({ color: DB32.oiledCedar, width: 1 });
+  text.position.set(-w / 2, boxTop + pad);
 
-    c.addChild(bg);
-    c.addChild(text);
-    return c;
-  }
+  c.addChild(bg);
+  c.addChild(text);
+  return c;
 }
 
 // The beacon: a golden lantern-diamond with a white heart and a small arrow

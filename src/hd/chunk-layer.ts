@@ -76,6 +76,17 @@ export class ChunkLayer {
     }
   }
 
+  // Frees every chunk the area touches, to be baked again the next time it
+  // is shown: a lamp in a lit level has come on.
+  repaint(area: LogicalRect): void {
+    for (const [col, row] of this.cellsIn(area, 0)) {
+      const chunk = this.chunks.get(key(col, row));
+      if (!chunk) continue;
+      free(chunk);
+      this.chunks.delete(key(col, row));
+    }
+  }
+
   destroy(): void {
     for (const chunk of this.chunks.values()) free(chunk);
     this.chunks.clear();

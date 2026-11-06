@@ -2,7 +2,7 @@ import type { DecorationSpec } from '@entities/decoration';
 import type { Entity, InteractContext } from '@entities/entity';
 import type { LandmarkSpec } from '@entities/landmark';
 import type { Vec2 } from '@types';
-import { Tilemap } from '@world/tilemap';
+import { type HazardRegion, Tilemap } from '@world/tilemap';
 
 // A named point inside a level. Doors target these by id, the level's default
 // spawn is one of these by id, and respawn/teleport features will reuse the
@@ -82,6 +82,8 @@ export const ROOM_BACKDROP = {
   brick: 'brick',
   earth: 'earth',
   pool: 'pool',
+  // No wall at all: the night sky shows through, over the roof.
+  sky: 'sky',
 } as const;
 export type RoomBackdrop = (typeof ROOM_BACKDROP)[keyof typeof ROOM_BACKDROP];
 
@@ -96,6 +98,8 @@ export interface LitRoom extends TileRect {
   // The camera holds still on this room while the player is in it, instead
   // of following them: the shed, so that it looks no bigger than outside.
   holdsCamera?: boolean;
+  // Out under the sky (the shed's roof): never dark, so never revealed.
+  outdoors?: boolean;
 }
 
 // A light in a lit level, in tiles: a lamp, a candle, the stove (warm: they
@@ -108,6 +112,8 @@ export interface LightSource {
   radius: number;
   strength: number;
   warm: boolean;
+  // A checkpoint's lamp: dark until the checkpoint of this id is lit.
+  lamp?: string;
 }
 
 // A level lit room by room. HD only: classic draws it as it draws any dark
@@ -160,6 +166,9 @@ export interface LevelSpec {
   backdropRegions?: readonly BackdropRegion[];
   // Water that flows (the meadow's underground river).
   currents?: readonly WaterCurrent[];
+  // Where hazard tiles are drawn as something other than brambles (the
+  // keep's spikes and hearth embers).
+  hazardLooks?: readonly HazardRegion[];
   // True when sky lies above the top row, so the camera may follow a jump
   // above it. False under a ceiling: the camera stops at row 0.
   openSky: boolean;
@@ -179,7 +188,7 @@ export class Level {
 
   constructor(spec: LevelSpec) {
     this.spec = spec;
-    this.tilemap = Tilemap.fromAscii(spec.rows);
+    this.tilemap = Tilemap.fromAscii(spec.rows, spec.hazardLooks);
   }
 
   spawn(id: string): SpawnPoint {

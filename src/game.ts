@@ -2,12 +2,15 @@ import { DB32, PHYSICS_STEP, PHYSICS_STEP_SLACK, SCREEN_HEIGHT, SCREEN_WIDTH, TI
 import { Bird, drawBird } from '@entities/bird';
 import { Cairn, cairnLitFlag } from '@entities/cairn';
 import { isCritter } from '@entities/critter';
+import { CrystalGate, gateOpenFlag } from '@entities/crystal-gate';
+import { CrystalSwitch, crystalLitFlag } from '@entities/crystal-switch';
 import { Decoration } from '@entities/decoration';
 import { Door } from '@entities/door';
 import type { Entity, InteractContext } from '@entities/entity';
 import { drawFishLarge, Fish } from '@entities/fish';
 import { drawGlowfishLarge, Glowfish } from '@entities/glowfish';
 import { Landmark } from '@entities/landmark';
+import { connectLevers } from '@entities/lever';
 import { drawMothLarge, Moth } from '@entities/moth';
 import { drawOwl, Owl } from '@entities/owl';
 import { Player } from '@entities/player';
@@ -481,6 +484,7 @@ export class Game {
       this.checkCritterEncounters();
       this.noticeNearbyPlants();
       this.checkCairns();
+      this.checkCrystals();
 
       if (!this.respawning) this.runInteractionLoop();
 
@@ -692,7 +696,8 @@ export class Game {
 
     // The ground in HD, in the same place in the layer; art-mode shows one.
     const lighting = level.spec.lighting;
-    this.light = lighting ? new LightField(tilemap, lighting) : null;
+    const lampLit = (lamp: string) => this.worldState.get(cairnLitFlag(level.spec.id, lamp));
+    this.light = lighting ? new LightField(tilemap, lighting, lampLit) : null;
     this.groundHd = new GroundHd(level, this.light);
     this.levelLayer.addChild(classicGround, this.groundHd.container);
     this.groundArt = registerArt({ classic: classicGround, hd: this.groundHd.container });
@@ -730,6 +735,8 @@ export class Game {
     // pose because its target flag is already true).
     const ctx = this.makeInteractContext();
     this.currentEntities = [...level.spec.createEntities(ctx)];
+    // Every lever is handed what it drives, and sets it if it is down.
+    connectLevers(this.currentEntities);
     // Every door is told the name of the level it leads to, for its prompt.
     for (const entity of this.currentEntities) {
       if (entity instanceof Door) entity.setDestination(LEVEL_SPECS[entity.spec.targetLevelId as LevelId].name);
@@ -789,6 +796,7 @@ export class Game {
     return {
       transitionTo: (levelId, spawnId) => this.transitionTo(levelId, spawnId),
       worldState: this.worldState,
+      audio: this.audio,
     };
   }
 
@@ -1062,10 +1070,15 @@ export class Game {
     const boxes = this.currentEntities.flatMap((entity) => entity.solids?.() ?? []);
     const ground = { tilemap, boxes };
     for (const entity of this.currentEntities) entity.step?.(dt, { player: this.player, ground });
-    this.player.update(this.stepInput, dt, { ...ground, currents: this.currentLevel.spec.currents ?? [] });
+    const grips = this.currentEntities.flatMap((entity) => entity.grips?.() ?? []);
+    const waters = this.currentEntities.flatMap((entity) => entity.waters?.() ?? []);
+    const calm = this.currentEntities.flatMap((entity) => entity.calm?.() ?? []);
+    const currents = this.currentLevel.spec.currents ?? [];
+    this.player.update(this.stepInput, dt, { ...ground, currents, grips, waters, calm });
   }
 
-  // Whether the player's box, inset by HAZARD_INSET, is on a hazard tile.
+  // Whether the player's box, inset by HAZARD_INSET, is on a hazard tile, or
+  // touches an entity that hurts (a falling stone).
   private touchesHazard(): boolean {
     const { pos, size } = this.player;
     const map = this.currentLevel.tilemap;
@@ -1076,7 +1089,7 @@ export class Game {
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) if (isHazard(map.at(tx, ty))) return true;
     }
-    return false;
+    return this.currentEntities.some((entity) => entity.hurts?.(pos, size));
   }
 
   // Under the wave, back to the last cairn, and out again: the world stands
@@ -1103,7 +1116,32 @@ export class Game {
       if (entity.isLit) continue;
       entity.light();
       this.worldState.set(cairnLitFlag(levelId, entity.id), true);
+      // In a lit level, its lamp's light comes on with it.
+      const area = this.light?.lampArea(entity.id);
+      if (area) this.groundHd?.repaint(area);
       this.audio.noteWritten();
+    }
+  }
+
+  // Lights a switch crystal the player touches, and opens every gate whose
+  // switches are all lit.
+  private checkCrystals(): void {
+    const levelId = this.currentLevel.spec.id;
+    let lit = false;
+    for (const entity of this.currentEntities) {
+      if (!(entity instanceof CrystalSwitch) || entity.isLit) continue;
+      if (!entity.isPlayerInRange(this.player.pos, this.player.size)) continue;
+      entity.light();
+      this.worldState.set(crystalLitFlag(levelId, entity.id), true);
+      this.audio.chime(entity.pitch);
+      lit = true;
+    }
+    if (!lit) return;
+    for (const entity of this.currentEntities) {
+      if (!(entity instanceof CrystalGate) || entity.isOpen) continue;
+      if (!entity.switches.every((id) => this.worldState.get(crystalLitFlag(levelId, id)))) continue;
+      entity.open();
+      this.worldState.set(gateOpenFlag(levelId, entity.id), true);
     }
   }
 

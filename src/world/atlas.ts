@@ -71,8 +71,8 @@ export const ATLAS: readonly AtlasPlace[] = [
     y: 126,
     from: 'meadow',
     howTo:
-      'From the meadow: down into the Roots under the forest, and through the Maze to its bottom gallery. ' +
-      'The crack in the rock is at its far western end.',
+      'From the meadow: through the Maze under the forest to its bottom gallery; the crack is at its far ' +
+      "west end. Or down the hollow at the tall oak's foot.",
     draw(g) {
       g.rect(-10, -7, 20, 14).fill(0x1a2030);
       g.rect(-7, -4, 14, 10).fill(0x0c1220);
@@ -108,8 +108,8 @@ export const ATLAS: readonly AtlasPlace[] = [
     y: 82,
     from: 'old-keep',
     howTo:
-      'From the keep: the door in the back wall of the entry hall, between the last gold column and the big ' +
-      'iron kettle.',
+      "From the keep: the door in the entry hall's back wall, by the big iron kettle. Or the grate at the " +
+      'east end of the sewers.',
     draw(g) {
       g.rect(-10, -8, 20, 15).fill(0xeaa25f);
       g.rect(-10, 3, 20, 4).fill(DB32.oiledCedar);

@@ -145,25 +145,27 @@ const MEADOW = {
  *
  * Three floors stacked, and the two doors are on different ones: the meadow's door lands the
  * player on the lower floor beside the one back out, and the one down to the crypt is a floor
- * below that. The only way between them is the hole in the lower floor at cols 36-37 — so the
+ * below that. The only way between them is the hole in the lower floor at cols 106-107 — so the
  * chapter walks the length of the hall, drops through it onto the plinth beneath, and walks back.
+ * The hall sits at (+70, +30) in the castle built round it, so every column here is 70 more and
+ * every row 30 more than the hall's own.
  */
 const KEEP = {
-  /** Where the meadow's door puts the player down: col 5, on the lower floor. */
-  spawn: 5 * TILE + 2,
-  /** The hole in the lower floor: cols 36-37. Far enough in to be over it. */
-  floorHole: 36 * TILE + 4,
+  /** Where the meadow's door puts the player down: col 75, on the lower floor. */
+  spawn: 75 * TILE + 2,
+  /** The hole in the lower floor: cols 106-107. Far enough in to be over it. */
+  floorHole: 106 * TILE + 4,
   /**
-   * The plinth under the hole, row 21 at cols 36-37 — the player's own y, standing on it. The fall
+   * The plinth under the hole, row 51 at cols 106-107 — the player's own y, standing on it. The fall
    * through the hole lands here, and the walk left steps off it onto the basement floor.
    */
-  plinthY: 21 * TILE - TILE,
+  plinthY: 51 * TILE - TILE,
   /**
-   * The door down to the crypt: col 8, at the foot of the basement's left pillar. The pillar is
-   * solid, so the walk left ends against it at x=144 — centre 150, fourteen pixels from the door's
-   * own 136, inside the sixteen the interact range allows.
+   * The door down to the crypt: col 78, at the foot of the basement's left pillar. The pillar is
+   * solid, so the walk left ends against it — centre fourteen pixels from the door's own, inside
+   * the sixteen the interact range allows.
    */
-  descendDoor: 9 * TILE + 1,
+  descendDoor: 79 * TILE + 1,
 } as const;
 
 /** The crypt, from `src/world/levels/old-keep-crypt.ts`. */

@@ -1,4 +1,5 @@
-import { DB32 } from '@constants';
+import { DB32, TILE_SIZE } from '@constants';
+import type { LogicalRect } from '@hd/chunk-layer';
 import { FINE, type FineCanvas } from '@hd/fine-canvas';
 import { bayer, LIT_RAMP } from '@hd/palette';
 import type { Vec2 } from '@types';
@@ -21,9 +22,13 @@ const WALL_SHARE = 0.55;
 // room's own, interpolated between tile centres, plus every source within
 // reach, its strength times (1 - d/r) to the power 1.5. Drawn by stepping
 // each pixel down (or up) its ramp, never by a new tone.
+// Whether the checkpoint of a lamp has been lit (see LightSource.lamp).
+export type LampLit = (lamp: string) => boolean;
+
 export class LightField {
   private readonly rooms: readonly LitRoom[];
-  private readonly lights: readonly LightSource[];
+  private readonly sources: readonly LightSource[];
+  private readonly lampLit: LampLit;
   private readonly width: number;
   private readonly height: number;
   // Per tile: the room it belongs to (-1: none), its ambient light, and for
@@ -32,9 +37,10 @@ export class LightField {
   private readonly ambient: Float32Array;
   private readonly wall: Int16Array;
 
-  constructor(map: Tilemap, lighting: LevelLighting) {
+  constructor(map: Tilemap, lighting: LevelLighting, lampLit: LampLit = () => true) {
     this.rooms = lighting.rooms;
-    this.lights = lighting.lights;
+    this.sources = lighting.lights;
+    this.lampLit = lampLit;
     this.width = map.width;
     this.height = map.height;
     const n = map.width * map.height;
@@ -65,6 +71,20 @@ export class LightField {
     if (tx < 0 || ty < 0 || tx >= this.width || ty >= this.height) return null;
     const i = this.wall[ty * this.width + tx];
     return i >= 0 ? this.rooms[i] : null;
+  }
+
+  // The lights that shine: every one but a lamp whose checkpoint is unlit.
+  private get lights(): readonly LightSource[] {
+    return this.sources.filter((s) => s.lamp === undefined || this.lampLit(s.lamp));
+  }
+
+  // Where a lamp's light falls, in logical px: what has to be baked again
+  // once it is lit. Null for a lamp the level has no light for.
+  lampArea(lamp: string): LogicalRect | null {
+    const s = this.sources.find((l) => l.lamp === lamp);
+    if (!s) return null;
+    const T = TILE_SIZE;
+    return { x: (s.x - s.radius) * T, y: (s.y - s.radius) * T, w: 2 * s.radius * T, h: 2 * s.radius * T };
   }
 
   // The light at a fine pixel of the world.
