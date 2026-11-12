@@ -298,9 +298,42 @@ write_zeus_marker() {
     "mkdir -p '$RELEASES_DIR' && printf '%s\n' '$(git rev-parse HEAD)' > '$ZEUS_MARKER'"
 }
 
+# The laptop is short on disk: a deploy leaves no build output behind, whether it succeeds or not.
+# `dist` is the release itself (built here, uploaded as is: ks-b never builds), so it is deleted only
+# once it has been uploaded, on exit. `test-results` is Playwright's run record from a demo-film take.
+# The film itself (`e2e/demo/out`) is a product, not build output, and is never touched.
+clean_local_build() {
+  # Runs on exit, after a failure too: the ERR trap must not report the deploy a second time.
+  trap - ERR
+  local dir="$PROJECT_DIR" target
+  local freed=()
+  for target in dist test-results; do
+    if [ -d "$dir/$target" ]; then
+      freed+=("$(du -sh "$dir/$target" 2>/dev/null | cut -f1 || true) $target")
+      rm -rf -- "${dir:?}/$target"
+    fi
+  done
+  [ ${#freed[@]} -gt 0 ] && log "🧹 Local build output removed: ${freed[*]}"
+  # node_modules too (and a stray `.vite` cache): the next deploy reinstalls it from the lockfile
+  # (`prepare_local_build`). Kept while a Vite dev server runs from this checkout, which loads from
+  # it — matched on this checkout's own vite binary, so another project's Vite does not count.
+  if pgrep -f "$dir/node_modules/.*vite/bin/vite.js" > /dev/null 2>&1; then
+    log "ℹ️  vite is running: local node_modules kept"
+  else
+    if [ -d "$dir/node_modules" ]; then
+      log "🧹 Removing $(du -sh "$dir/node_modules" 2>/dev/null | cut -f1 || true) node_modules"
+      rm -rf -- "${dir:?}/node_modules"
+    fi
+    rm -rf -- "${dir:?}/.vite"
+  fi
+  return 0
+}
+
 prepare_local_build() {
   log "➡️  Installing dependencies"
   cd "$PROJECT_DIR"
+  # Always, not only when node_modules is missing: the previous deploy deleted it
+  # (`clean_local_build`), and this is the build that ships, so it is installed exactly from the lockfile.
   pnpm install --frozen-lockfile
 
   # Mirrors `pnpm build` (tsc --noEmit && vite build): a deploy must not ship what the project's
@@ -509,6 +542,7 @@ __REMOTE_LIST__
 }
 
 deploy() {
+  trap clean_local_build EXIT
   require_command git
   require_command pnpm
   require_command ssh
